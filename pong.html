@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pong</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: 'Courier New', monospace;
+      color: #fff;
+    }
+    canvas {
+      border: 2px solid #333;
+      display: block;
+    }
+    #ui {
+      margin-top: 14px;
+      font-size: 13px;
+      color: #666;
+      text-align: center;
+    }
+    #mode-select {
+      margin-bottom: 18px;
+      display: flex;
+      gap: 12px;
+    }
+    button {
+      background: #222;
+      color: #fff;
+      border: 2px solid #444;
+      padding: 8px 22px;
+      font-family: inherit;
+      font-size: 14px;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    button.active, button:hover { border-color: #fff; }
+    #overlay {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 18px;
+    }
+    #overlay h1 { font-size: 52px; letter-spacing: 10px; }
+    #overlay p  { font-size: 16px; color: #aaa; }
+    #start-btn  { font-size: 16px; padding: 10px 30px; }
+  </style>
+</head>
+<body>
+
+<div id="mode-select">
+  <button id="btn-1p" class="active" onclick="setMode(1)">1 Player</button>
+  <button id="btn-2p"              onclick="setMode(2)">2 Players</button>
+</div>
+
+<div style="position:relative;">
+  <canvas id="c" width="800" height="500"></canvas>
+  <div id="overlay">
+    <h1>PONG</h1>
+    <p id="controls-hint">W/S — Left paddle &nbsp;|&nbsp; &uarr;/&darr; — Right paddle</p>
+    <button id="start-btn" onclick="startGame()">PRESS SPACE or CLICK</button>
+  </div>
+</div>
+
+<div id="ui" id="info"></div>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx    = canvas.getContext('2d');
+
+const W = canvas.width;
+const H = canvas.height;
+const PAD_W = 12, PAD_H = 90, BALL_SIZE = 12;
+const WIN_SCORE = 7;
+
+let mode = 1; // 1 = vs AI, 2 = two players
+
+// Game state
+let state = 'menu'; // menu | playing | paused | over
+let scores = [0, 0];
+let ball, paddles, lastTime;
+
+const keys = {};
+document.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (e.code === 'Space') {
+    if (state === 'menu' || state === 'over') startGame();
+    else if (state === 'playing') state = 'paused';
+    else if (state === 'paused')  state = 'playing';
+  }
+  if (['ArrowUp','ArrowDown','Space'].includes(e.code)) e.preventDefault();
+});
+document.addEventListener('keyup', e => { keys[e.code] = false; });
+
+function setMode(m) {
+  mode = m;
+  document.getElementById('btn-1p').classList.toggle('active', m === 1);
+  document.getElementById('btn-2p').classList.toggle('active', m === 2);
+  document.getElementById('controls-hint').textContent =
+    m === 1
+      ? 'W / S — Your paddle   |   Ball speeds up over time'
+      : 'W / S — Left   |   ↑ / ↓ — Right';
+}
+
+function resetBall(dir = 1) {
+  const angle = (Math.random() * 60 - 30) * Math.PI / 180;
+  const speed = 5;
+  ball = {
+    x: W / 2, y: H / 2,
+    vx: Math.cos(angle) * speed * dir,
+    vy: Math.sin(angle) * speed,
+    speed
+  };
+}
+
+function startGame() {
+  document.getElementById('overlay').style.display = 'none';
+  scores = [0, 0];
+  paddles = [
+    { x: 20,          y: H/2 - PAD_H/2, dy: 0 },
+    { x: W-20-PAD_W,  y: H/2 - PAD_H/2, dy: 0 }
+  ];
+  resetBall(1);
+  state = 'playing';
+  lastTime = null;
+  requestAnimationFrame(loop);
+}
+
+function loop(ts) {
+  const dt = lastTime ? Math.min((ts - lastTime) / 16.67, 3) : 1;
+  lastTime = ts;
+
+  if (state === 'playing') update(dt);
+  draw();
+
+  if (state !== 'over') requestAnimationFrame(loop);
+}
+
+function update(dt) {
+  // --- Player 1 input (left paddle) ---
+  if (keys['KeyW'] || keys['ArrowUp'] && mode === 2)   paddles[0].dy = -7;
+  else if (keys['KeyS'] || keys['ArrowDown'] && mode === 2) paddles[0].dy = 7;
+  else paddles[0].dy = 0;
+
+  // Separate bindings when 1-player so arrow keys don't conflict
+  if (mode === 1) {
+    if (keys['KeyW']) paddles[0].dy = -7;
+    else if (keys['KeyS']) paddles[0].dy = 7;
+    else paddles[0].dy = 0;
+  } else {
+    if (keys['KeyW']) paddles[0].dy = -7;
+    else if (keys['KeyS']) paddles[0].dy = 7;
+    else paddles[0].dy = 0;
+  }
+
+  // --- Player 2 / AI (right paddle) ---
+  if (mode === 2) {
+    if (keys['ArrowUp'])   paddles[1].dy = -7;
+    else if (keys['ArrowDown']) paddles[1].dy = 7;
+    else paddles[1].dy = 0;
+  } else {
+    // Simple AI: tracks ball with limited speed + small lag
+    const center = paddles[1].y + PAD_H / 2;
+    const target  = ball.y;
+    const diff    = target - center;
+    const aiSpeed = Math.min(Math.abs(diff), 5.5);
+    paddles[1].dy = diff > 0 ? aiSpeed : -aiSpeed;
+  }
+
+  // Move paddles
+  paddles.forEach(p => {
+    p.y = Math.max(0, Math.min(H - PAD_H, p.y + p.dy * dt));
+  });
+
+  // Move ball
+  ball.x += ball.vx * dt;
+  ball.y += ball.vy * dt;
+
+  // Top / bottom bounce
+  if (ball.y <= 0) { ball.y = 0; ball.vy = Math.abs(ball.vy); }
+  if (ball.y + BALL_SIZE >= H) { ball.y = H - BALL_SIZE; ball.vy = -Math.abs(ball.vy); }
+
+  // Paddle collision
+  [0, 1].forEach(i => {
+    const p = paddles[i];
+    if (
+      ball.x < p.x + PAD_W && ball.x + BALL_SIZE > p.x &&
+      ball.y < p.y + PAD_H && ball.y + BALL_SIZE > p.y
+    ) {
+      // Reflect
+      ball.vx = (i === 0 ? 1 : -1) * Math.abs(ball.vx);
+      // Add spin based on where ball hits paddle
+      const rel = (ball.y + BALL_SIZE/2) - (p.y + PAD_H/2);
+      ball.vy = rel * 0.2 * (ball.speed / 5);
+
+      // Speed up
+      ball.speed = Math.min(ball.speed * 1.05, 18);
+      const len = Math.hypot(ball.vx, ball.vy);
+      ball.vx = (ball.vx / len) * ball.speed;
+      ball.vy = (ball.vy / len) * ball.speed;
+    }
+  });
+
+  // Scoring
+  if (ball.x < 0) {
+    scores[1]++;
+    checkWin() || setTimeout(() => resetBall(1), 600);
+  }
+  if (ball.x > W) {
+    scores[0]++;
+    checkWin() || setTimeout(() => resetBall(-1), 600);
+  }
+}
+
+function checkWin() {
+  if (scores[0] >= WIN_SCORE || scores[1] >= WIN_SCORE) {
+    state = 'over';
+    const winner = scores[0] >= WIN_SCORE
+      ? (mode === 1 ? 'You Win!' : 'Player 1 Wins!')
+      : (mode === 1 ? 'AI Wins!'  : 'Player 2 Wins!');
+    const ov = document.getElementById('overlay');
+    ov.innerHTML = `
+      <h1 style="font-size:36px;letter-spacing:4px">${winner}</h1>
+      <p style="font-size:18px">${scores[0]} &ndash; ${scores[1]}</p>
+      <button class="active" id="start-btn" onclick="startGame()">Play Again</button>`;
+    ov.style.display = 'flex';
+    requestAnimationFrame(draw);
+    return true;
+  }
+  return false;
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#111';
+  ctx.fillRect(0, 0, W, H);
+
+  // Centre line
+  ctx.setLineDash([12, 12]);
+  ctx.strokeStyle = '#333';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(W/2, 0);
+  ctx.lineTo(W/2, H);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Scores
+  ctx.fillStyle = '#eee';
+  ctx.font = 'bold 56px "Courier New"';
+  ctx.textAlign = 'center';
+  ctx.fillText(scores[0], W/2 - 90, 70);
+  ctx.fillText(scores[1], W/2 + 90, 70);
+
+  // Paddles
+  ctx.fillStyle = '#fff';
+  paddles.forEach(p => {
+    roundRect(p.x, p.y, PAD_W, PAD_H, 4);
+  });
+
+  // Ball
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(ball.x, ball.y, BALL_SIZE, BALL_SIZE);
+
+  // Paused overlay
+  if (state === 'paused') {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 40px "Courier New"';
+    ctx.textAlign = 'center';
+    ctx.fillText('PAUSED', W/2, H/2);
+    ctx.font = '16px "Courier New"';
+    ctx.fillStyle = '#aaa';
+    ctx.fillText('Press SPACE to resume', W/2, H/2 + 36);
+  }
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.fill();
+}
+
+// Initial draw so canvas isn't blank behind overlay
+draw();
+</script>
+</body>
+</html>
