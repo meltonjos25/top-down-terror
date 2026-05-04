@@ -1,0 +1,925 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Morning Workout — Josh & Wife</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d1117;--surface:#161b22;--surface2:#21262d;--surface3:#30363d;
+  --accent:#3fb950;--accent-dim:#1a4226;--accent-glow:#3fb95033;
+  --text:#e6edf3;--muted:#8b949e;--red:#f85149;--yellow:#d29922;--blue:#58a6ff;
+  --border:#30363d;--r:14px;
+}
+html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+#app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+
+/* ---- HEADER ---- */
+.header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:10}
+.header-title{font-size:17px;font-weight:700;letter-spacing:.3px}
+.header-user{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600;cursor:pointer;color:var(--accent)}
+.header-user:hover{background:var(--accent-dim)}
+
+/* ---- SCROLL BODY ---- */
+.body{flex:1;overflow-y:auto;padding:0 0 120px}
+
+/* ---- BUTTONS ---- */
+.btn{display:block;width:100%;padding:15px 20px;border:none;border-radius:var(--r);font-size:16px;font-weight:700;cursor:pointer;text-align:center;transition:opacity .15s,transform .1s}
+.btn:active{transform:scale(.97);opacity:.85}
+.btn-primary{background:var(--accent);color:#000}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border)}
+.btn-ghost{background:transparent;color:var(--muted);font-size:14px;padding:10px}
+.btn-sm{padding:8px 16px;font-size:14px;width:auto;display:inline-block;border-radius:8px}
+
+/* ---- SETUP SCREEN ---- */
+.setup{padding:32px 24px;display:flex;flex-direction:column;gap:20px}
+.setup h1{font-size:26px;font-weight:800;line-height:1.2}
+.setup p{color:var(--muted);font-size:15px;line-height:1.6}
+.setup-steps{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;gap:14px}
+.step{display:flex;gap:12px;align-items:flex-start}
+.step-num{background:var(--accent-dim);color:var(--accent);font-weight:700;font-size:12px;width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.step-text{font-size:14px;line-height:1.5;color:var(--muted)}
+.step-text a{color:var(--blue);text-decoration:none}
+.step-text code{background:var(--surface2);padding:1px 6px;border-radius:4px;font-size:13px;color:var(--accent)}
+input.field{width:100%;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;color:var(--text);font-size:15px;outline:none;transition:border-color .2s}
+input.field:focus{border-color:var(--accent)}
+input.field::placeholder{color:var(--muted)}
+
+/* ---- AUTH SCREEN ---- */
+.auth-screen{padding:48px 24px;display:flex;flex-direction:column;align-items:center;gap:24px;text-align:center}
+.auth-screen h2{font-size:24px;font-weight:800}
+.auth-screen p{color:var(--muted);font-size:15px;line-height:1.6;max-width:320px}
+.logo{font-size:48px;margin-bottom:8px}
+.g-btn{display:flex;align-items:center;gap:12px;background:#fff;color:#1f1f1f;border:none;border-radius:10px;padding:14px 24px;font-size:16px;font-weight:600;cursor:pointer;width:100%;max-width:320px;justify-content:center;transition:box-shadow .2s}
+.g-btn:hover{box-shadow:0 2px 12px #ffffff33}
+.g-btn svg{width:20px;height:20px;flex-shrink:0}
+
+/* ---- USER SELECT ---- */
+.user-select{padding:32px 24px;display:flex;flex-direction:column;gap:16px}
+.user-select h2{font-size:22px;font-weight:800;text-align:center;margin-bottom:8px}
+.user-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--r);padding:24px;cursor:pointer;transition:border-color .2s,background .2s;text-align:center}
+.user-card:hover,.user-card.active{border-color:var(--accent);background:var(--accent-glow)}
+.user-card h3{font-size:20px;font-weight:700;margin-bottom:6px}
+.user-card p{font-size:14px;color:var(--muted)}
+.user-card .icon{font-size:36px;margin-bottom:12px}
+
+/* ---- WORKOUT OVERVIEW ---- */
+.day-header{padding:20px 20px 12px;display:flex;flex-direction:column;gap:4px}
+.day-label{font-size:13px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.8px}
+.day-workout{font-size:22px;font-weight:800}
+.day-meta{display:flex;gap:10px;margin-top:6px}
+.badge{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:3px 10px;font-size:12px;font-weight:600;color:var(--muted)}
+.badge.core{border-color:#3fb95044;color:var(--accent)}
+.badge.arms{border-color:#58a6ff44;color:var(--blue)}
+.badge.rest{border-color:#d2992244;color:var(--yellow)}
+
+.progress-bar-wrap{padding:0 20px 16px}
+.progress-bar-bg{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
+.progress-bar-fill{height:100%;background:var(--accent);border-radius:3px;transition:width .4s ease}
+.progress-label{font-size:12px;color:var(--muted);margin-bottom:6px}
+
+.block-section{margin-bottom:4px}
+.block-label{padding:10px 20px 6px;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px}
+.exercise-row{display:flex;align-items:center;padding:14px 20px;border-top:1px solid var(--border);gap:14px;cursor:pointer;transition:background .15s}
+.exercise-row:hover{background:var(--surface)}
+.exercise-row.done{opacity:.55}
+.exercise-check{width:26px;height:26px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:all .2s;font-size:13px}
+.exercise-check.checked{background:var(--accent);border-color:var(--accent);color:#000}
+.exercise-info{flex:1;min-width:0}
+.exercise-name{font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.exercise-meta{font-size:12px;color:var(--muted);margin-top:2px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.prog-badge{background:var(--accent-dim);color:var(--accent);font-size:10px;font-weight:700;padding:1px 6px;border-radius:4px}
+.exercise-arrow{color:var(--muted);font-size:16px;flex-shrink:0}
+
+/* ---- REST DAY ---- */
+.rest-day{padding:60px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px}
+.rest-day .icon{font-size:56px}
+.rest-day h2{font-size:24px;font-weight:800}
+.rest-day p{color:var(--muted);font-size:15px;max-width:280px;line-height:1.6}
+
+/* ---- BOTTOM BAR ---- */
+.bottom-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;padding:16px 20px;background:var(--bg);border-top:1px solid var(--border)}
+
+/* ---- EXERCISE LOG MODAL ---- */
+.modal-overlay{position:fixed;inset:0;background:#000a;z-index:100;display:flex;align-items:flex-end;justify-content:center}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:0 0 40px;max-height:92vh;overflow-y:auto}
+.modal-handle{width:36px;height:4px;background:var(--surface3);border-radius:2px;margin:12px auto 0}
+.modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.modal-title{font-size:17px;font-weight:700}
+.modal-close{background:var(--surface2);border:none;color:var(--muted);width:30px;height:30px;border-radius:50%;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.modal-body{padding:20px}
+.modal-note{background:var(--surface2);border-left:3px solid var(--accent);border-radius:6px;padding:10px 14px;font-size:13px;color:var(--muted);margin-bottom:16px;line-height:1.5}
+.modal-demo{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--blue);margin-bottom:20px;text-decoration:none}
+.modal-demo:hover{opacity:.8}
+.sets-section{display:flex;flex-direction:column;gap:12px;margin-bottom:20px}
+.set-row{display:flex;align-items:center;gap:10px}
+.set-label{font-size:13px;color:var(--muted);width:44px;flex-shrink:0}
+.set-input-wrap{flex:1;display:flex;align-items:center;gap:8px}
+.set-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:16px;font-weight:700;width:70px;padding:10px 12px;text-align:center;outline:none;transition:border-color .2s;-moz-appearance:textfield}
+.set-input::-webkit-inner-spin-button,.set-input::-webkit-outer-spin-button{-webkit-appearance:none}
+.set-input:focus{border-color:var(--accent)}
+.set-unit{font-size:13px;color:var(--muted)}
+.set-check{width:32px;height:32px;border-radius:8px;border:2px solid var(--border);background:transparent;color:var(--accent);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;flex-shrink:0}
+.set-check.done{background:var(--accent-dim);border-color:var(--accent)}
+.target-hint{background:var(--surface2);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--muted);margin-bottom:16px}
+.target-hint strong{color:var(--text)}
+.notes-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;resize:none;outline:none;font-family:inherit;transition:border-color .2s;margin-bottom:16px}
+.notes-input:focus{border-color:var(--accent)}
+.timer-section{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 0;margin-bottom:16px;background:var(--surface2);border-radius:12px}
+.timer-display{font-size:44px;font-weight:800;letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.timer-display.running{color:var(--accent)}
+.timer-display.done-time{color:var(--yellow)}
+.timer-row{display:flex;gap:10px}
+.timer-btn{background:var(--surface3);border:none;color:var(--text);padding:10px 20px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer}
+.timer-btn:hover{opacity:.8}
+.timer-target{font-size:12px;color:var(--muted)}
+
+/* ---- SUMMARY SCREEN ---- */
+.summary{padding:24px 20px;display:flex;flex-direction:column;gap:16px}
+.summary h2{font-size:22px;font-weight:800}
+.summary-stat{display:flex;justify-content:space-between;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.summary-stat-label{font-size:14px;color:var(--muted)}
+.summary-stat-value{font-size:18px;font-weight:700;color:var(--accent)}
+.summary-list{display:flex;flex-direction:column;gap:8px}
+.summary-ex{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:12px 16px}
+.summary-ex-name{font-size:14px;font-weight:600}
+.summary-ex-log{font-size:12px;color:var(--muted);margin-top:4px}
+.uploading{display:flex;align-items:center;justify-content:center;gap:10px;padding:20px;color:var(--muted)}
+.spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.success-screen{padding:60px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px}
+.success-screen .check{font-size:64px}
+.success-screen h2{font-size:26px;font-weight:800}
+.success-screen p{color:var(--muted);font-size:15px;max-width:300px;line-height:1.6}
+
+/* ---- MISC ---- */
+.error-msg{background:#f8514922;border:1px solid #f8514966;border-radius:10px;padding:12px 16px;font-size:14px;color:var(--red);margin-top:4px}
+.divider{height:1px;background:var(--border);margin:0 20px}
+.skip-link{text-align:center;font-size:13px;color:var(--muted);padding:10px}
+.skip-link a{color:var(--blue);cursor:pointer;text-decoration:none}
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+// ═══════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════
+const SPREADSHEET_ID = '1zqR0CeERQg_8YtgWnQYxiFKAbGcZb4Zvf-R1Iqn46t8';
+const SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
+const JOSH_LOG_SHEET = 'Josh — Workout Log';
+const WIFE_LOG_SHEET = 'Wife — Workout Log';
+
+// ═══════════════════════════════════════════════
+// WORKOUT DATA
+// ═══════════════════════════════════════════════
+const W = (block, name, sets, target, demo, note='') => ({block, name, sets, target, demo, note});
+const D = id => `https://drive.google.com/uc?export=view&id=${id}`;
+
+const WORKOUTS = {
+  josh: {
+    Monday: {
+      name: 'Core Workout A', type: 'CORE', duration: '30 min',
+      exercises: [
+        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe'),'Slow, full range of motion'),
+        W('Warm-Up','Dead Bug (Arms Only)',1,'10/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'Press low back flat to floor'),
+        W('Warm-Up','Glute Bridge',1,'15 reps',D('1N4wQeNv6X7O-_5rqlJXIIwNXQq5C7Hia'),'Activate posterior chain'),
+        W('Warm-Up',"World's Greatest Stretch",1,'5/side',D('1OWzGx1QuRAQwIDovrmkCvo_wiwa5emXE'),'Hip flexors + thoracic rotation'),
+        W('Block 1','RKC Plank',3,'45 sec',D('1Zz6mLD6TrKn1dDPTCYPhqrSKpcXoGkRg'),'Max tension — drag elbows toward toes. Squeeze everything.'),
+        W('Block 1','Plank to Push-Up',3,'10 reps',D('1PeDhPhhYKUyY66crUTnZfV7mRBeWec3U'),'Forearm → hands → back. Hips level throughout.'),
+        W('Block 1','Plank Shoulder Taps',3,'12/side',D('1gvCiX2coIdMzwfRWHqLg7er5XlQBvca1'),'Resist hip rotation. Move slowly.'),
+        W('Block 2','Dead Bug (Full)',3,'8/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'Opposite arm + leg. No low back arch.'),
+        W('Block 2','Hollow Body Hold',3,'35 sec',D('1rZE12L3up-qLOd14fugLKTjj6aYgMbWw'),'Low back MUST stay pressed down'),
+        W('Block 2','Superman Hold',3,'30 sec',D('1JzNB2NHNhectd99qJ0eURkqDO49ZI_ON'),'Squeeze glutes at top. Balances anterior work.'),
+        W('Finisher','Max Plank Hold',1,'To failure',D('1KMuupDS14He7w20tTQ8XMf_OjBLOTze7'),'Beat your previous time. Log it.'),
+        W('Cool-Down',"Child's Pose",1,'45 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD')),
+        W('Cool-Down','Cobra Stretch',1,'30 sec',D('1SuylSHK_D0kG_MsElo9AjQKAku0qHWNU')),
+        W('Cool-Down','Seated Spinal Twist',1,'30 sec/side',D('1L0hlciEAtVbyUvvPKuYdjMRK6RSmgEMk')),
+      ]
+    },
+    Tuesday: {
+      name: 'Arms Workout A', type: 'ARMS', duration: '30 min',
+      exercises: [
+        W('Warm-Up','Arm Circles (Fwd + Back)',1,'15 each direction',D('1wzWvAAkSNEVLWoohCxs2Yu-qM8Stoign'),'Full shoulder warm-up'),
+        W('Warm-Up','Shoulder Cross-Body Stretch',1,'20 sec/side',D('1lamotB8joSgEvvWjwQPktbyyx5yZq24X')),
+        W('Warm-Up','Wrist Circles',1,'10 each direction',D('163YEY9fJhoOWCTylE6X2b3I7F6mgUW5-'),'Protect wrists before pushing/pulling'),
+        W('Biceps','Diamond Push-Ups',3,'12 reps',D('1P--ZgEAr3pA-vaMtTtc5yHjq8pO7NW48'),'Hands form diamond. Elbows in tight.'),
+        W('Biceps','Chin-Up or Inverted Row',3,'8 reps',D('15yUmKzn14rOkOs2dH0hWWq7d_PpIFXph'),'Palms face you. Full hang to chin over bar.'),
+        W('Biceps','Isometric Bicep Hold',3,'30 sec/arm',D('1mLm9NNQaj8EqOeLmwtAgP5C8283umSs1'),'Use band. Hold contraction at 90 degrees.'),
+        W('Triceps','Close-Grip Push-Ups',3,'15 reps',D('1J00Gw0AAvIYmO3QI1jTPuJ1SswC8ep8Q'),'Elbows track back along ribs.'),
+        W('Triceps','Tricep Dips (Chair)',3,'12 reps',D('1yX28hmrYMgYKT-_tR0XE4MAP0owqMeks'),'Use chair seat. Full lockout at top.'),
+        W('Triceps','Eccentric Push-Ups',3,'8 reps',D('1gEADQkzSXyXdhyUBet9UBu2ZXlZMUFQ-'),'Lower in 4 seconds. Explosive up.'),
+        W('Finisher','Push-Up Burnout',1,'Max reps',D('1vAUbYH008-G7RHPPWWBHrsilkJpyFhMo'),'Standard push-up to true failure. Log reps.'),
+        W('Cool-Down','Overhead Tricep Stretch',1,'30 sec/side',D('1tF2WwfVe2Pvvn7l-JWAW1aQFbOF-pVcq')),
+        W('Cool-Down','Shoulder Cross-Body Stretch',1,'30 sec/side',D('1lamotB8joSgEvvWjwQPktbyyx5yZq24X')),
+      ]
+    },
+    Wednesday: {
+      name: 'Core Workout B', type: 'CORE', duration: '30 min',
+      exercises: [
+        W('Warm-Up','Hip Circles',1,'10/direction',D('1gX_46FWcn86_zvzDINB6pS9SGFwBwWDg'),'Loosen hip flexors'),
+        W('Warm-Up','Lying Knee Rocks',1,'12 reps',D('1EHhCk8ETkPPUoQULLERd9i-YKqVLlgB6'),'Gentle thoracic rotation warmup'),
+        W('Warm-Up','Glute Bridge March',1,'10/side',D('1E3EgygvOOJMC_RiabXtxe_Xt5vaMdxUI'),'Alternate legs while bridged'),
+        W('Warm-Up','Inchworm Walk-Out',1,'6 reps',D('1uOH9ju56_3dWoraSXNvJECA3cFut8i87'),'Hamstrings + core activation'),
+        W('Block 1','Russian Twists (Feet Elevated)',3,'20 total',D('10BIVtGUgJ4aj4TIE-AjzPwhm2JEjLMVm'),'Controlled. Touch floor each side.'),
+        W('Block 1','Slow Bicycle Crunches',3,'15/side',D('19cNCgiUBTClijqC2-zT3cSnbPWF_qtio'),'3 sec hold at peak. No neck yanking.'),
+        W('Block 1','V-Ups',3,'12 reps',D('105hwV10t4HNT4oDKxg4PRR0cc_hLvL6c'),'Mod to tuck-ups if form breaks.'),
+        W('Block 2','Side Plank with Hip Dip',3,'12 dips/side',D('1zBGq2MzYANghg7kigkdxNoJ-Lbjf94Nw'),'Full range. Don\'t rush.'),
+        W('Block 2','Side Plank Reach-Through',3,'10/side',D('1xUGnspbrP9v61ZpWnbl-PcFlrm83KBGL'),'Top arm threads under body.'),
+        W('Block 2','Standing Oblique Crunches',3,'15/side',D('1ioT60aUi8iyfvXcIoAsydooGypkkEXpj'),'Hand behind head. Lateral crunch.'),
+        W('Finisher','Mountain Climbers',4,'20 sec on / 10 sec off',D('166Y8XikBWEX5h7NMy7jahi6W-m3oPs6p'),'Hips level. 4 rounds. No rest between rounds.'),
+        W('Cool-Down','Lying Spinal Twist',1,'45 sec/side',D('1kiQwUe4apdnrt3BSFUiYg5DtqCINPhN7')),
+        W('Cool-Down','Figure-4 Stretch',1,'30 sec/side',D('1X_eKP8xEJgVmM9RPb6VjT0I_piECoBaD')),
+        W("Cool-Down","Child's Pose",1,'30 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD')),
+      ]
+    },
+    Thursday: {
+      name: 'Arms Workout B', type: 'ARMS', duration: '30 min',
+      exercises: [
+        W('Warm-Up','Arm Circles',1,'15 each direction',D('1wzWvAAkSNEVLWoohCxs2Yu-qM8Stoign')),
+        W('Warm-Up','Band Pull-Apart (or Towel)',1,'15 reps',D('1TbaqKrNFF2G57RypZznvTidfzO4oiD_9'),'Mimic motion with towel if no band'),
+        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe'),'Thoracic mobility'),
+        W('Shoulders','Pike Push-Ups',3,'10 reps',D('1TmRqcgKZSk1OdSMDlsQ3faM8oRAiwhGm'),'Hips high. Head toward floor. Shoulder press pattern.'),
+        W('Shoulders','Elevated Pike Push-Up',3,'8 reps',D('1ZD9PvJ7K9ely5Q3U6lL0ytWcwNLNfe1X'),'Feet on chair. Increases shoulder load significantly.'),
+        W('Shoulders','Wall Handstand Hold',3,'20 sec',D('1iRvoixgi5R9b3cacN4-YimmCmfSJkL_5'),'Kick up to wall. Build toward free handstand.'),
+        W('Upper Back','Wide Push-Up',3,'12 reps',D('1uVAxrvVHoNlWQM84Bv3L21RPasdr7xxw'),'Hands wider than shoulders. Chest + back.'),
+        W('Upper Back','Superman Pulls',3,'12 reps',D('1HxOaEVcd4AXTk5k67UY4-2CcF8bCpbZu'),'Prone. Lift + pull elbows back like rowing.'),
+        W('Upper Back','Prone Y-T-W Raises',3,'8 of each',D('1QcjwUnHj_V0ASIqVaK4Yb2Zat1ytlmJo'),'Lying face down. Raise arms in Y, T, and W shapes.'),
+        W('Finisher','Pike Push-Up Burnout',1,'Max reps',D('1TmRqcgKZSk1OdSMDlsQ3faM8oRAiwhGm'),'Log reps.'),
+        W('Cool-Down','Doorway Chest Stretch',1,'30 sec',D('1HUcDBcmTTDTOLE_HzBmkf8Y447OngVHK')),
+        W('Cool-Down',"Child's Pose Wide Arms",1,'45 sec',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe')),
+      ]
+    },
+    Friday: {
+      name: 'Core Workout C', type: 'CORE', duration: '30 min',
+      exercises: [
+        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe')),
+        W('Warm-Up','Hip Flexor Lunge Stretch',1,'30 sec/side',D('1yJxSvIBOT_vWCtMNEt9ajsWytEAp5jvJ'),'Hold and breathe'),
+        W('Warm-Up','Bear Crawl (In Place)',1,'30 sec',D('1ngc-facHaFRK7lUBU7UvUAGW26NtyK8L'),'Knees 1 inch off floor'),
+        W('Warm-Up','Arm Circles + Thoracic Openers',1,'10 each',D('1wzWvAAkSNEVLWoohCxs2Yu-qM8Stoign')),
+        W('Block 1','Dead Bug (Full)',3,'8/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'Anchor movement. Perfect form always.'),
+        W('Block 1','Plank to Downward Dog',3,'10 reps',D('1HlH7CrSXKMCG-yczjHBLQ_cx4WGiknQf'),'Push hips up & back. Core stays tight.'),
+        W('Block 1','Single-Leg Glute Bridge',3,'12/side',D('11WbFaz6riDdt5A4WHWaehvU25b_VlBhm'),'Posterior chain + core integration'),
+        W('Block 2','Hollow Body Rock',3,'30 sec',D('1rZE12L3up-qLOd14fugLKTjj6aYgMbWw'),'Rock forward/back. Progression from holds.'),
+        W('Block 2','Superman to Hollow Body',3,'8 reps',D('1qa2JO-t6ZHsNQDJ3raPqiyCRnQf0OMD8'),'Prone (superman) → roll to hollow body.'),
+        W('Block 2','Long-Lever Plank',3,'30 sec',D('1Ngl4C4SFFznwEfb6rQHrSMq8Bastm8ws'),'Arms extended further forward than standard plank.'),
+        W('Finisher','Core Gauntlet',1,'Plank 45s → Side L 30s → Side R 30s → Hollow 30s','','No rest. End of week — leave nothing.'),
+        W('Cool-Down',"Child's Pose",1,'45 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD')),
+        W('Cool-Down','Supine Hamstring Stretch',1,'30 sec/side',D('1TeIDsmQh-EteNMgXzPJYR6I9vT0zoS1A')),
+        W('Cool-Down','Cobra to Upward Dog',1,'30 sec',D('15U0i1qtHYHO1TEZla3RA2xBETWSnHEPv')),
+      ]
+    },
+    Saturday: {
+      name: 'Arms Workout C', type: 'ARMS', duration: '30 min',
+      exercises: [
+        W('Warm-Up','Jumping Jacks',1,'30 sec',D('1yWEekIAqvGQxbuAMizONzN5CgYwrDnNH'),'Get blood flowing'),
+        W('Warm-Up','Wrist + Shoulder Circles',1,'10 each',D('1T4HvIuTxExYat-t09NLhcA4OBGR_w0bw')),
+        W('Warm-Up','Inchworm Walk-Out',1,'6 reps',D('1uOH9ju56_3dWoraSXNvJECA3cFut8i87')),
+        W('Power','Explosive Push-Ups',3,'8 reps',D('14duDv-mIGIY0RvCKO_GoGf0fniLx3Dil'),'Push hard enough to leave ground. Land soft.'),
+        W('Power','Archer Push-Ups',3,'6/side',D('11CkKQIDbZLtc_cObSnYe1_QCmYHneTxz'),'One arm wide, one arm bent. Shifts load to one side.'),
+        W('Power','Pseudo Planche Lean',3,'20 sec',D('1s2QjXKjcdqqSHimuCvEGjwv_7e99Lh-7'),'Lean forward over hands in push-up position.'),
+        W('Endurance','Standard Push-Up',3,'20 reps',D('1vAUbYH008-G7RHPPWWBHrsilkJpyFhMo'),'Strict form. No sagging hips.'),
+        W('Endurance','Diamond Push-Up',3,'12 reps',D('1P--ZgEAr3pA-vaMtTtc5yHjq8pO7NW48')),
+        W('Endurance','Pike Push-Up',3,'10 reps',D('1TmRqcgKZSk1OdSMDlsQ3faM8oRAiwhGm')),
+        W('Finisher','Arm Triset Burnout',1,'Wide x10 → Diamond x10 → Pike x10','','One continuous triset. Log total reps.'),
+        W('Cool-Down','Overhead Tricep Stretch',1,'30 sec/side',D('1tF2WwfVe2Pvvn7l-JWAW1aQFbOF-pVcq')),
+        W('Cool-Down','Doorway Chest Opener',1,'30 sec',D('1HUcDBcmTTDTOLE_HzBmkf8Y447OngVHK')),
+        W('Cool-Down','Wrist Flexor Stretch',1,'20 sec/side',D('1yl8NKAUI11skkdUXGo2Du3TjPk7Ittyw')),
+      ]
+    },
+    Sunday: { name: 'Rest & Recovery', type: 'REST', duration: '—', exercises: [] },
+  },
+  wife: {
+    Monday: {
+      name: 'Core Workout A', type: 'CORE', duration: '30 min',
+      exercises: [
+        W('Warm-Up','Diaphragmatic Breathing',1,'8 breaths',D('1hjvFfZEsKf_L1Cc6JeetmrlJlw55r7mn'),'Belly expands on inhale. Exhale draws navel in. NEVER hold breath.'),
+        W('Warm-Up','Pelvic Tilts (Lying Down)',1,'12 reps',D('1cBaKObElA5KKpNBenE0Hbe963o_t06zL'),'Gentle anterior/posterior tilt. Reconnects deep core.'),
+        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe'),'Slow and fluid.'),
+        W('Warm-Up','Glute Bridge',1,'12 reps',D('1N4wQeNv6X7O-_5rqlJXIIwNXQq5C7Hia'),'Exhale as you lift. Pelvic floor safe.'),
+        W('Block 1','Modified Dead Bug (Arms Only)',3,'8/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'NEVER hold breath. Exhale on exertion.'),
+        W('Block 1','Bird Dog',3,'10/side',D('14abNYf37W4j4eDQhF5a588PTe_61CTxA'),'2 sec hold at top. Spine neutral.'),
+        W('Block 1','Glute Bridge Hold',3,'30 sec',D('1N4wQeNv6X7O-_5rqlJXIIwNXQq5C7Hia'),'Squeeze and hold at the top'),
+        W('Block 2','Heel Slides',3,'10/side',D('1Z4EhSGY85S5xUK0UgL25xAgcbnp70-W2'),'Lying flat. Slide foot out slowly. Core engaged.'),
+        W('Block 2','Forearm Plank',3,'20 sec',D('1KMuupDS14He7w20tTQ8XMf_OjBLOTze7'),'Breathe steadily. NO breath-holding ever.'),
+        W('Block 2','Seated Ab Squeeze',3,'15 reps',D('1S5OsMbRHEpZcPbDptKj5LnBhxCVs04yJ'),'Sitting upright. Inhale. Exhale while activating core for 3 sec.'),
+        W('Finisher','Breathing Plank',1,'40 sec',D('1KMuupDS14He7w20tTQ8XMf_OjBLOTze7'),'Hold plank with controlled breathing throughout.'),
+        W('Cool-Down',"Child's Pose",1,'45 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD'),'Great for nursing moms — gentle chest opener'),
+        W('Cool-Down','Seated Spinal Twist',1,'30 sec/side',D('1L0hlciEAtVbyUvvPKuYdjMRK6RSmgEMk')),
+        W('Cool-Down','Knees-to-Chest Hug',1,'30 sec',D('1GjRjEleaoB-LP7TaOJGy05q6VtMoSEJH')),
+      ]
+    },
+    Tuesday: { name: 'Rest Day', type: 'REST', duration: '—', exercises: [] },
+    Wednesday: {
+      name: 'Core Workout B', type: 'CORE', duration: '30 min',
+      exercises: [
+        W('Warm-Up','Diaphragmatic Breathing',1,'6 breaths',D('1hjvFfZEsKf_L1Cc6JeetmrlJlw55r7mn'),'Reset and focus before starting'),
+        W('Warm-Up','Hip Circles (Standing)',1,'10/direction',D('1gX_46FWcn86_zvzDINB6pS9SGFwBwWDg'),'Loosen hip flexors'),
+        W('Warm-Up','Lying Knee Rocks',1,'12 reps',D('1EHhCk8ETkPPUoQULLERd9i-YKqVLlgB6'),'Gentle thoracic rotation'),
+        W('Warm-Up','Glute Bridge',1,'12 reps',D('1N4wQeNv6X7O-_5rqlJXIIwNXQq5C7Hia'),'Hold at the top for 2 seconds. Slow and controlled'),
+        W('Block 1','Modified Side Plank (Knees Down)',3,'25 sec/side',D('1lmeH9roq-62QLxC8WFB6WeeY1uEvGsyY'),'Work toward full side plank over weeks.'),
+        W('Block 1','Standing Side Crunches',3,'12/side',D('1ioT60aUi8iyfvXcIoAsydooGypkkEXpj'),'Hands behind head. Lateral flex. No spinal compression.'),
+        W('Block 1','Side-Lying Leg Raises',3,'12/side',D('11ebZ3wuny7VpUL6nOecCmOAXvuN0PfTC'),'Targets obliques + hip abductors safely.'),
+        W('Block 2','Bird Dog (Slow)',3,'10/side',D('14abNYf37W4j4eDQhF5a588PTe_61CTxA'),'3 sec hold at top.'),
+        W('Block 2','Slow Mountain Climbers',3,'8/side',D('1db4U6cj7z_MWFPLxcibCPPJf42lDIpmM'),'STEP — do not jump. Controlled. Breathe.'),
+        W('Block 2','Glute Bridge March',3,'10/side',D('1E3EgygvOOJMC_RiabXtxe_Xt5vaMdxUI'),'Bridge position, alternate knee lifts.'),
+        W('Finisher','Supine Reverse Marches',2,'40 sec',D('1C5b3Rig5NdmR45j3mXMQmq07sHeIXQCs'),'Slow and controlled. Light cardio core finish. Keep breathing.'),
+        W('Cool-Down','Lying Spinal Twist',1,'40 sec/side',D('1kiQwUe4apdnrt3BSFUiYg5DtqCINPhN7'),'Look the other way your leg is crossing over.'),
+        W('Cool-Down','Figure-4 Stretch',1,'30 sec/side',D('1X_eKP8xEJgVmM9RPb6VjT0I_piECoBaD')),
+        W("Cool-Down","Child's Pose",1,'30 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD')),
+      ]
+    },
+    Thursday: { name: 'Rest Day', type: 'REST', duration: '—', exercises: [] },
+    Friday: {
+      name: 'Core Workout C', type: 'CORE', duration: '30 min',
+      exercises: [
+        W('Warm-Up','Diaphragmatic Breathing',1,'8 breaths',D('1hjvFfZEsKf_L1Cc6JeetmrlJlw55r7mn'),'End-of-week reset. Focus on breath before moving.'),
+        W('Warm-Up','Kneeling Pelvic Tilts',1,'12 reps',D('1IpwBdNrpCLA5p7yhX8-PKShz2CgunHz0'),'Gentle anterior/posterior tilt. Reconnects deep core.'),
+        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe')),
+        W('Warm-Up','Standing Hip Flexor Stretch',1,'30 sec/side',D('1TfZ-I-0Rh5NL-_iszGSwwVlsaY3RYDUl')),
+        W('Block 1','Dead Bug',3,'8/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'Best postpartum core exercise. Master this movement.'),
+        W('Block 1','Plank to Downward Dog',3,'8 reps',D('1HlH7CrSXKMCG-yczjHBLQ_cx4WGiknQf'),'Slow transition. Core stays braced. Breathe.'),
+        W('Block 1','Single-Leg Glute Bridge',3,'10/side',D('11WbFaz6riDdt5A4WHWaehvU25b_VlBhm'),'Pelvic floor safe. Exhale as you lift.'),
+        W('Block 2','Forearm Plank',3,'30 sec',D('1KMuupDS14He7w20tTQ8XMf_OjBLOTze7'),"Progress from Monday's 20 sec. Breathe steadily."),
+        W('Block 2','Modified Side Plank Hold',3,'30 sec/side',D('1lmeH9roq-62QLxC8WFB6WeeY1uEvGsyY'),'Knees down still OK. Focus on alignment.'),
+        W('Block 2','Seated Torso Rotations',3,'12/side',D('1r_JQ61Qrl1A_6RsQOogfFpgIMgQ05IYH'),'Sitting upright. Gentle rotation. Exhale each rotation.'),
+        W('Finisher','Core Breathing Flow',3,"Bird Dog 30s → Plank 25s → Child's Pose 15s",'','Finish strong but controlled. 3 rounds, no rest.'),
+        W('Cool-Down',"Child's Pose",1,'1 min',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD'),'Extra time — you showed up 3x this week.'),
+        W('Cool-Down','Supine Spinal Twist',1,'40 sec/side',D('1yQOOYSI-dDUTq-IFXBNmtd8NUsW-YsFU')),
+        W('Cool-Down','Happy Baby Pose',1,'30 sec',D('1o070HoRJ4zQncbXPczn77xurj5-lZ2oN')),
+      ]
+    },
+    Saturday: { name: 'Rest Day', type: 'REST', duration: '—', exercises: [] },
+    Sunday:   { name: 'Rest & Recovery', type: 'REST', duration: '—', exercises: [] },
+  }
+};
+
+// ═══════════════════════════════════════════════
+// APP STATE
+// ═══════════════════════════════════════════════
+const S = {
+  screen: 'setup',    // setup | auth | user | workout | summary | success
+  clientId: localStorage.getItem('gClientId') || '',
+  accessToken: null,
+  tokenExpiry: 0,
+  user: null,          // 'josh' | 'wife'
+  day: null,
+  workout: null,
+  logs: {},            // exerciseName -> {setsCompleted, repsPerSet[], notes, done}
+  progression: {},     // exerciseName -> adjustedTarget string
+  history: [],         // rows from Sheets log
+  modal: null,         // exercise index currently open
+  timerInterval: null,
+  timerSec: 0,
+  timerRunning: false,
+  error: '',
+};
+
+function today() {
+  return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
+}
+
+// ═══════════════════════════════════════════════
+// PROGRESSION LOGIC
+// ═══════════════════════════════════════════════
+function parseTarget(str) {
+  str = str || '';
+  if (/failure|max|burnout|gauntlet|triset|flow/i.test(str)) return {value: null, unit: 'max'};
+  if (/on\s*\/\s*off/i.test(str)) return {value: null, unit: 'interval'};
+  if (/→|→/i.test(str)) return {value: null, unit: 'complex'};
+  const perSide = /side|arm|leg/i.test(str);
+  const sec = str.match(/(\d+)\s*sec/i);
+  if (sec) return {value: parseInt(sec[1]), unit: 'sec', perSide};
+  const min = str.match(/(\d+)\s*min/i);
+  if (min) return {value: parseInt(min[1]) * 60, unit: 'sec', perSide};
+  const num = str.match(/(\d+)/);
+  if (num) return {value: parseInt(num[1]), unit: 'reps', perSide};
+  return {value: null, unit: 'other'};
+}
+
+function calcProgression(exercises, history) {
+  const prog = {};
+  const byName = {};
+  history.forEach(row => {
+    const name = row[3];
+    const reps = row[5];
+    const date = row[0];
+    if (!byName[name] || date > byName[name].date) byName[name] = {date, reps};
+  });
+  exercises.forEach(ex => {
+    const parsed = parseTarget(ex.target);
+    const last = byName[ex.name];
+    if (!last || parsed.unit === 'max' || parsed.unit === 'interval' || parsed.unit === 'complex' || !parsed.value) {
+      prog[ex.name] = {target: ex.target, progressed: false};
+      return;
+    }
+    const loggedVal = parseFloat(last.reps);
+    if (!isNaN(loggedVal) && loggedVal >= parsed.value) {
+      let newVal = parsed.unit === 'sec' ? parsed.value + 5 : parsed.value + 1;
+      const unit = parsed.unit === 'sec' ? ' sec' : ' reps';
+      const side = parsed.perSide ? '/side' : '';
+      prog[ex.name] = {target: `${newVal}${unit}${side}`, progressed: true};
+    } else {
+      prog[ex.name] = {target: ex.target, progressed: false};
+    }
+  });
+  return prog;
+}
+
+// ═══════════════════════════════════════════════
+// GOOGLE SHEETS API
+// ═══════════════════════════════════════════════
+let tokenClient = null;
+
+function initGIS() {
+  if (!S.clientId || typeof google === 'undefined') return;
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: S.clientId,
+      scope: SCOPE,
+      callback: async (resp) => {
+        if (resp.error) { S.error = 'Sign-in failed: ' + resp.error; render(); return; }
+        S.accessToken = resp.access_token;
+        S.tokenExpiry = Date.now() + (resp.expires_in - 30) * 1000;
+        await onSignedIn();
+      }
+    });
+  } catch(e) { S.error = e.message; render(); }
+}
+
+function needsAuth() { return !S.accessToken || Date.now() > S.tokenExpiry; }
+
+async function sheetsGet(range) {
+  const r = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}`,
+    { headers: { Authorization: `Bearer ${S.accessToken}` } }
+  );
+  if (!r.ok) throw new Error(`Sheets read failed: ${r.status}`);
+  return r.json();
+}
+
+async function sheetsAppend(sheet, values) {
+  const r = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(sheet + '!A:H')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${S.accessToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ values })
+    }
+  );
+  if (!r.ok) { const t = await r.text(); throw new Error(`Sheets write failed: ${r.status} ${t}`); }
+  return r.json();
+}
+
+async function loadHistory() {
+  try {
+    const sheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
+    const data = await sheetsGet(`${sheet}!A2:H`);
+    S.history = data.values || [];
+  } catch(e) { S.history = []; }
+}
+
+async function onSignedIn() {
+  S.screen = 'user';
+  render();
+}
+
+async function submitWorkout() {
+  S.screen = 'uploading';
+  render();
+  try {
+    const sheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
+    const dateStr = new Date().toISOString().slice(0,10);
+    const rows = [];
+    S.workout.exercises.forEach((ex, i) => {
+      const log = S.logs[i];
+      if (!log || !log.done) return;
+      rows.push([
+        dateStr,
+        S.day,
+        S.workout.name,
+        ex.name,
+        String(log.setsCompleted || ex.sets),
+        log.reps || '',
+        log.notes || '',
+        '✅'
+      ]);
+    });
+    if (rows.length) await sheetsAppend(sheet, rows);
+    S.screen = 'success';
+    render();
+  } catch(e) {
+    S.error = e.message;
+    S.screen = 'summary';
+    render();
+  }
+}
+
+// ═══════════════════════════════════════════════
+// RENDER
+// ═══════════════════════════════════════════════
+const app = document.getElementById('app');
+
+function render() {
+  if (S.screen === 'setup')     return renderSetup();
+  if (S.screen === 'auth')      return renderAuth();
+  if (S.screen === 'user')      return renderUserSelect();
+  if (S.screen === 'workout')   return renderWorkout();
+  if (S.screen === 'summary')   return renderSummary();
+  if (S.screen === 'uploading') return renderUploading();
+  if (S.screen === 'success')   return renderSuccess();
+}
+
+// ---- SETUP ----
+function renderSetup() {
+  app.innerHTML = `
+  <div class="setup">
+    <div style="font-size:48px;margin-bottom:-8px">🏋️</div>
+    <h1>Morning Workout<br>Josh & Wife</h1>
+    <p>This app syncs your workouts to Google Sheets. You need a free Google Cloud Client ID to connect.</p>
+    <div class="setup-steps">
+      <div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> and create or select a project</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Enable the <strong>Google Sheets API</strong> (APIs & Services → Enable APIs)</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Go to <strong>Credentials → Create Credentials → OAuth 2.0 Client ID</strong><br>Type: <strong>Web application</strong></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Under Authorized JavaScript origins add:<br><code>https://meltonjos25.github.io</code></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Copy your Client ID and paste it below</div></div>
+    </div>
+    <input class="field" id="cid" type="text" placeholder="Paste Client ID here (ends in .apps.googleusercontent.com)" value="${S.clientId}">
+    ${S.error ? `<div class="error-msg">${S.error}</div>` : ''}
+    <button class="btn btn-primary" onclick="saveClientId()">Continue →</button>
+    <div class="skip-link">Already set up? <a onclick="trySkipSetup()">Skip to sign in</a></div>
+  </div>`;
+}
+
+function saveClientId() {
+  const v = document.getElementById('cid').value.trim();
+  if (!v) { S.error = 'Please enter your Client ID.'; render(); return; }
+  S.clientId = v;
+  localStorage.setItem('gClientId', v);
+  S.error = '';
+  S.screen = 'auth';
+  render();
+  setTimeout(initGIS, 200);
+}
+
+function trySkipSetup() {
+  if (!S.clientId) { S.error = 'No Client ID saved. Please complete setup.'; render(); return; }
+  S.screen = 'auth';
+  render();
+  setTimeout(initGIS, 200);
+}
+
+// ---- AUTH ----
+function renderAuth() {
+  app.innerHTML = `
+  <div class="auth-screen">
+    <div class="logo">💪</div>
+    <h2>Sign in with Google</h2>
+    <p>We need access to your Google Sheets to log your workouts. No data is stored on any server.</p>
+    ${S.error ? `<div class="error-msg" style="max-width:320px">${S.error}</div>` : ''}
+    <button class="g-btn" onclick="signIn()">
+      <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
+      Sign in with Google
+    </button>
+    <button class="btn-ghost btn" onclick="S.screen='setup';render()">← Back to setup</button>
+  </div>`;
+  setTimeout(initGIS, 100);
+}
+
+function signIn() {
+  S.error = '';
+  if (!tokenClient) {
+    initGIS();
+    if (!tokenClient) { S.error = 'Google sign-in not ready. Check your Client ID.'; render(); return; }
+  }
+  tokenClient.requestAccessToken({ prompt: '' });
+}
+
+// ---- USER SELECT ----
+function renderUserSelect() {
+  app.innerHTML = `
+  <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="signOut()">Sign out</button></div>
+  <div class="user-select">
+    <h2>Who's working out?</h2>
+    <div class="user-card" onclick="selectUser('josh')">
+      <div class="icon">💪</div>
+      <h3>Josh</h3>
+      <p>Core (Mon/Wed/Fri) · Arms (Tue/Thu/Sat)</p>
+    </div>
+    <div class="user-card" onclick="selectUser('wife')">
+      <div class="icon">🌟</div>
+      <h3>Wife</h3>
+      <p>Core (Mon/Wed/Fri) · Rest other days</p>
+    </div>
+  </div>`;
+}
+
+async function selectUser(who) {
+  S.user = who;
+  S.day = today();
+  S.workout = WORKOUTS[who][S.day];
+  S.logs = {};
+  S.modal = null;
+  S.screen = 'workout';
+  render();
+  await loadHistory();
+  S.progression = calcProgression(S.workout.exercises, S.history);
+  render();
+}
+
+function signOut() {
+  S.accessToken = null; S.user = null; S.screen = 'auth'; render();
+}
+
+// ---- WORKOUT ----
+function renderWorkout() {
+  const w = S.workout;
+  if (!w) return;
+
+  if (w.type === 'REST') {
+    app.innerHTML = `
+    <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button></div>
+    <div class="rest-day">
+      <div class="icon">😴</div>
+      <h2>${w.name}</h2>
+      <p>Today is a rest day. Recovery is part of the program — enjoy it.</p>
+      <button class="btn btn-secondary" style="max-width:280px;margin-top:16px" onclick="S.screen='user';render()">← Change user</button>
+    </div>`;
+    return;
+  }
+
+  const total = w.exercises.length;
+  const done = Object.values(S.logs).filter(l => l.done).length;
+  const pct = total ? Math.round(done/total*100) : 0;
+
+  const blocks = {};
+  w.exercises.forEach((ex, i) => {
+    if (!blocks[ex.block]) blocks[ex.block] = [];
+    blocks[ex.block].push({ex, i});
+  });
+
+  let blockHTML = '';
+  for (const [block, items] of Object.entries(blocks)) {
+    const blockColor = {
+      'Warm-Up':'#d29922','Block 1':'#58a6ff','Block 2':'#a371f7',
+      'Finisher':'#f85149','Cool-Down':'#3fb950'
+    }[block] || '#8b949e';
+    blockHTML += `<div class="block-section"><div class="block-label" style="color:${blockColor}">${block}</div>`;
+    items.forEach(({ex, i}) => {
+      const log = S.logs[i];
+      const isDone = log?.done;
+      const prog = S.progression[ex.name];
+      const target = prog?.target || ex.target;
+      const progressed = prog?.progressed;
+      blockHTML += `
+      <div class="exercise-row${isDone ? ' done' : ''}" onclick="openModal(${i})">
+        <div class="exercise-check${isDone ? ' checked' : ''}">${isDone ? '✓' : ''}</div>
+        <div class="exercise-info">
+          <div class="exercise-name">${ex.name}</div>
+          <div class="exercise-meta">
+            <span>${ex.sets}×</span><span>${target}</span>
+            ${progressed ? '<span class="prog-badge">↑ PROGRESSED</span>' : ''}
+          </div>
+        </div>
+        <div class="exercise-arrow">›</div>
+      </div>`;
+    });
+    blockHTML += '</div>';
+  }
+
+  const canSubmit = done > 0;
+  app.innerHTML = `
+  <div class="header">
+    <div class="header-title">${S.day} · ${w.name}</div>
+    <button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button>
+  </div>
+  <div class="body">
+    <div class="day-header">
+      <div class="day-label">${S.day}</div>
+      <div class="day-workout">${w.name}</div>
+      <div class="day-meta">
+        <span class="badge ${w.type.toLowerCase()}">${w.type}</span>
+        <span class="badge">${w.duration}</span>
+        <span class="badge">${done}/${total} done</span>
+      </div>
+    </div>
+    <div class="progress-bar-wrap">
+      <div class="progress-label">${pct}% complete</div>
+      <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+    </div>
+    ${blockHTML}
+  </div>
+  <div class="bottom-bar">
+    <button class="btn btn-primary" onclick="S.screen='summary';render()" ${!canSubmit ? 'disabled style="opacity:.4"' : ''}>
+      Review & Submit Workout →
+    </button>
+  </div>
+  ${S.modal !== null ? renderModal() : ''}`;
+}
+
+// ---- MODAL ----
+function openModal(i) {
+  S.modal = i;
+  clearInterval(S.timerInterval);
+  S.timerSec = 0;
+  S.timerRunning = false;
+  if (!S.logs[i]) {
+    const ex = S.workout.exercises[i];
+    S.logs[i] = { done: false, setsCompleted: 0, repsPerSet: Array(ex.sets).fill(''), notes: '', setsState: Array(ex.sets).fill(false) };
+  }
+  render();
+}
+
+function closeModal() { S.modal = null; clearInterval(S.timerInterval); S.timerRunning = false; render(); }
+
+function renderModal() {
+  const i = S.modal;
+  const ex = S.workout.exercises[i];
+  const log = S.logs[i];
+  const prog = S.progression[ex.name];
+  const target = prog?.target || ex.target;
+  const parsed = parseTarget(target);
+  const isTimed = parsed.unit === 'sec';
+  const isMax = parsed.unit === 'max' || parsed.unit === 'complex';
+
+  const setsHTML = Array.from({length: ex.sets}, (_, s) => {
+    const checked = log.setsState?.[s];
+    return `
+    <div class="set-row">
+      <div class="set-label">Set ${s+1}</div>
+      <div class="set-input-wrap">
+        <input class="set-input" type="number" min="0" value="${log.repsPerSet[s] || ''}" placeholder="${isMax ? '—' : (isTimed ? '0' : '0')}" oninput="setRep(${i},${s},this.value)">
+        <span class="set-unit">${isTimed ? 'sec' : isMax ? 'reps' : parsed.unit === 'reps' ? 'reps' : ''}</span>
+      </div>
+      <button class="set-check${checked ? ' done' : ''}" onclick="toggleSet(${i},${s})">${checked ? '✓' : ''}</button>
+    </div>`;
+  }).join('');
+
+  const timerSec = S.timerSec;
+  const mm = String(Math.floor(timerSec/60)).padStart(2,'0');
+  const ss = String(timerSec%60).padStart(2,'0');
+  const timerClass = S.timerRunning ? 'running' : timerSec > 0 ? 'done-time' : '';
+
+  const timerHTML = isTimed ? `
+  <div class="timer-section">
+    <div class="timer-target">Target: ${target}</div>
+    <div class="timer-display ${timerClass}">${mm}:${ss}</div>
+    <div class="timer-row">
+      <button class="timer-btn" onclick="timerToggle()">${S.timerRunning ? '⏸ Pause' : '▶ Start'}</button>
+      <button class="timer-btn" onclick="timerReset()">↺ Reset</button>
+      <button class="timer-btn" onclick="timerUse(${i})">Use Time</button>
+    </div>
+  </div>` : '';
+
+  return `
+  <div class="modal-overlay" onclick="handleOverlayClick(event)">
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="modal-handle"></div>
+      <div class="modal-header">
+        <div class="modal-title">${ex.name}</div>
+        <button class="modal-close" onclick="closeModal()">×</button>
+      </div>
+      <div class="modal-body">
+        ${ex.note ? `<div class="modal-note">${ex.note}</div>` : ''}
+        ${ex.demo ? `<a class="modal-demo" href="${ex.demo}" target="_blank">▶ Watch Demo</a>` : ''}
+        <div class="target-hint">Target: <strong>${ex.sets} × ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">↑ PROGRESSED</span>' : ''}</div>
+        ${timerHTML}
+        <div class="sets-section">${setsHTML}</div>
+        <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it felt…" oninput="setNote(${i},this.value)">${log.notes}</textarea>
+        <button class="btn btn-primary" onclick="markDone(${i})">✓ Mark Complete</button>
+        <button class="btn btn-secondary" style="margin-top:10px" onclick="closeModal()">Close</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function handleOverlayClick(e) { if (e.target.classList.contains('modal-overlay')) closeModal(); }
+
+function setRep(i, s, v) { S.logs[i].repsPerSet[s] = v; }
+function setNote(i, v) { S.logs[i].notes = v; }
+
+function toggleSet(i, s) {
+  S.logs[i].setsState[s] = !S.logs[i].setsState[s];
+  S.logs[i].setsCompleted = S.logs[i].setsState.filter(Boolean).length;
+  // re-render just the modal part
+  const overlay = document.querySelector('.modal-overlay');
+  if (overlay) overlay.outerHTML = renderModal();
+  else render();
+}
+
+function markDone(i) {
+  const log = S.logs[i];
+  const ex = S.workout.exercises[i];
+  log.done = true;
+  log.setsCompleted = ex.sets;
+  log.reps = log.repsPerSet.filter(r => r !== '').join(', ') || log.repsPerSet[0] || '';
+  S.modal = null;
+  clearInterval(S.timerInterval);
+  S.timerRunning = false;
+  render();
+}
+
+// ---- TIMER ----
+function timerToggle() {
+  if (S.timerRunning) {
+    clearInterval(S.timerInterval);
+    S.timerRunning = false;
+  } else {
+    S.timerRunning = true;
+    S.timerInterval = setInterval(() => {
+      S.timerSec++;
+      const d = document.querySelector('.timer-display');
+      if (d) {
+        const mm = String(Math.floor(S.timerSec/60)).padStart(2,'0');
+        const ss = String(S.timerSec%60).padStart(2,'0');
+        d.textContent = `${mm}:${ss}`;
+        d.className = 'timer-display running';
+      }
+      const btn = document.querySelector('.timer-btn');
+      if (btn) btn.textContent = '⏸ Pause';
+    }, 1000);
+  }
+  render();
+}
+
+function timerReset() {
+  clearInterval(S.timerInterval);
+  S.timerSec = 0;
+  S.timerRunning = false;
+  render();
+}
+
+function timerUse(i) {
+  const log = S.logs[i];
+  const ex = S.workout.exercises[i];
+  const sec = S.timerSec;
+  log.repsPerSet = Array(ex.sets).fill(String(sec));
+  render();
+}
+
+// ---- SUMMARY ----
+function renderSummary() {
+  const w = S.workout;
+  const done = w.exercises.filter((_, i) => S.logs[i]?.done);
+  const skipped = w.exercises.filter((_, i) => !S.logs[i]?.done);
+  const totalSets = done.reduce((a, _, i) => {
+    const realI = w.exercises.indexOf(_);
+    return a + (S.logs[realI]?.setsCompleted || 0);
+  }, 0);
+
+  app.innerHTML = `
+  <div class="header"><div class="header-title">Review Workout</div><button class="header-user" onclick="S.screen='workout';render()">← Back</button></div>
+  <div class="body">
+    <div class="summary">
+      <h2>Workout Summary</h2>
+      <div class="summary-stat"><span class="summary-stat-label">Exercises done</span><span class="summary-stat-value">${done.length} / ${w.exercises.length}</span></div>
+      <div class="summary-stat"><span class="summary-stat-label">Sets completed</span><span class="summary-stat-value">${totalSets}</span></div>
+      ${S.error ? `<div class="error-msg">${S.error}</div>` : ''}
+      ${done.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px">Completed</div><div class="summary-list">${done.map(ex => {
+        const i = w.exercises.indexOf(ex);
+        const log = S.logs[i];
+        return `<div class="summary-ex"><div class="summary-ex-name">✅ ${ex.name}</div><div class="summary-ex-log">${ex.sets} sets · ${log?.reps || 'logged'} ${log?.notes ? '· ' + log.notes : ''}</div></div>`;
+      }).join('')}</div>` : ''}
+      ${skipped.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-top:8px">Skipped</div><div class="summary-list">${skipped.map(ex => `<div class="summary-ex" style="opacity:.5"><div class="summary-ex-name">— ${ex.name}</div></div>`).join('')}</div>` : ''}
+    </div>
+  </div>
+  <div class="bottom-bar">
+    <button class="btn btn-primary" onclick="submitWorkout()">Submit to Google Sheets →</button>
+  </div>`;
+}
+
+function renderUploading() {
+  app.innerHTML = `
+  <div class="auth-screen">
+    <div class="uploading"><div class="spinner"></div>Saving to Google Sheets…</div>
+  </div>`;
+}
+
+function renderSuccess() {
+  app.innerHTML = `
+  <div class="success-screen">
+    <div class="check">🎉</div>
+    <h2>Workout Logged!</h2>
+    <p>Your ${S.workout.name} has been saved to Google Sheets. Great work${S.user === 'josh' ? ', Josh' : ''}!</p>
+    <button class="btn btn-primary" style="max-width:300px;margin-top:16px" onclick="goHome()">Done</button>
+  </div>`;
+}
+
+function goHome() { S.user = null; S.screen = 'user'; render(); }
+
+// ═══════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════
+window.addEventListener('load', () => {
+  if (S.clientId) {
+    S.screen = 'auth';
+    setTimeout(initGIS, 500);
+  }
+  render();
+});
+</script>
+</body>
+</html>
