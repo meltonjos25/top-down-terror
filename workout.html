@@ -163,7 +163,6 @@ input.field::placeholder{color:var(--muted)}
 <body>
 <div id="app"></div>
 
-<script src="https://accounts.google.com/gsi/client" async></script>
 <script>
 // ═══════════════════════════════════════════════
 // CONFIG
@@ -430,24 +429,42 @@ function calcProgression(exercises, history) {
 }
 
 // ═══════════════════════════════════════════════
-// GOOGLE SHEETS API
+// GOOGLE SHEETS API  (redirect-based OAuth2 — works on all browsers)
 // ═══════════════════════════════════════════════
-let tokenClient = null;
+function getRedirectUri() {
+  return window.location.origin + window.location.pathname;
+}
 
-function initGIS() {
-  if (!S.clientId || typeof google === 'undefined') return;
-  try {
-    tokenClient = google.accounts.oauth2.initTokenClient({
-      client_id: S.clientId,
-      scope: SCOPE,
-      callback: async (resp) => {
-        if (resp.error) { S.error = 'Sign-in failed: ' + resp.error; render(); return; }
-        S.accessToken = resp.access_token;
-        S.tokenExpiry = Date.now() + (resp.expires_in - 30) * 1000;
-        await onSignedIn();
-      }
-    });
-  } catch(e) { S.error = e.message; render(); }
+function signIn() {
+  if (!S.clientId) { S.error = 'No Client ID saved.'; render(); return; }
+  const params = new URLSearchParams({
+    client_id: S.clientId,
+    redirect_uri: getRedirectUri(),
+    response_type: 'token',
+    scope: SCOPE,
+    include_granted_scopes: 'true',
+    prompt: 'select_account',
+  });
+  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
+}
+
+function checkForToken() {
+  const hash = window.location.hash;
+  if (!hash || hash.length < 2) return false;
+  const params = new URLSearchParams(hash.slice(1));
+  const token = params.get('access_token');
+  if (token) {
+    S.accessToken = token;
+    S.tokenExpiry = Date.now() + (parseInt(params.get('expires_in') || '3600') - 30) * 1000;
+    history.replaceState(null, '', window.location.pathname);
+    return true;
+  }
+  const err = params.get('error');
+  if (err) {
+    S.error = `Auth error: ${err}${params.get('error_description') ? ' — ' + decodeURIComponent(params.get('error_description').replace(/\+/g,' ')) : ''}`;
+    history.replaceState(null, '', window.location.pathname);
+  }
+  return false;
 }
 
 function needsAuth() { return !S.accessToken || Date.now() > S.tokenExpiry; }
@@ -544,8 +561,9 @@ function renderSetup() {
       <div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> and create or select a project</div></div>
       <div class="step"><div class="step-num">2</div><div class="step-text">Enable the <strong>Google Sheets API</strong> (APIs & Services → Enable APIs)</div></div>
       <div class="step"><div class="step-num">3</div><div class="step-text">Go to <strong>Credentials → Create Credentials → OAuth 2.0 Client ID</strong><br>Type: <strong>Web application</strong></div></div>
-      <div class="step"><div class="step-num">4</div><div class="step-text">Under Authorized JavaScript origins add:<br><code>https://meltonjos25.github.io</code></div></div>
-      <div class="step"><div class="step-num">5</div><div class="step-text">Copy your Client ID and paste it below</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Under <strong>Authorized JavaScript origins</strong> add:<br><code>https://meltonjos25.github.io</code></div></div>
+      <div class="step"><div class="step-num">5</div><div class="step-text">Under <strong>Authorized redirect URIs</strong> add:<br><code>https://meltonjos25.github.io/top-down-terror/workout.html</code></div></div>
+      <div class="step"><div class="step-num">6</div><div class="step-text">Copy your Client ID and paste it below</div></div>
     </div>
     <input class="field" id="cid" type="text" placeholder="Paste Client ID here (ends in .apps.googleusercontent.com)" value="${S.clientId}">
     ${S.error ? `<div class="error-msg">${S.error}</div>` : ''}
@@ -562,14 +580,12 @@ function saveClientId() {
   S.error = '';
   S.screen = 'auth';
   render();
-  setTimeout(initGIS, 200);
 }
 
 function trySkipSetup() {
   if (!S.clientId) { S.error = 'No Client ID saved. Please complete setup.'; render(); return; }
   S.screen = 'auth';
   render();
-  setTimeout(initGIS, 200);
 }
 
 // ---- AUTH ----
@@ -578,7 +594,7 @@ function renderAuth() {
   <div class="auth-screen">
     <div class="logo">💪</div>
     <h2>Sign in with Google</h2>
-    <p>We need access to your Google Sheets to log your workouts. No data is stored on any server.</p>
+    <p>We need access to your Google Sheets to log your workouts. Tapping the button below will take you to Google and bring you right back.</p>
     ${S.error ? `<div class="error-msg" style="max-width:320px">${S.error}</div>` : ''}
     <button class="g-btn" onclick="signIn()">
       <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
@@ -586,16 +602,6 @@ function renderAuth() {
     </button>
     <button class="btn-ghost btn" onclick="S.screen='setup';render()">← Back to setup</button>
   </div>`;
-  setTimeout(initGIS, 100);
-}
-
-function signIn() {
-  S.error = '';
-  if (!tokenClient) {
-    initGIS();
-    if (!tokenClient) { S.error = 'Google sign-in not ready. Check your Client ID.'; render(); return; }
-  }
-  tokenClient.requestAccessToken({ prompt: '' });
 }
 
 // ---- USER SELECT ----
@@ -913,11 +919,13 @@ function goHome() { S.user = null; S.screen = 'user'; render(); }
 // ═══════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════
-window.addEventListener('load', () => {
-  if (S.clientId) {
-    S.screen = 'auth';
-    setTimeout(initGIS, 500);
+window.addEventListener('load', async () => {
+  if (checkForToken()) {
+    // Returned from Google OAuth redirect with a token
+    await onSignedIn();
+    return;
   }
+  if (S.clientId) S.screen = 'auth';
   render();
 });
 </script>
