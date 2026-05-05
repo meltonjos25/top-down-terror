@@ -167,8 +167,6 @@ input.field::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════
-const SPREADSHEET_ID = '1zqR0CeERQg_8YtgWnQYxiFKAbGcZb4Zvf-R1Iqn46t8';
-const SCOPE = 'https://www.googleapis.com/auth/spreadsheets';
 const JOSH_LOG_SHEET = 'Josh — Workout Log';
 const WIFE_LOG_SHEET = 'Wife — Workout Log';
 
@@ -360,17 +358,15 @@ const WORKOUTS = {
 // APP STATE
 // ═══════════════════════════════════════════════
 const S = {
-  screen: 'setup',    // setup | auth | user | workout | summary | success
-  clientId: localStorage.getItem('gClientId') || '',
-  accessToken: null,
-  tokenExpiry: 0,
+  screen: 'setup',    // setup | user | workout | summary | uploading | success
+  gasUrl: localStorage.getItem('gasUrl') || '',
   user: null,          // 'josh' | 'wife'
   day: null,
   workout: null,
-  logs: {},            // exerciseName -> {setsCompleted, repsPerSet[], notes, done}
-  progression: {},     // exerciseName -> adjustedTarget string
-  history: [],         // rows from Sheets log
-  modal: null,         // exercise index currently open
+  logs: {},
+  progression: {},
+  history: [],
+  modal: null,
   timerInterval: null,
   timerSec: 0,
   timerRunning: false,
@@ -429,79 +425,29 @@ function calcProgression(exercises, history) {
 }
 
 // ═══════════════════════════════════════════════
-// GOOGLE SHEETS API  (redirect-based OAuth2 — works on all browsers)
+// GOOGLE APPS SCRIPT API  (no sign-in required — works on all devices)
 // ═══════════════════════════════════════════════
-function getRedirectUri() {
-  return window.location.origin + window.location.pathname;
+async function gasRead(sheetName) {
+  const url = `${S.gasUrl}?action=read&sheet=${encodeURIComponent(sheetName)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Read failed: ${r.status}`);
+  const json = await r.json();
+  return json.rows || [];
 }
 
-function signIn() {
-  if (!S.clientId) { S.error = 'No Client ID saved.'; render(); return; }
-  const params = new URLSearchParams({
-    client_id: S.clientId,
-    redirect_uri: getRedirectUri(),
-    response_type: 'token',
-    scope: SCOPE,
-    include_granted_scopes: 'true',
-    prompt: 'select_account',
-  });
-  window.location.href = `https://accounts.google.com/o/oauth2/v2/auth?${params}`;
-}
-
-function checkForToken() {
-  const hash = window.location.hash;
-  if (!hash || hash.length < 2) return false;
-  const params = new URLSearchParams(hash.slice(1));
-  const token = params.get('access_token');
-  if (token) {
-    S.accessToken = token;
-    S.tokenExpiry = Date.now() + (parseInt(params.get('expires_in') || '3600') - 30) * 1000;
-    history.replaceState(null, '', window.location.pathname);
-    return true;
-  }
-  const err = params.get('error');
-  if (err) {
-    S.error = `Auth error: ${err}${params.get('error_description') ? ' — ' + decodeURIComponent(params.get('error_description').replace(/\+/g,' ')) : ''}`;
-    history.replaceState(null, '', window.location.pathname);
-  }
-  return false;
-}
-
-function needsAuth() { return !S.accessToken || Date.now() > S.tokenExpiry; }
-
-async function sheetsGet(range) {
-  const r = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(range)}`,
-    { headers: { Authorization: `Bearer ${S.accessToken}` } }
-  );
-  if (!r.ok) throw new Error(`Sheets read failed: ${r.status}`);
-  return r.json();
-}
-
-async function sheetsAppend(sheet, values) {
-  const r = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${encodeURIComponent(sheet + '!A:H')}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`,
-    {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${S.accessToken}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ values })
-    }
-  );
-  if (!r.ok) { const t = await r.text(); throw new Error(`Sheets write failed: ${r.status} ${t}`); }
+async function gasWrite(sheetName, rows) {
+  const data = encodeURIComponent(JSON.stringify({sheet: sheetName, rows}));
+  const url = `${S.gasUrl}?action=log&data=${data}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Write failed: ${r.status}`);
   return r.json();
 }
 
 async function loadHistory() {
   try {
     const sheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
-    const data = await sheetsGet(`${sheet}!A2:H`);
-    S.history = data.values || [];
+    S.history = await gasRead(sheet);
   } catch(e) { S.history = []; }
-}
-
-async function onSignedIn() {
-  S.screen = 'user';
-  render();
 }
 
 async function submitWorkout() {
@@ -525,7 +471,7 @@ async function submitWorkout() {
         '✅'
       ]);
     });
-    if (rows.length) await sheetsAppend(sheet, rows);
+    if (rows.length) await gasWrite(sheet, rows);
     S.screen = 'success';
     render();
   } catch(e) {
@@ -542,7 +488,6 @@ const app = document.getElementById('app');
 
 function render() {
   if (S.screen === 'setup')     return renderSetup();
-  if (S.screen === 'auth')      return renderAuth();
   if (S.screen === 'user')      return renderUserSelect();
   if (S.screen === 'workout')   return renderWorkout();
   if (S.screen === 'summary')   return renderSummary();
@@ -551,63 +496,82 @@ function render() {
 }
 
 // ---- SETUP ----
+const GAS_CODE = `const JOSH_LOG = 'Josh \\u2014 Workout Log';
+const WIFE_LOG = 'Wife \\u2014 Workout Log';
+const SHEET_ID = '1zqR0CeERQg_8YtgWnQYxiFKAbGcZb4Zvf-R1Iqn46t8';
+
+function doGet(e) {
+  const action = (e.parameter.action || 'ping');
+  const ss = SpreadsheetApp.openById(SHEET_ID);
+  if (action === 'log') {
+    const data = JSON.parse(decodeURIComponent(e.parameter.data));
+    const sheet = ss.getSheetByName(data.sheet);
+    if (sheet) data.rows.forEach(function(row){ sheet.appendRow(row); });
+    return res({success:true});
+  }
+  if (action === 'read') {
+    const sheet = ss.getSheetByName(e.parameter.sheet);
+    const rows = sheet ? sheet.getDataRange().getValues().slice(1) : [];
+    return res({rows:rows});
+  }
+  return res({status:'ok'});
+}
+
+function res(data) {
+  return ContentService
+    .createTextOutput(JSON.stringify(data))
+    .setMimeType(ContentService.MimeType.JSON);
+}`;
+
 function renderSetup() {
   app.innerHTML = `
   <div class="setup">
     <div style="font-size:48px;margin-bottom:-8px">🏋️</div>
     <h1>Morning Workout<br>Josh & Wife</h1>
-    <p>This app syncs your workouts to Google Sheets. You need a free Google Cloud Client ID to connect.</p>
+    <p>One-time setup: deploy a tiny Google Apps Script so the app can write to your sheet — no sign-in needed on your phone.</p>
     <div class="setup-steps">
-      <div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://console.cloud.google.com" target="_blank">console.cloud.google.com</a> and create or select a project</div></div>
-      <div class="step"><div class="step-num">2</div><div class="step-text">Enable the <strong>Google Sheets API</strong> (APIs & Services → Enable APIs)</div></div>
-      <div class="step"><div class="step-num">3</div><div class="step-text">Go to <strong>Credentials → Create Credentials → OAuth 2.0 Client ID</strong><br>Type: <strong>Web application</strong></div></div>
-      <div class="step"><div class="step-num">4</div><div class="step-text">Under <strong>Authorized JavaScript origins</strong> add:<br><code>https://meltonjos25.github.io</code></div></div>
-      <div class="step"><div class="step-num">5</div><div class="step-text">Under <strong>Authorized redirect URIs</strong> add:<br><code>https://meltonjos25.github.io/top-down-terror/workout.html</code></div></div>
-      <div class="step"><div class="step-num">6</div><div class="step-text">Copy your Client ID and paste it below</div></div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://script.google.com" target="_blank">script.google.com</a> → click <strong>New project</strong></div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Delete everything in the editor, paste the code below, then click <strong>Save</strong> (disk icon)</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Click <strong>Deploy → New deployment</strong> → gear icon → <strong>Web app</strong><br>• Execute as: <strong>Me</strong><br>• Who has access: <strong>Anyone</strong><br>→ click <strong>Deploy</strong></div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text">Copy the <strong>Web app URL</strong> and paste it below</div></div>
     </div>
-    <input class="field" id="cid" type="text" placeholder="Paste Client ID here (ends in .apps.googleusercontent.com)" value="${S.clientId}">
+    <div style="position:relative">
+      <pre style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:11px;overflow-x:auto;white-space:pre;color:var(--muted);line-height:1.5">${GAS_CODE.replace(/</g,'&lt;')}</pre>
+      <button class="btn btn-secondary btn-sm" style="position:absolute;top:10px;right:10px" onclick="copyGasCode()">Copy</button>
+    </div>
+    <input class="field" id="gasurl" type="url" placeholder="https://script.google.com/macros/s/…/exec" value="${S.gasUrl}">
     ${S.error ? `<div class="error-msg">${S.error}</div>` : ''}
-    <button class="btn btn-primary" onclick="saveClientId()">Continue →</button>
-    <div class="skip-link">Already set up? <a onclick="trySkipSetup()">Skip to sign in</a></div>
+    <button class="btn btn-primary" onclick="saveGasUrl()">Continue →</button>
+    <div class="skip-link">Already set up? <a onclick="trySkip()">Skip to workout</a></div>
   </div>`;
 }
 
-function saveClientId() {
-  const v = document.getElementById('cid').value.trim();
-  if (!v) { S.error = 'Please enter your Client ID.'; render(); return; }
-  S.clientId = v;
-  localStorage.setItem('gClientId', v);
+function copyGasCode() {
+  navigator.clipboard.writeText(GAS_CODE).catch(() => {});
+  const btn = document.querySelector('.setup pre + button');
+  if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 2000); }
+}
+
+function saveGasUrl() {
+  const v = document.getElementById('gasurl').value.trim();
+  if (!v || !v.startsWith('https://')) { S.error = 'Please enter a valid web app URL.'; render(); return; }
+  S.gasUrl = v;
+  localStorage.setItem('gasUrl', v);
   S.error = '';
-  S.screen = 'auth';
+  S.screen = 'user';
   render();
 }
 
-function trySkipSetup() {
-  if (!S.clientId) { S.error = 'No Client ID saved. Please complete setup.'; render(); return; }
-  S.screen = 'auth';
+function trySkip() {
+  if (!S.gasUrl) { S.error = 'No URL saved yet. Complete the steps above.'; render(); return; }
+  S.screen = 'user';
   render();
-}
-
-// ---- AUTH ----
-function renderAuth() {
-  app.innerHTML = `
-  <div class="auth-screen">
-    <div class="logo">💪</div>
-    <h2>Sign in with Google</h2>
-    <p>We need access to your Google Sheets to log your workouts. Tapping the button below will take you to Google and bring you right back.</p>
-    ${S.error ? `<div class="error-msg" style="max-width:320px">${S.error}</div>` : ''}
-    <button class="g-btn" onclick="signIn()">
-      <svg viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.29-8.16 2.29-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/><path fill="none" d="M0 0h48v48H0z"/></svg>
-      Sign in with Google
-    </button>
-    <button class="btn-ghost btn" onclick="S.screen='setup';render()">← Back to setup</button>
-  </div>`;
 }
 
 // ---- USER SELECT ----
 function renderUserSelect() {
   app.innerHTML = `
-  <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="signOut()">Sign out</button></div>
+  <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="S.screen='setup';render()">⚙ Setup</button></div>
   <div class="user-select">
     <h2>Who's working out?</h2>
     <div class="user-card" onclick="selectUser('josh')">
@@ -636,9 +600,6 @@ async function selectUser(who) {
   render();
 }
 
-function signOut() {
-  S.accessToken = null; S.user = null; S.screen = 'auth'; render();
-}
 
 // ---- WORKOUT ----
 function renderWorkout() {
@@ -919,13 +880,8 @@ function goHome() { S.user = null; S.screen = 'user'; render(); }
 // ═══════════════════════════════════════════════
 // BOOT
 // ═══════════════════════════════════════════════
-window.addEventListener('load', async () => {
-  if (checkForToken()) {
-    // Returned from Google OAuth redirect with a token
-    await onSignedIn();
-    return;
-  }
-  if (S.clientId) S.screen = 'auth';
+window.addEventListener('load', () => {
+  if (S.gasUrl) S.screen = 'user';
   render();
 });
 </script>
