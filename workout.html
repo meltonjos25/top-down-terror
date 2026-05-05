@@ -404,10 +404,11 @@ function calcProgression(exercises, history) {
     const date = row[0];
     if (!byName[name] || date > byName[name].date) byName[name] = {date, reps};
   });
+  const NO_PROGRESS = new Set(['Warm-Up', 'Cool-Down', 'Finisher']);
   exercises.forEach(ex => {
     const parsed = parseTarget(ex.target);
     const last = byName[ex.name];
-    if (!last || parsed.unit === 'max' || parsed.unit === 'interval' || parsed.unit === 'complex' || !parsed.value) {
+    if (NO_PROGRESS.has(ex.block) || !last || parsed.unit === 'max' || parsed.unit === 'interval' || parsed.unit === 'complex' || !parsed.value) {
       prog[ex.name] = {target: ex.target, progressed: false};
       return;
     }
