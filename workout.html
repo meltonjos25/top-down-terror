@@ -1,9 +1,9 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Morning Workout â€” Josh & Wife</title>
+<title>Morning Workout — Josh & Wife</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -164,43 +164,43 @@ input.field::placeholder{color:var(--muted)}
 <div id="app"></div>
 
 <script>
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 // CONFIG
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-const JOSH_LOG_SHEET = 'Josh â€” Workout Log';
-const WIFE_LOG_SHEET = 'Wife â€” Workout Log';
+// ═══════════════════════════════════════════════
+const JOSH_LOG_SHEET = 'Josh — Workout Log';
+const WIFE_LOG_SHEET = 'Wife — Workout Log';
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 // PLAN SHEET MAPPING  (which sheet + workout name for each user/day)
-// Edit exercises, sets, and reps directly in Google Sheets â€” the app reads
+// Edit exercises, sets, and reps directly in Google Sheets — the app reads
 // them fresh on each load. Sheet columns must be:
 //   Day | Block | Exercise | Sets | Target Reps/Time | Demo Link | Coaching Note
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 const PLAN_SHEETS = {
   josh: {
-    Monday:    { sheet: 'Josh â€” Core', name: 'Core Workout A',  type: 'CORE', duration: '30 min' },
-    Tuesday:   { sheet: 'Josh â€” Arms', name: 'Arms Workout A',  type: 'ARMS', duration: '30 min' },
-    Wednesday: { sheet: 'Josh â€” Core', name: 'Core Workout B',  type: 'CORE', duration: '30 min' },
-    Thursday:  { sheet: 'Josh â€” Arms', name: 'Arms Workout B',  type: 'ARMS', duration: '30 min' },
-    Friday:    { sheet: 'Josh â€” Core', name: 'Core Workout C',  type: 'CORE', duration: '30 min' },
-    Saturday:  { sheet: 'Josh â€” Arms', name: 'Arms Workout C',  type: 'ARMS', duration: '30 min' },
+    Monday:    { sheet: 'Josh — Core', name: 'Core Workout A',  type: 'CORE', duration: '30 min' },
+    Tuesday:   { sheet: 'Josh — Arms', name: 'Arms Workout A',  type: 'ARMS', duration: '30 min' },
+    Wednesday: { sheet: 'Josh — Core', name: 'Core Workout B',  type: 'CORE', duration: '30 min' },
+    Thursday:  { sheet: 'Josh — Arms', name: 'Arms Workout B',  type: 'ARMS', duration: '30 min' },
+    Friday:    { sheet: 'Josh — Core', name: 'Core Workout C',  type: 'CORE', duration: '30 min' },
+    Saturday:  { sheet: 'Josh — Arms', name: 'Arms Workout C',  type: 'ARMS', duration: '30 min' },
     Sunday:    null,
   },
   wife: {
-    Monday:    { sheet: 'Wife â€” Core', name: 'Core Workout A',  type: 'CORE', duration: '30 min' },
+    Monday:    { sheet: 'Wife — Core', name: 'Core Workout A',  type: 'CORE', duration: '30 min' },
     Tuesday:   null,
-    Wednesday: { sheet: 'Wife â€” Core', name: 'Core Workout B',  type: 'CORE', duration: '30 min' },
+    Wednesday: { sheet: 'Wife — Core', name: 'Core Workout B',  type: 'CORE', duration: '30 min' },
     Thursday:  null,
-    Friday:    { sheet: 'Wife â€” Core', name: 'Core Workout C',  type: 'CORE', duration: '30 min' },
+    Friday:    { sheet: 'Wife — Core', name: 'Core Workout C',  type: 'CORE', duration: '30 min' },
     Saturday:  null,
     Sunday:    null,
   }
 };
 
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 // APP STATE
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 const S = {
   screen: 'setup',    // setup | user | workout | summary | uploading | success
   gasUrl: localStorage.getItem('gasUrl') || '',
@@ -221,14 +221,14 @@ function today() {
   return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 // PROGRESSION LOGIC
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 function parseTarget(str) {
   str = str || '';
   if (/failure|max|burnout|gauntlet|triset|flow/i.test(str)) return {value: null, unit: 'max'};
   if (/on\s*\/\s*off/i.test(str)) return {value: null, unit: 'interval'};
-  if (/â†’|â†’/i.test(str)) return {value: null, unit: 'complex'};
+  if (/→|→/i.test(str)) return {value: null, unit: 'complex'};
   const perSide = /side|arm|leg/i.test(str);
   const sec = str.match(/(\d+)\s*sec/i);
   if (sec) return {value: parseInt(sec[1]), unit: 'sec', perSide};
@@ -269,9 +269,9 @@ function calcProgression(exercises, history) {
   return prog;
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-// GOOGLE APPS SCRIPT API  (no sign-in required â€” works on all devices)
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
+// GOOGLE APPS SCRIPT API  (no sign-in required — works on all devices)
+// ═══════════════════════════════════════════════
 async function gasRead(sheetName) {
   const url = `${S.gasUrl}?action=read&sheet=${encodeURIComponent(sheetName)}`;
   const r = await fetch(url);
@@ -324,7 +324,7 @@ async function submitWorkout() {
         String(log.setsCompleted || ex.sets),
         log.reps || '',
         log.notes || '',
-        'âœ…'
+        '✅'
       ]);
     });
     if (rows.length) await gasWrite(sheet, rows);
@@ -337,9 +337,9 @@ async function submitWorkout() {
   }
 }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 // RENDER
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 const app = document.getElementById('app');
 
 function render() {
@@ -398,22 +398,22 @@ function res(data) {
 function renderSetup() {
   app.innerHTML = `
   <div class="setup">
-    <div style="font-size:48px;margin-bottom:-8px">ðŸ‹ï¸</div>
+    <div style="font-size:48px;margin-bottom:-8px">🏋️</div>
     <h1>Morning Workout<br>Josh & Wife</h1>
-    <p>One-time setup: deploy a tiny Google Apps Script so the app can write to your sheet â€” no sign-in needed on your phone.</p>
+    <p>One-time setup: deploy a tiny Google Apps Script so the app can write to your sheet — no sign-in needed on your phone.</p>
     <div class="setup-steps">
-      <div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://script.google.com" target="_blank">script.google.com</a> â†’ click <strong>New project</strong></div></div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://script.google.com" target="_blank">script.google.com</a> → click <strong>New project</strong></div></div>
       <div class="step"><div class="step-num">2</div><div class="step-text">Delete everything in the editor, paste the code below, then click <strong>Save</strong> (disk icon)</div></div>
-      <div class="step"><div class="step-num">3</div><div class="step-text">Click <strong>Deploy â†’ New deployment</strong> â†’ gear icon â†’ <strong>Web app</strong><br>â€¢ Execute as: <strong>Me</strong><br>â€¢ Who has access: <strong>Anyone</strong><br>â†’ click <strong>Deploy</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Click <strong>Deploy → New deployment</strong> → gear icon → <strong>Web app</strong><br>• Execute as: <strong>Me</strong><br>• Who has access: <strong>Anyone</strong><br>→ click <strong>Deploy</strong></div></div>
       <div class="step"><div class="step-num">4</div><div class="step-text">Copy the <strong>Web app URL</strong> and paste it below</div></div>
     </div>
     <div style="position:relative">
       <pre style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:11px;overflow-x:auto;white-space:pre;color:var(--muted);line-height:1.5">${GAS_CODE.replace(/</g,'&lt;')}</pre>
       <button class="btn btn-secondary btn-sm" style="position:absolute;top:10px;right:10px" onclick="copyGasCode()">Copy</button>
     </div>
-    <input class="field" id="gasurl" type="url" placeholder="https://script.google.com/macros/s/â€¦/exec" value="${S.gasUrl}">
+    <input class="field" id="gasurl" type="url" placeholder="https://script.google.com/macros/s/…/exec" value="${S.gasUrl}">
     ${S.error ? `<div class="error-msg">${S.error}</div>` : ''}
-    <button class="btn btn-primary" onclick="saveGasUrl()">Continue â†’</button>
+    <button class="btn btn-primary" onclick="saveGasUrl()">Continue →</button>
     <div class="skip-link">Already set up? <a onclick="trySkip()">Skip to workout</a></div>
   </div>`;
 }
@@ -443,18 +443,18 @@ function trySkip() {
 // ---- USER SELECT ----
 function renderUserSelect() {
   app.innerHTML = `
-  <div class="header"><div class="header-title">ðŸ‹ï¸ Morning Workout</div><button class="header-user" onclick="S.screen='setup';render()">âš™ Setup</button></div>
+  <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="S.screen='setup';render()">⚙ Setup</button></div>
   <div class="user-select">
     <h2>Who's working out?</h2>
     <div class="user-card" onclick="selectUser('josh')">
-      <div class="icon">ðŸ’ª</div>
+      <div class="icon">💪</div>
       <h3>Josh</h3>
-      <p>Core (Mon/Wed/Fri) Â· Arms (Tue/Thu/Sat)</p>
+      <p>Core (Mon/Wed/Fri) · Arms (Tue/Thu/Sat)</p>
     </div>
     <div class="user-card" onclick="selectUser('wife')">
-      <div class="icon">ðŸŒŸ</div>
+      <div class="icon">🌟</div>
       <h3>Wife</h3>
-      <p>Core (Mon/Wed/Fri) Â· Rest other days</p>
+      <p>Core (Mon/Wed/Fri) · Rest other days</p>
     </div>
   </div>`;
 }
@@ -502,12 +502,12 @@ function renderWorkout() {
 
   if (w.type === 'REST') {
     app.innerHTML = `
-    <div class="header"><div class="header-title">ðŸ‹ï¸ Morning Workout</div><button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button></div>
+    <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button></div>
     <div class="rest-day">
-      <div class="icon">ðŸ˜´</div>
+      <div class="icon">😴</div>
       <h2>${w.name}</h2>
-      <p>Today is a rest day. Recovery is part of the program â€” enjoy it.</p>
-      <button class="btn btn-secondary" style="max-width:280px;margin-top:16px" onclick="S.screen='user';render()">â† Change user</button>
+      <p>Today is a rest day. Recovery is part of the program — enjoy it.</p>
+      <button class="btn btn-secondary" style="max-width:280px;margin-top:16px" onclick="S.screen='user';render()">← Change user</button>
     </div>`;
     return;
   }
@@ -537,15 +537,15 @@ function renderWorkout() {
       const progressed = prog?.progressed;
       blockHTML += `
       <div class="exercise-row${isDone ? ' done' : ''}" onclick="openModal(${i})">
-        <div class="exercise-check${isDone ? ' checked' : ''}">${isDone ? 'âœ“' : ''}</div>
+        <div class="exercise-check${isDone ? ' checked' : ''}">${isDone ? '✓' : ''}</div>
         <div class="exercise-info">
           <div class="exercise-name">${ex.name}</div>
           <div class="exercise-meta">
-            <span>${ex.sets}Ã—</span><span>${target}</span>
-            ${progressed ? '<span class="prog-badge">â†‘ PROGRESSED</span>' : ''}
+            <span>${ex.sets}×</span><span>${target}</span>
+            ${progressed ? '<span class="prog-badge">↑ PROGRESSED</span>' : ''}
           </div>
         </div>
-        <div class="exercise-arrow">â€º</div>
+        <div class="exercise-arrow">›</div>
       </div>`;
     });
     blockHTML += '</div>';
@@ -554,7 +554,7 @@ function renderWorkout() {
   const canSubmit = done > 0;
   app.innerHTML = `
   <div class="header">
-    <div class="header-title">${S.day} Â· ${w.name}</div>
+    <div class="header-title">${S.day} · ${w.name}</div>
     <button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button>
   </div>
   <div class="body">
@@ -575,7 +575,7 @@ function renderWorkout() {
   </div>
   <div class="bottom-bar">
     <button class="btn btn-primary" onclick="S.screen='summary';render()" ${!canSubmit ? 'disabled style="opacity:.4"' : ''}>
-      Review & Submit Workout â†’
+      Review & Submit Workout →
     </button>
   </div>
   ${S.modal !== null ? renderModal() : ''}`;
@@ -612,10 +612,10 @@ function renderModal() {
     <div class="set-row">
       <div class="set-label">Set ${s+1}</div>
       <div class="set-input-wrap">
-        <input class="set-input" type="number" min="0" value="${log.repsPerSet[s] || ''}" placeholder="${isMax ? 'â€”' : (isTimed ? '0' : '0')}" oninput="setRep(${i},${s},this.value)">
+        <input class="set-input" type="number" min="0" value="${log.repsPerSet[s] || ''}" placeholder="${isMax ? '—' : (isTimed ? '0' : '0')}" oninput="setRep(${i},${s},this.value)">
         <span class="set-unit">${isTimed ? 'sec' : isMax ? 'reps' : parsed.unit === 'reps' ? 'reps' : ''}</span>
       </div>
-      <button class="set-check${checked ? ' done' : ''}" onclick="toggleSet(${i},${s})">${checked ? 'âœ“' : ''}</button>
+      <button class="set-check${checked ? ' done' : ''}" onclick="toggleSet(${i},${s})">${checked ? '✓' : ''}</button>
     </div>`;
   }).join('');
 
@@ -629,8 +629,8 @@ function renderModal() {
     <div class="timer-target">Target: ${target}</div>
     <div class="timer-display ${timerClass}">${mm}:${ss}</div>
     <div class="timer-row">
-      <button class="timer-btn" onclick="timerToggle()">${S.timerRunning ? 'â¸ Pause' : 'â–¶ Start'}</button>
-      <button class="timer-btn" onclick="timerReset()">â†º Reset</button>
+      <button class="timer-btn" onclick="timerToggle()">${S.timerRunning ? '⏸ Pause' : '▶ Start'}</button>
+      <button class="timer-btn" onclick="timerReset()">↺ Reset</button>
       <button class="timer-btn" onclick="timerUse(${i})">Use Time</button>
     </div>
   </div>` : '';
@@ -641,16 +641,16 @@ function renderModal() {
       <div class="modal-handle"></div>
       <div class="modal-header">
         <div class="modal-title">${ex.name}</div>
-        <button class="modal-close" onclick="closeModal()">Ã—</button>
+        <button class="modal-close" onclick="closeModal()">×</button>
       </div>
       <div class="modal-body">
         ${ex.note ? `<div class="modal-note">${ex.note}</div>` : ''}
-        ${ex.demo ? `<a class="modal-demo" href="${ex.demo}" target="_blank">â–¶ Watch Demo</a>` : ''}
-        <div class="target-hint">Target: <strong>${ex.sets} Ã— ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">â†‘ PROGRESSED</span>' : ''}</div>
+        ${ex.demo ? `<a class="modal-demo" href="${ex.demo}" target="_blank">▶ Watch Demo</a>` : ''}
+        <div class="target-hint">Target: <strong>${ex.sets} × ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">↑ PROGRESSED</span>' : ''}</div>
         ${timerHTML}
         <div class="sets-section">${setsHTML}</div>
-        <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it feltâ€¦" oninput="setNote(${i},this.value)">${log.notes}</textarea>
-        <button class="btn btn-primary" onclick="markDone(${i})">âœ“ Mark Complete</button>
+        <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it felt…" oninput="setNote(${i},this.value)">${log.notes}</textarea>
+        <button class="btn btn-primary" onclick="markDone(${i})">✓ Mark Complete</button>
         <button class="btn btn-secondary" style="margin-top:10px" onclick="closeModal()">Close</button>
       </div>
     </div>
@@ -700,7 +700,7 @@ function timerToggle() {
         d.className = 'timer-display running';
       }
       const btn = document.querySelector('.timer-btn');
-      if (btn) btn.textContent = 'â¸ Pause';
+      if (btn) btn.textContent = '⏸ Pause';
     }, 1000);
   }
   render();
@@ -732,7 +732,7 @@ function renderSummary() {
   }, 0);
 
   app.innerHTML = `
-  <div class="header"><div class="header-title">Review Workout</div><button class="header-user" onclick="S.screen='workout';render()">â† Back</button></div>
+  <div class="header"><div class="header-title">Review Workout</div><button class="header-user" onclick="S.screen='workout';render()">← Back</button></div>
   <div class="body">
     <div class="summary">
       <h2>Workout Summary</h2>
@@ -742,27 +742,27 @@ function renderSummary() {
       ${done.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px">Completed</div><div class="summary-list">${done.map(ex => {
         const i = w.exercises.indexOf(ex);
         const log = S.logs[i];
-        return `<div class="summary-ex"><div class="summary-ex-name">âœ… ${ex.name}</div><div class="summary-ex-log">${ex.sets} sets Â· ${log?.reps || 'logged'} ${log?.notes ? 'Â· ' + log.notes : ''}</div></div>`;
+        return `<div class="summary-ex"><div class="summary-ex-name">✅ ${ex.name}</div><div class="summary-ex-log">${ex.sets} sets · ${log?.reps || 'logged'} ${log?.notes ? '· ' + log.notes : ''}</div></div>`;
       }).join('')}</div>` : ''}
-      ${skipped.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-top:8px">Skipped</div><div class="summary-list">${skipped.map(ex => `<div class="summary-ex" style="opacity:.5"><div class="summary-ex-name">â€” ${ex.name}</div></div>`).join('')}</div>` : ''}
+      ${skipped.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-top:8px">Skipped</div><div class="summary-list">${skipped.map(ex => `<div class="summary-ex" style="opacity:.5"><div class="summary-ex-name">— ${ex.name}</div></div>`).join('')}</div>` : ''}
     </div>
   </div>
   <div class="bottom-bar">
-    <button class="btn btn-primary" onclick="submitWorkout()">Submit to Google Sheets â†’</button>
+    <button class="btn btn-primary" onclick="submitWorkout()">Submit to Google Sheets →</button>
   </div>`;
 }
 
 function renderUploading() {
   app.innerHTML = `
   <div class="auth-screen">
-    <div class="uploading"><div class="spinner"></div>Saving to Google Sheetsâ€¦</div>
+    <div class="uploading"><div class="spinner"></div>Saving to Google Sheets…</div>
   </div>`;
 }
 
 function renderSuccess() {
   app.innerHTML = `
   <div class="success-screen">
-    <div class="check">ðŸŽ‰</div>
+    <div class="check">🎉</div>
     <h2>Workout Logged!</h2>
     <p>Your ${S.workout.name} has been saved to Google Sheets. Great work${S.user === 'josh' ? ', Josh' : ''}!</p>
     <button class="btn btn-primary" style="max-width:300px;margin-top:16px" onclick="goHome()">Done</button>
@@ -771,9 +771,9 @@ function renderSuccess() {
 
 function goHome() { S.user = null; S.screen = 'user'; render(); }
 
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 // BOOT
-// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// ═══════════════════════════════════════════════
 window.addEventListener('load', () => {
   if (S.gasUrl) S.screen = 'user';
   render();
