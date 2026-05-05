@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Morning Workout — Josh & Wife</title>
+<title>Morning Workout â€” Josh & Wife</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -164,199 +164,43 @@ input.field::placeholder{color:var(--muted)}
 <div id="app"></div>
 
 <script>
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // CONFIG
-// ═══════════════════════════════════════════════
-const JOSH_LOG_SHEET = 'Josh — Workout Log';
-const WIFE_LOG_SHEET = 'Wife — Workout Log';
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const JOSH_LOG_SHEET = 'Josh â€” Workout Log';
+const WIFE_LOG_SHEET = 'Wife â€” Workout Log';
 
-// ═══════════════════════════════════════════════
-// WORKOUT DATA
-// ═══════════════════════════════════════════════
-const W = (block, name, sets, target, demo, note='') => ({block, name, sets, target, demo, note});
-const D = id => `https://drive.google.com/uc?export=view&id=${id}`;
-
-const WORKOUTS = {
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// PLAN SHEET MAPPING  (which sheet + workout name for each user/day)
+// Edit exercises, sets, and reps directly in Google Sheets â€” the app reads
+// them fresh on each load. Sheet columns must be:
+//   Day | Block | Exercise | Sets | Target Reps/Time | Demo Link | Coaching Note
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+const PLAN_SHEETS = {
   josh: {
-    Monday: {
-      name: 'Core Workout A', type: 'CORE', duration: '30 min',
-      exercises: [
-        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe'),'Slow, full range of motion'),
-        W('Warm-Up','Dead Bug (Arms Only)',1,'10/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'Press low back flat to floor'),
-        W('Warm-Up','Glute Bridge',1,'15 reps',D('1N4wQeNv6X7O-_5rqlJXIIwNXQq5C7Hia'),'Activate posterior chain'),
-        W('Warm-Up',"World's Greatest Stretch",1,'5/side',D('1OWzGx1QuRAQwIDovrmkCvo_wiwa5emXE'),'Hip flexors + thoracic rotation'),
-        W('Block 1','RKC Plank',3,'45 sec',D('1Zz6mLD6TrKn1dDPTCYPhqrSKpcXoGkRg'),'Max tension — drag elbows toward toes. Squeeze everything.'),
-        W('Block 1','Plank to Push-Up',3,'10 reps',D('1PeDhPhhYKUyY66crUTnZfV7mRBeWec3U'),'Forearm → hands → back. Hips level throughout.'),
-        W('Block 1','Plank Shoulder Taps',3,'12/side',D('1gvCiX2coIdMzwfRWHqLg7er5XlQBvca1'),'Resist hip rotation. Move slowly.'),
-        W('Block 2','Dead Bug (Full)',3,'8/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'Opposite arm + leg. No low back arch.'),
-        W('Block 2','Hollow Body Hold',3,'35 sec',D('1rZE12L3up-qLOd14fugLKTjj6aYgMbWw'),'Low back MUST stay pressed down'),
-        W('Block 2','Superman Hold',3,'30 sec',D('1JzNB2NHNhectd99qJ0eURkqDO49ZI_ON'),'Squeeze glutes at top. Balances anterior work.'),
-        W('Finisher','Max Plank Hold',1,'To failure',D('1KMuupDS14He7w20tTQ8XMf_OjBLOTze7'),'Beat your previous time. Log it.'),
-        W('Cool-Down',"Child's Pose",1,'45 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD')),
-        W('Cool-Down','Cobra Stretch',1,'30 sec',D('1SuylSHK_D0kG_MsElo9AjQKAku0qHWNU')),
-        W('Cool-Down','Seated Spinal Twist',1,'30 sec/side',D('1L0hlciEAtVbyUvvPKuYdjMRK6RSmgEMk')),
-      ]
-    },
-    Tuesday: {
-      name: 'Arms Workout A', type: 'ARMS', duration: '30 min',
-      exercises: [
-        W('Warm-Up','Arm Circles (Fwd + Back)',1,'15 each direction',D('1wzWvAAkSNEVLWoohCxs2Yu-qM8Stoign'),'Full shoulder warm-up'),
-        W('Warm-Up','Shoulder Cross-Body Stretch',1,'20 sec/side',D('1lamotB8joSgEvvWjwQPktbyyx5yZq24X')),
-        W('Warm-Up','Wrist Circles',1,'10 each direction',D('163YEY9fJhoOWCTylE6X2b3I7F6mgUW5-'),'Protect wrists before pushing/pulling'),
-        W('Biceps','Diamond Push-Ups',3,'12 reps',D('1P--ZgEAr3pA-vaMtTtc5yHjq8pO7NW48'),'Hands form diamond. Elbows in tight.'),
-        W('Biceps','Chin-Up or Inverted Row',3,'8 reps',D('15yUmKzn14rOkOs2dH0hWWq7d_PpIFXph'),'Palms face you. Full hang to chin over bar.'),
-        W('Biceps','Isometric Bicep Hold',3,'30 sec/arm',D('1mLm9NNQaj8EqOeLmwtAgP5C8283umSs1'),'Use band. Hold contraction at 90 degrees.'),
-        W('Triceps','Close-Grip Push-Ups',3,'15 reps',D('1J00Gw0AAvIYmO3QI1jTPuJ1SswC8ep8Q'),'Elbows track back along ribs.'),
-        W('Triceps','Tricep Dips (Chair)',3,'12 reps',D('1yX28hmrYMgYKT-_tR0XE4MAP0owqMeks'),'Use chair seat. Full lockout at top.'),
-        W('Triceps','Eccentric Push-Ups',3,'8 reps',D('1gEADQkzSXyXdhyUBet9UBu2ZXlZMUFQ-'),'Lower in 4 seconds. Explosive up.'),
-        W('Finisher','Push-Up Burnout',1,'Max reps',D('1vAUbYH008-G7RHPPWWBHrsilkJpyFhMo'),'Standard push-up to true failure. Log reps.'),
-        W('Cool-Down','Overhead Tricep Stretch',1,'30 sec/side',D('1tF2WwfVe2Pvvn7l-JWAW1aQFbOF-pVcq')),
-        W('Cool-Down','Shoulder Cross-Body Stretch',1,'30 sec/side',D('1lamotB8joSgEvvWjwQPktbyyx5yZq24X')),
-      ]
-    },
-    Wednesday: {
-      name: 'Core Workout B', type: 'CORE', duration: '30 min',
-      exercises: [
-        W('Warm-Up','Hip Circles',1,'10/direction',D('1gX_46FWcn86_zvzDINB6pS9SGFwBwWDg'),'Loosen hip flexors'),
-        W('Warm-Up','Lying Knee Rocks',1,'12 reps',D('1EHhCk8ETkPPUoQULLERd9i-YKqVLlgB6'),'Gentle thoracic rotation warmup'),
-        W('Warm-Up','Glute Bridge March',1,'10/side',D('1E3EgygvOOJMC_RiabXtxe_Xt5vaMdxUI'),'Alternate legs while bridged'),
-        W('Warm-Up','Inchworm Walk-Out',1,'6 reps',D('1uOH9ju56_3dWoraSXNvJECA3cFut8i87'),'Hamstrings + core activation'),
-        W('Block 1','Russian Twists (Feet Elevated)',3,'20 total',D('10BIVtGUgJ4aj4TIE-AjzPwhm2JEjLMVm'),'Controlled. Touch floor each side.'),
-        W('Block 1','Slow Bicycle Crunches',3,'15/side',D('19cNCgiUBTClijqC2-zT3cSnbPWF_qtio'),'3 sec hold at peak. No neck yanking.'),
-        W('Block 1','V-Ups',3,'12 reps',D('105hwV10t4HNT4oDKxg4PRR0cc_hLvL6c'),'Mod to tuck-ups if form breaks.'),
-        W('Block 2','Side Plank with Hip Dip',3,'12 dips/side',D('1zBGq2MzYANghg7kigkdxNoJ-Lbjf94Nw'),'Full range. Don\'t rush.'),
-        W('Block 2','Side Plank Reach-Through',3,'10/side',D('1xUGnspbrP9v61ZpWnbl-PcFlrm83KBGL'),'Top arm threads under body.'),
-        W('Block 2','Standing Oblique Crunches',3,'15/side',D('1ioT60aUi8iyfvXcIoAsydooGypkkEXpj'),'Hand behind head. Lateral crunch.'),
-        W('Finisher','Mountain Climbers',4,'20 sec on / 10 sec off',D('166Y8XikBWEX5h7NMy7jahi6W-m3oPs6p'),'Hips level. 4 rounds. No rest between rounds.'),
-        W('Cool-Down','Lying Spinal Twist',1,'45 sec/side',D('1kiQwUe4apdnrt3BSFUiYg5DtqCINPhN7')),
-        W('Cool-Down','Figure-4 Stretch',1,'30 sec/side',D('1X_eKP8xEJgVmM9RPb6VjT0I_piECoBaD')),
-        W("Cool-Down","Child's Pose",1,'30 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD')),
-      ]
-    },
-    Thursday: {
-      name: 'Arms Workout B', type: 'ARMS', duration: '30 min',
-      exercises: [
-        W('Warm-Up','Arm Circles',1,'15 each direction',D('1wzWvAAkSNEVLWoohCxs2Yu-qM8Stoign')),
-        W('Warm-Up','Band Pull-Apart (or Towel)',1,'15 reps',D('1TbaqKrNFF2G57RypZznvTidfzO4oiD_9'),'Mimic motion with towel if no band'),
-        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe'),'Thoracic mobility'),
-        W('Shoulders','Pike Push-Ups',3,'10 reps',D('1TmRqcgKZSk1OdSMDlsQ3faM8oRAiwhGm'),'Hips high. Head toward floor. Shoulder press pattern.'),
-        W('Shoulders','Elevated Pike Push-Up',3,'8 reps',D('1ZD9PvJ7K9ely5Q3U6lL0ytWcwNLNfe1X'),'Feet on chair. Increases shoulder load significantly.'),
-        W('Shoulders','Wall Handstand Hold',3,'20 sec',D('1iRvoixgi5R9b3cacN4-YimmCmfSJkL_5'),'Kick up to wall. Build toward free handstand.'),
-        W('Upper Back','Wide Push-Up',3,'12 reps',D('1uVAxrvVHoNlWQM84Bv3L21RPasdr7xxw'),'Hands wider than shoulders. Chest + back.'),
-        W('Upper Back','Superman Pulls',3,'12 reps',D('1HxOaEVcd4AXTk5k67UY4-2CcF8bCpbZu'),'Prone. Lift + pull elbows back like rowing.'),
-        W('Upper Back','Prone Y-T-W Raises',3,'8 of each',D('1QcjwUnHj_V0ASIqVaK4Yb2Zat1ytlmJo'),'Lying face down. Raise arms in Y, T, and W shapes.'),
-        W('Finisher','Pike Push-Up Burnout',1,'Max reps',D('1TmRqcgKZSk1OdSMDlsQ3faM8oRAiwhGm'),'Log reps.'),
-        W('Cool-Down','Doorway Chest Stretch',1,'30 sec',D('1HUcDBcmTTDTOLE_HzBmkf8Y447OngVHK')),
-        W('Cool-Down',"Child's Pose Wide Arms",1,'45 sec',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe')),
-      ]
-    },
-    Friday: {
-      name: 'Core Workout C', type: 'CORE', duration: '30 min',
-      exercises: [
-        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe')),
-        W('Warm-Up','Hip Flexor Lunge Stretch',1,'30 sec/side',D('1yJxSvIBOT_vWCtMNEt9ajsWytEAp5jvJ'),'Hold and breathe'),
-        W('Warm-Up','Bear Crawl (In Place)',1,'30 sec',D('1ngc-facHaFRK7lUBU7UvUAGW26NtyK8L'),'Knees 1 inch off floor'),
-        W('Warm-Up','Arm Circles + Thoracic Openers',1,'10 each',D('1wzWvAAkSNEVLWoohCxs2Yu-qM8Stoign')),
-        W('Block 1','Dead Bug (Full)',3,'8/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'Anchor movement. Perfect form always.'),
-        W('Block 1','Plank to Downward Dog',3,'10 reps',D('1HlH7CrSXKMCG-yczjHBLQ_cx4WGiknQf'),'Push hips up & back. Core stays tight.'),
-        W('Block 1','Single-Leg Glute Bridge',3,'12/side',D('11WbFaz6riDdt5A4WHWaehvU25b_VlBhm'),'Posterior chain + core integration'),
-        W('Block 2','Hollow Body Rock',3,'30 sec',D('1rZE12L3up-qLOd14fugLKTjj6aYgMbWw'),'Rock forward/back. Progression from holds.'),
-        W('Block 2','Superman to Hollow Body',3,'8 reps',D('1qa2JO-t6ZHsNQDJ3raPqiyCRnQf0OMD8'),'Prone (superman) → roll to hollow body.'),
-        W('Block 2','Long-Lever Plank',3,'30 sec',D('1Ngl4C4SFFznwEfb6rQHrSMq8Bastm8ws'),'Arms extended further forward than standard plank.'),
-        W('Finisher','Core Gauntlet',1,'Plank 45s → Side L 30s → Side R 30s → Hollow 30s','','No rest. End of week — leave nothing.'),
-        W('Cool-Down',"Child's Pose",1,'45 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD')),
-        W('Cool-Down','Supine Hamstring Stretch',1,'30 sec/side',D('1TeIDsmQh-EteNMgXzPJYR6I9vT0zoS1A')),
-        W('Cool-Down','Cobra to Upward Dog',1,'30 sec',D('15U0i1qtHYHO1TEZla3RA2xBETWSnHEPv')),
-      ]
-    },
-    Saturday: {
-      name: 'Arms Workout C', type: 'ARMS', duration: '30 min',
-      exercises: [
-        W('Warm-Up','Jumping Jacks',1,'30 sec',D('1yWEekIAqvGQxbuAMizONzN5CgYwrDnNH'),'Get blood flowing'),
-        W('Warm-Up','Wrist + Shoulder Circles',1,'10 each',D('1T4HvIuTxExYat-t09NLhcA4OBGR_w0bw')),
-        W('Warm-Up','Inchworm Walk-Out',1,'6 reps',D('1uOH9ju56_3dWoraSXNvJECA3cFut8i87')),
-        W('Power','Explosive Push-Ups',3,'8 reps',D('14duDv-mIGIY0RvCKO_GoGf0fniLx3Dil'),'Push hard enough to leave ground. Land soft.'),
-        W('Power','Archer Push-Ups',3,'6/side',D('11CkKQIDbZLtc_cObSnYe1_QCmYHneTxz'),'One arm wide, one arm bent. Shifts load to one side.'),
-        W('Power','Pseudo Planche Lean',3,'20 sec',D('1s2QjXKjcdqqSHimuCvEGjwv_7e99Lh-7'),'Lean forward over hands in push-up position.'),
-        W('Endurance','Standard Push-Up',3,'20 reps',D('1vAUbYH008-G7RHPPWWBHrsilkJpyFhMo'),'Strict form. No sagging hips.'),
-        W('Endurance','Diamond Push-Up',3,'12 reps',D('1P--ZgEAr3pA-vaMtTtc5yHjq8pO7NW48')),
-        W('Endurance','Pike Push-Up',3,'10 reps',D('1TmRqcgKZSk1OdSMDlsQ3faM8oRAiwhGm')),
-        W('Finisher','Arm Triset Burnout',1,'Wide x10 → Diamond x10 → Pike x10','','One continuous triset. Log total reps.'),
-        W('Cool-Down','Overhead Tricep Stretch',1,'30 sec/side',D('1tF2WwfVe2Pvvn7l-JWAW1aQFbOF-pVcq')),
-        W('Cool-Down','Doorway Chest Opener',1,'30 sec',D('1HUcDBcmTTDTOLE_HzBmkf8Y447OngVHK')),
-        W('Cool-Down','Wrist Flexor Stretch',1,'20 sec/side',D('1yl8NKAUI11skkdUXGo2Du3TjPk7Ittyw')),
-      ]
-    },
-    Sunday: { name: 'Rest & Recovery', type: 'REST', duration: '—', exercises: [] },
+    Monday:    { sheet: 'Josh â€” Core', name: 'Core Workout A',  type: 'CORE', duration: '30 min' },
+    Tuesday:   { sheet: 'Josh â€” Arms', name: 'Arms Workout A',  type: 'ARMS', duration: '30 min' },
+    Wednesday: { sheet: 'Josh â€” Core', name: 'Core Workout B',  type: 'CORE', duration: '30 min' },
+    Thursday:  { sheet: 'Josh â€” Arms', name: 'Arms Workout B',  type: 'ARMS', duration: '30 min' },
+    Friday:    { sheet: 'Josh â€” Core', name: 'Core Workout C',  type: 'CORE', duration: '30 min' },
+    Saturday:  { sheet: 'Josh â€” Arms', name: 'Arms Workout C',  type: 'ARMS', duration: '30 min' },
+    Sunday:    null,
   },
   wife: {
-    Monday: {
-      name: 'Core Workout A', type: 'CORE', duration: '30 min',
-      exercises: [
-        W('Warm-Up','Diaphragmatic Breathing',1,'8 breaths',D('1hjvFfZEsKf_L1Cc6JeetmrlJlw55r7mn'),'Belly expands on inhale. Exhale draws navel in. NEVER hold breath.'),
-        W('Warm-Up','Pelvic Tilts (Lying Down)',1,'12 reps',D('1cBaKObElA5KKpNBenE0Hbe963o_t06zL'),'Gentle anterior/posterior tilt. Reconnects deep core.'),
-        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe'),'Slow and fluid.'),
-        W('Warm-Up','Glute Bridge',1,'12 reps',D('1N4wQeNv6X7O-_5rqlJXIIwNXQq5C7Hia'),'Exhale as you lift. Pelvic floor safe.'),
-        W('Block 1','Modified Dead Bug (Arms Only)',3,'8/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'NEVER hold breath. Exhale on exertion.'),
-        W('Block 1','Bird Dog',3,'10/side',D('14abNYf37W4j4eDQhF5a588PTe_61CTxA'),'2 sec hold at top. Spine neutral.'),
-        W('Block 1','Glute Bridge Hold',3,'30 sec',D('1N4wQeNv6X7O-_5rqlJXIIwNXQq5C7Hia'),'Squeeze and hold at the top'),
-        W('Block 2','Heel Slides',3,'10/side',D('1Z4EhSGY85S5xUK0UgL25xAgcbnp70-W2'),'Lying flat. Slide foot out slowly. Core engaged.'),
-        W('Block 2','Forearm Plank',3,'20 sec',D('1KMuupDS14He7w20tTQ8XMf_OjBLOTze7'),'Breathe steadily. NO breath-holding ever.'),
-        W('Block 2','Seated Ab Squeeze',3,'15 reps',D('1S5OsMbRHEpZcPbDptKj5LnBhxCVs04yJ'),'Sitting upright. Inhale. Exhale while activating core for 3 sec.'),
-        W('Finisher','Breathing Plank',1,'40 sec',D('1KMuupDS14He7w20tTQ8XMf_OjBLOTze7'),'Hold plank with controlled breathing throughout.'),
-        W('Cool-Down',"Child's Pose",1,'45 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD'),'Great for nursing moms — gentle chest opener'),
-        W('Cool-Down','Seated Spinal Twist',1,'30 sec/side',D('1L0hlciEAtVbyUvvPKuYdjMRK6RSmgEMk')),
-        W('Cool-Down','Knees-to-Chest Hug',1,'30 sec',D('1GjRjEleaoB-LP7TaOJGy05q6VtMoSEJH')),
-      ]
-    },
-    Tuesday: { name: 'Rest Day', type: 'REST', duration: '—', exercises: [] },
-    Wednesday: {
-      name: 'Core Workout B', type: 'CORE', duration: '30 min',
-      exercises: [
-        W('Warm-Up','Diaphragmatic Breathing',1,'6 breaths',D('1hjvFfZEsKf_L1Cc6JeetmrlJlw55r7mn'),'Reset and focus before starting'),
-        W('Warm-Up','Hip Circles (Standing)',1,'10/direction',D('1gX_46FWcn86_zvzDINB6pS9SGFwBwWDg'),'Loosen hip flexors'),
-        W('Warm-Up','Lying Knee Rocks',1,'12 reps',D('1EHhCk8ETkPPUoQULLERd9i-YKqVLlgB6'),'Gentle thoracic rotation'),
-        W('Warm-Up','Glute Bridge',1,'12 reps',D('1N4wQeNv6X7O-_5rqlJXIIwNXQq5C7Hia'),'Hold at the top for 2 seconds. Slow and controlled'),
-        W('Block 1','Modified Side Plank (Knees Down)',3,'25 sec/side',D('1lmeH9roq-62QLxC8WFB6WeeY1uEvGsyY'),'Work toward full side plank over weeks.'),
-        W('Block 1','Standing Side Crunches',3,'12/side',D('1ioT60aUi8iyfvXcIoAsydooGypkkEXpj'),'Hands behind head. Lateral flex. No spinal compression.'),
-        W('Block 1','Side-Lying Leg Raises',3,'12/side',D('11ebZ3wuny7VpUL6nOecCmOAXvuN0PfTC'),'Targets obliques + hip abductors safely.'),
-        W('Block 2','Bird Dog (Slow)',3,'10/side',D('14abNYf37W4j4eDQhF5a588PTe_61CTxA'),'3 sec hold at top.'),
-        W('Block 2','Slow Mountain Climbers',3,'8/side',D('1db4U6cj7z_MWFPLxcibCPPJf42lDIpmM'),'STEP — do not jump. Controlled. Breathe.'),
-        W('Block 2','Glute Bridge March',3,'10/side',D('1E3EgygvOOJMC_RiabXtxe_Xt5vaMdxUI'),'Bridge position, alternate knee lifts.'),
-        W('Finisher','Supine Reverse Marches',2,'40 sec',D('1C5b3Rig5NdmR45j3mXMQmq07sHeIXQCs'),'Slow and controlled. Light cardio core finish. Keep breathing.'),
-        W('Cool-Down','Lying Spinal Twist',1,'40 sec/side',D('1kiQwUe4apdnrt3BSFUiYg5DtqCINPhN7'),'Look the other way your leg is crossing over.'),
-        W('Cool-Down','Figure-4 Stretch',1,'30 sec/side',D('1X_eKP8xEJgVmM9RPb6VjT0I_piECoBaD')),
-        W("Cool-Down","Child's Pose",1,'30 sec',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD')),
-      ]
-    },
-    Thursday: { name: 'Rest Day', type: 'REST', duration: '—', exercises: [] },
-    Friday: {
-      name: 'Core Workout C', type: 'CORE', duration: '30 min',
-      exercises: [
-        W('Warm-Up','Diaphragmatic Breathing',1,'8 breaths',D('1hjvFfZEsKf_L1Cc6JeetmrlJlw55r7mn'),'End-of-week reset. Focus on breath before moving.'),
-        W('Warm-Up','Kneeling Pelvic Tilts',1,'12 reps',D('1IpwBdNrpCLA5p7yhX8-PKShz2CgunHz0'),'Gentle anterior/posterior tilt. Reconnects deep core.'),
-        W('Warm-Up','Cat-Camel Stretch',1,'10 reps',D('1AGvigNJizvm6VcoUujBLt2sbiVUxWSxe')),
-        W('Warm-Up','Standing Hip Flexor Stretch',1,'30 sec/side',D('1TfZ-I-0Rh5NL-_iszGSwwVlsaY3RYDUl')),
-        W('Block 1','Dead Bug',3,'8/side',D('1KSh0yG8p4XHLyd38fhjfZuuFlugDI8Ny'),'Best postpartum core exercise. Master this movement.'),
-        W('Block 1','Plank to Downward Dog',3,'8 reps',D('1HlH7CrSXKMCG-yczjHBLQ_cx4WGiknQf'),'Slow transition. Core stays braced. Breathe.'),
-        W('Block 1','Single-Leg Glute Bridge',3,'10/side',D('11WbFaz6riDdt5A4WHWaehvU25b_VlBhm'),'Pelvic floor safe. Exhale as you lift.'),
-        W('Block 2','Forearm Plank',3,'30 sec',D('1KMuupDS14He7w20tTQ8XMf_OjBLOTze7'),"Progress from Monday's 20 sec. Breathe steadily."),
-        W('Block 2','Modified Side Plank Hold',3,'30 sec/side',D('1lmeH9roq-62QLxC8WFB6WeeY1uEvGsyY'),'Knees down still OK. Focus on alignment.'),
-        W('Block 2','Seated Torso Rotations',3,'12/side',D('1r_JQ61Qrl1A_6RsQOogfFpgIMgQ05IYH'),'Sitting upright. Gentle rotation. Exhale each rotation.'),
-        W('Finisher','Core Breathing Flow',3,"Bird Dog 30s → Plank 25s → Child's Pose 15s",'','Finish strong but controlled. 3 rounds, no rest.'),
-        W('Cool-Down',"Child's Pose",1,'1 min',D('1bgFusfHhD6yq2uzbzz-rgEhNg2DuO4wD'),'Extra time — you showed up 3x this week.'),
-        W('Cool-Down','Supine Spinal Twist',1,'40 sec/side',D('1yQOOYSI-dDUTq-IFXBNmtd8NUsW-YsFU')),
-        W('Cool-Down','Happy Baby Pose',1,'30 sec',D('1o070HoRJ4zQncbXPczn77xurj5-lZ2oN')),
-      ]
-    },
-    Saturday: { name: 'Rest Day', type: 'REST', duration: '—', exercises: [] },
-    Sunday:   { name: 'Rest & Recovery', type: 'REST', duration: '—', exercises: [] },
+    Monday:    { sheet: 'Wife â€” Core', name: 'Core Workout A',  type: 'CORE', duration: '30 min' },
+    Tuesday:   null,
+    Wednesday: { sheet: 'Wife â€” Core', name: 'Core Workout B',  type: 'CORE', duration: '30 min' },
+    Thursday:  null,
+    Friday:    { sheet: 'Wife â€” Core', name: 'Core Workout C',  type: 'CORE', duration: '30 min' },
+    Saturday:  null,
+    Sunday:    null,
   }
 };
 
-// ═══════════════════════════════════════════════
+
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // APP STATE
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const S = {
   screen: 'setup',    // setup | user | workout | summary | uploading | success
   gasUrl: localStorage.getItem('gasUrl') || '',
@@ -377,14 +221,14 @@ function today() {
   return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // PROGRESSION LOGIC
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 function parseTarget(str) {
   str = str || '';
   if (/failure|max|burnout|gauntlet|triset|flow/i.test(str)) return {value: null, unit: 'max'};
   if (/on\s*\/\s*off/i.test(str)) return {value: null, unit: 'interval'};
-  if (/→|→/i.test(str)) return {value: null, unit: 'complex'};
+  if (/â†’|â†’/i.test(str)) return {value: null, unit: 'complex'};
   const perSide = /side|arm|leg/i.test(str);
   const sec = str.match(/(\d+)\s*sec/i);
   if (sec) return {value: parseInt(sec[1]), unit: 'sec', perSide};
@@ -425,9 +269,9 @@ function calcProgression(exercises, history) {
   return prog;
 }
 
-// ═══════════════════════════════════════════════
-// GOOGLE APPS SCRIPT API  (no sign-in required — works on all devices)
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+// GOOGLE APPS SCRIPT API  (no sign-in required â€” works on all devices)
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 async function gasRead(sheetName) {
   const url = `${S.gasUrl}?action=read&sheet=${encodeURIComponent(sheetName)}`;
   const r = await fetch(url);
@@ -442,6 +286,17 @@ async function gasWrite(sheetName, rows) {
   const r = await fetch(url);
   if (!r.ok) throw new Error(`Write failed: ${r.status}`);
   return r.json();
+}
+
+async function fetchPlan(user, day) {
+  const meta = PLAN_SHEETS[user][day];
+  if (!meta) return null; // rest day
+  const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Could not load workout plan (${r.status})`);
+  const json = await r.json();
+  if (json.error) throw new Error(json.error);
+  return { ...meta, exercises: json.exercises };
 }
 
 async function loadHistory() {
@@ -469,7 +324,7 @@ async function submitWorkout() {
         String(log.setsCompleted || ex.sets),
         log.reps || '',
         log.notes || '',
-        '✅'
+        'âœ…'
       ]);
     });
     if (rows.length) await gasWrite(sheet, rows);
@@ -482,14 +337,15 @@ async function submitWorkout() {
   }
 }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // RENDER
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 const app = document.getElementById('app');
 
 function render() {
   if (S.screen === 'setup')     return renderSetup();
   if (S.screen === 'user')      return renderUserSelect();
+  if (S.screen === 'loading')   return renderLoading();
   if (S.screen === 'workout')   return renderWorkout();
   if (S.screen === 'summary')   return renderSummary();
   if (S.screen === 'uploading') return renderUploading();
@@ -497,25 +353,40 @@ function render() {
 }
 
 // ---- SETUP ----
-const GAS_CODE = `const JOSH_LOG = 'Josh \\u2014 Workout Log';
-const WIFE_LOG = 'Wife \\u2014 Workout Log';
-const SHEET_ID = '1zqR0CeERQg_8YtgWnQYxiFKAbGcZb4Zvf-R1Iqn46t8';
+const GAS_CODE = `const SHEET_ID = '1zqR0CeERQg_8YtgWnQYxiFKAbGcZb4Zvf-R1Iqn46t8';
 
 function doGet(e) {
-  const action = (e.parameter.action || 'ping');
-  const ss = SpreadsheetApp.openById(SHEET_ID);
+  var action = e.parameter.action || 'ping';
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+
+  if (action === 'get_plan') {
+    var sheet = ss.getSheetByName(e.parameter.sheet);
+    if (!sheet) return res({error: 'Sheet not found: ' + e.parameter.sheet});
+    var rows = sheet.getDataRange().getValues();
+    var day = e.parameter.day;
+    var exercises = rows.slice(1)
+      .filter(function(r){ return String(r[0]) === day; })
+      .map(function(r){
+        return {block:String(r[1]),name:String(r[2]),sets:parseInt(r[3])||1,
+                target:String(r[4]),demo:String(r[5]),note:String(r[6]||'')};
+      });
+    return res({exercises: exercises});
+  }
+
   if (action === 'log') {
-    const data = JSON.parse(decodeURIComponent(e.parameter.data));
-    const sheet = ss.getSheetByName(data.sheet);
-    if (sheet) data.rows.forEach(function(row){ sheet.appendRow(row); });
-    return res({success:true});
+    var data = JSON.parse(decodeURIComponent(e.parameter.data));
+    var logSheet = ss.getSheetByName(data.sheet);
+    if (logSheet) data.rows.forEach(function(row){ logSheet.appendRow(row); });
+    return res({success: true});
   }
+
   if (action === 'read') {
-    const sheet = ss.getSheetByName(e.parameter.sheet);
-    const rows = sheet ? sheet.getDataRange().getValues().slice(1) : [];
-    return res({rows:rows});
+    var s = ss.getSheetByName(e.parameter.sheet);
+    var vals = s ? s.getDataRange().getValues().slice(1) : [];
+    return res({rows: vals});
   }
-  return res({status:'ok'});
+
+  return res({status: 'ok'});
 }
 
 function res(data) {
@@ -527,22 +398,22 @@ function res(data) {
 function renderSetup() {
   app.innerHTML = `
   <div class="setup">
-    <div style="font-size:48px;margin-bottom:-8px">🏋️</div>
+    <div style="font-size:48px;margin-bottom:-8px">ðŸ‹ï¸</div>
     <h1>Morning Workout<br>Josh & Wife</h1>
-    <p>One-time setup: deploy a tiny Google Apps Script so the app can write to your sheet — no sign-in needed on your phone.</p>
+    <p>One-time setup: deploy a tiny Google Apps Script so the app can write to your sheet â€” no sign-in needed on your phone.</p>
     <div class="setup-steps">
-      <div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://script.google.com" target="_blank">script.google.com</a> → click <strong>New project</strong></div></div>
+      <div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://script.google.com" target="_blank">script.google.com</a> â†’ click <strong>New project</strong></div></div>
       <div class="step"><div class="step-num">2</div><div class="step-text">Delete everything in the editor, paste the code below, then click <strong>Save</strong> (disk icon)</div></div>
-      <div class="step"><div class="step-num">3</div><div class="step-text">Click <strong>Deploy → New deployment</strong> → gear icon → <strong>Web app</strong><br>• Execute as: <strong>Me</strong><br>• Who has access: <strong>Anyone</strong><br>→ click <strong>Deploy</strong></div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text">Click <strong>Deploy â†’ New deployment</strong> â†’ gear icon â†’ <strong>Web app</strong><br>â€¢ Execute as: <strong>Me</strong><br>â€¢ Who has access: <strong>Anyone</strong><br>â†’ click <strong>Deploy</strong></div></div>
       <div class="step"><div class="step-num">4</div><div class="step-text">Copy the <strong>Web app URL</strong> and paste it below</div></div>
     </div>
     <div style="position:relative">
       <pre style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:11px;overflow-x:auto;white-space:pre;color:var(--muted);line-height:1.5">${GAS_CODE.replace(/</g,'&lt;')}</pre>
       <button class="btn btn-secondary btn-sm" style="position:absolute;top:10px;right:10px" onclick="copyGasCode()">Copy</button>
     </div>
-    <input class="field" id="gasurl" type="url" placeholder="https://script.google.com/macros/s/…/exec" value="${S.gasUrl}">
+    <input class="field" id="gasurl" type="url" placeholder="https://script.google.com/macros/s/â€¦/exec" value="${S.gasUrl}">
     ${S.error ? `<div class="error-msg">${S.error}</div>` : ''}
-    <button class="btn btn-primary" onclick="saveGasUrl()">Continue →</button>
+    <button class="btn btn-primary" onclick="saveGasUrl()">Continue â†’</button>
     <div class="skip-link">Already set up? <a onclick="trySkip()">Skip to workout</a></div>
   </div>`;
 }
@@ -572,18 +443,18 @@ function trySkip() {
 // ---- USER SELECT ----
 function renderUserSelect() {
   app.innerHTML = `
-  <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="S.screen='setup';render()">⚙ Setup</button></div>
+  <div class="header"><div class="header-title">ðŸ‹ï¸ Morning Workout</div><button class="header-user" onclick="S.screen='setup';render()">âš™ Setup</button></div>
   <div class="user-select">
     <h2>Who's working out?</h2>
     <div class="user-card" onclick="selectUser('josh')">
-      <div class="icon">💪</div>
+      <div class="icon">ðŸ’ª</div>
       <h3>Josh</h3>
-      <p>Core (Mon/Wed/Fri) · Arms (Tue/Thu/Sat)</p>
+      <p>Core (Mon/Wed/Fri) Â· Arms (Tue/Thu/Sat)</p>
     </div>
     <div class="user-card" onclick="selectUser('wife')">
-      <div class="icon">🌟</div>
+      <div class="icon">ðŸŒŸ</div>
       <h3>Wife</h3>
-      <p>Core (Mon/Wed/Fri) · Rest other days</p>
+      <p>Core (Mon/Wed/Fri) Â· Rest other days</p>
     </div>
   </div>`;
 }
@@ -591,14 +462,36 @@ function renderUserSelect() {
 async function selectUser(who) {
   S.user = who;
   S.day = today();
-  S.workout = WORKOUTS[who][S.day];
+  S.workout = null;
   S.logs = {};
   S.modal = null;
-  S.screen = 'workout';
+  S.error = '';
+  S.screen = 'loading';
   render();
-  await loadHistory();
-  S.progression = calcProgression(S.workout.exercises, S.history);
+  try {
+    S.workout = await fetchPlan(who, S.day);
+    if (!S.workout) {
+      // rest day — build a minimal rest object
+      S.workout = { name: 'Rest & Recovery', type: 'REST', duration: '—', exercises: [] };
+    }
+    await loadHistory();
+    S.progression = calcProgression(S.workout.exercises, S.history);
+    S.screen = 'workout';
+  } catch(e) {
+    S.error = e.message;
+    S.screen = 'user';
+  }
   render();
+}
+
+function renderLoading() {
+  app.innerHTML = `
+  <div class="auth-screen">
+    <div class="uploading" style="flex-direction:column;gap:16px">
+      <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
+      <div style="font-size:15px">Loading today's workout…</div>
+    </div>
+  </div>`;
 }
 
 
@@ -609,12 +502,12 @@ function renderWorkout() {
 
   if (w.type === 'REST') {
     app.innerHTML = `
-    <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button></div>
+    <div class="header"><div class="header-title">ðŸ‹ï¸ Morning Workout</div><button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button></div>
     <div class="rest-day">
-      <div class="icon">😴</div>
+      <div class="icon">ðŸ˜´</div>
       <h2>${w.name}</h2>
-      <p>Today is a rest day. Recovery is part of the program — enjoy it.</p>
-      <button class="btn btn-secondary" style="max-width:280px;margin-top:16px" onclick="S.screen='user';render()">← Change user</button>
+      <p>Today is a rest day. Recovery is part of the program â€” enjoy it.</p>
+      <button class="btn btn-secondary" style="max-width:280px;margin-top:16px" onclick="S.screen='user';render()">â† Change user</button>
     </div>`;
     return;
   }
@@ -644,15 +537,15 @@ function renderWorkout() {
       const progressed = prog?.progressed;
       blockHTML += `
       <div class="exercise-row${isDone ? ' done' : ''}" onclick="openModal(${i})">
-        <div class="exercise-check${isDone ? ' checked' : ''}">${isDone ? '✓' : ''}</div>
+        <div class="exercise-check${isDone ? ' checked' : ''}">${isDone ? 'âœ“' : ''}</div>
         <div class="exercise-info">
           <div class="exercise-name">${ex.name}</div>
           <div class="exercise-meta">
-            <span>${ex.sets}×</span><span>${target}</span>
-            ${progressed ? '<span class="prog-badge">↑ PROGRESSED</span>' : ''}
+            <span>${ex.sets}Ã—</span><span>${target}</span>
+            ${progressed ? '<span class="prog-badge">â†‘ PROGRESSED</span>' : ''}
           </div>
         </div>
-        <div class="exercise-arrow">›</div>
+        <div class="exercise-arrow">â€º</div>
       </div>`;
     });
     blockHTML += '</div>';
@@ -661,7 +554,7 @@ function renderWorkout() {
   const canSubmit = done > 0;
   app.innerHTML = `
   <div class="header">
-    <div class="header-title">${S.day} · ${w.name}</div>
+    <div class="header-title">${S.day} Â· ${w.name}</div>
     <button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button>
   </div>
   <div class="body">
@@ -682,7 +575,7 @@ function renderWorkout() {
   </div>
   <div class="bottom-bar">
     <button class="btn btn-primary" onclick="S.screen='summary';render()" ${!canSubmit ? 'disabled style="opacity:.4"' : ''}>
-      Review & Submit Workout →
+      Review & Submit Workout â†’
     </button>
   </div>
   ${S.modal !== null ? renderModal() : ''}`;
@@ -719,10 +612,10 @@ function renderModal() {
     <div class="set-row">
       <div class="set-label">Set ${s+1}</div>
       <div class="set-input-wrap">
-        <input class="set-input" type="number" min="0" value="${log.repsPerSet[s] || ''}" placeholder="${isMax ? '—' : (isTimed ? '0' : '0')}" oninput="setRep(${i},${s},this.value)">
+        <input class="set-input" type="number" min="0" value="${log.repsPerSet[s] || ''}" placeholder="${isMax ? 'â€”' : (isTimed ? '0' : '0')}" oninput="setRep(${i},${s},this.value)">
         <span class="set-unit">${isTimed ? 'sec' : isMax ? 'reps' : parsed.unit === 'reps' ? 'reps' : ''}</span>
       </div>
-      <button class="set-check${checked ? ' done' : ''}" onclick="toggleSet(${i},${s})">${checked ? '✓' : ''}</button>
+      <button class="set-check${checked ? ' done' : ''}" onclick="toggleSet(${i},${s})">${checked ? 'âœ“' : ''}</button>
     </div>`;
   }).join('');
 
@@ -736,8 +629,8 @@ function renderModal() {
     <div class="timer-target">Target: ${target}</div>
     <div class="timer-display ${timerClass}">${mm}:${ss}</div>
     <div class="timer-row">
-      <button class="timer-btn" onclick="timerToggle()">${S.timerRunning ? '⏸ Pause' : '▶ Start'}</button>
-      <button class="timer-btn" onclick="timerReset()">↺ Reset</button>
+      <button class="timer-btn" onclick="timerToggle()">${S.timerRunning ? 'â¸ Pause' : 'â–¶ Start'}</button>
+      <button class="timer-btn" onclick="timerReset()">â†º Reset</button>
       <button class="timer-btn" onclick="timerUse(${i})">Use Time</button>
     </div>
   </div>` : '';
@@ -748,16 +641,16 @@ function renderModal() {
       <div class="modal-handle"></div>
       <div class="modal-header">
         <div class="modal-title">${ex.name}</div>
-        <button class="modal-close" onclick="closeModal()">×</button>
+        <button class="modal-close" onclick="closeModal()">Ã—</button>
       </div>
       <div class="modal-body">
         ${ex.note ? `<div class="modal-note">${ex.note}</div>` : ''}
-        ${ex.demo ? `<a class="modal-demo" href="${ex.demo}" target="_blank">▶ Watch Demo</a>` : ''}
-        <div class="target-hint">Target: <strong>${ex.sets} × ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">↑ PROGRESSED</span>' : ''}</div>
+        ${ex.demo ? `<a class="modal-demo" href="${ex.demo}" target="_blank">â–¶ Watch Demo</a>` : ''}
+        <div class="target-hint">Target: <strong>${ex.sets} Ã— ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">â†‘ PROGRESSED</span>' : ''}</div>
         ${timerHTML}
         <div class="sets-section">${setsHTML}</div>
-        <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it felt…" oninput="setNote(${i},this.value)">${log.notes}</textarea>
-        <button class="btn btn-primary" onclick="markDone(${i})">✓ Mark Complete</button>
+        <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it feltâ€¦" oninput="setNote(${i},this.value)">${log.notes}</textarea>
+        <button class="btn btn-primary" onclick="markDone(${i})">âœ“ Mark Complete</button>
         <button class="btn btn-secondary" style="margin-top:10px" onclick="closeModal()">Close</button>
       </div>
     </div>
@@ -807,7 +700,7 @@ function timerToggle() {
         d.className = 'timer-display running';
       }
       const btn = document.querySelector('.timer-btn');
-      if (btn) btn.textContent = '⏸ Pause';
+      if (btn) btn.textContent = 'â¸ Pause';
     }, 1000);
   }
   render();
@@ -839,7 +732,7 @@ function renderSummary() {
   }, 0);
 
   app.innerHTML = `
-  <div class="header"><div class="header-title">Review Workout</div><button class="header-user" onclick="S.screen='workout';render()">← Back</button></div>
+  <div class="header"><div class="header-title">Review Workout</div><button class="header-user" onclick="S.screen='workout';render()">â† Back</button></div>
   <div class="body">
     <div class="summary">
       <h2>Workout Summary</h2>
@@ -849,27 +742,27 @@ function renderSummary() {
       ${done.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px">Completed</div><div class="summary-list">${done.map(ex => {
         const i = w.exercises.indexOf(ex);
         const log = S.logs[i];
-        return `<div class="summary-ex"><div class="summary-ex-name">✅ ${ex.name}</div><div class="summary-ex-log">${ex.sets} sets · ${log?.reps || 'logged'} ${log?.notes ? '· ' + log.notes : ''}</div></div>`;
+        return `<div class="summary-ex"><div class="summary-ex-name">âœ… ${ex.name}</div><div class="summary-ex-log">${ex.sets} sets Â· ${log?.reps || 'logged'} ${log?.notes ? 'Â· ' + log.notes : ''}</div></div>`;
       }).join('')}</div>` : ''}
-      ${skipped.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-top:8px">Skipped</div><div class="summary-list">${skipped.map(ex => `<div class="summary-ex" style="opacity:.5"><div class="summary-ex-name">— ${ex.name}</div></div>`).join('')}</div>` : ''}
+      ${skipped.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-top:8px">Skipped</div><div class="summary-list">${skipped.map(ex => `<div class="summary-ex" style="opacity:.5"><div class="summary-ex-name">â€” ${ex.name}</div></div>`).join('')}</div>` : ''}
     </div>
   </div>
   <div class="bottom-bar">
-    <button class="btn btn-primary" onclick="submitWorkout()">Submit to Google Sheets →</button>
+    <button class="btn btn-primary" onclick="submitWorkout()">Submit to Google Sheets â†’</button>
   </div>`;
 }
 
 function renderUploading() {
   app.innerHTML = `
   <div class="auth-screen">
-    <div class="uploading"><div class="spinner"></div>Saving to Google Sheets…</div>
+    <div class="uploading"><div class="spinner"></div>Saving to Google Sheetsâ€¦</div>
   </div>`;
 }
 
 function renderSuccess() {
   app.innerHTML = `
   <div class="success-screen">
-    <div class="check">🎉</div>
+    <div class="check">ðŸŽ‰</div>
     <h2>Workout Logged!</h2>
     <p>Your ${S.workout.name} has been saved to Google Sheets. Great work${S.user === 'josh' ? ', Josh' : ''}!</p>
     <button class="btn btn-primary" style="max-width:300px;margin-top:16px" onclick="goHome()">Done</button>
@@ -878,9 +771,9 @@ function renderSuccess() {
 
 function goHome() { S.user = null; S.screen = 'user'; render(); }
 
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 // BOOT
-// ═══════════════════════════════════════════════
+// â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 window.addEventListener('load', () => {
   if (S.gasUrl) S.screen = 'user';
   render();
