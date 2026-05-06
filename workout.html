@@ -741,7 +741,6 @@ async function selectDay(timestamp) {
     }
     await loadHistory();
     S.progression = calcProgression(S.workout.exercises, S.history);
-    S.workoutStartTime = Date.now();
     S.screen = 'workout';
   } catch(e) {
     S.error = e.message;
@@ -974,6 +973,7 @@ function checkPR(i) {
 }
 
 function markDone(i) {
+  if (S.workoutStartTime === null) S.workoutStartTime = Date.now();
   const log = S.logs[i];
   const ex = S.workout.exercises[i];
   log.done = true;
