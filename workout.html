@@ -207,6 +207,11 @@ input.field::placeholder{color:var(--muted)}
 .cal-day.other-month .cal-day-num{color:var(--muted)}
 .cal-check{color:var(--accent);font-size:13px;font-weight:800;line-height:1}
 
+/* ---- MUSCLE HEATMAP ---- */
+.muscle-diagram{margin:0 0 16px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px 10px}
+.muscle-legend{display:flex;gap:16px;font-size:11px;color:var(--muted);margin-bottom:8px}
+.muscle-diagram svg{width:100%;display:block;max-height:150px}
+
 /* ---- QUOTE OF THE DAY ---- */
 .quote-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;text-align:center}
 .quote-text{font-size:14px;line-height:1.65;color:var(--muted);font-style:italic}
@@ -276,6 +281,129 @@ const QUOTES = [
 function quoteOfDay() {
   const dayIndex = Math.floor(Date.now() / 86400000);
   return QUOTES[dayIndex % QUOTES.length];
+}
+
+// ═══════════════════════════════════════════════
+// MUSCLE HEATMAP
+// ═══════════════════════════════════════════════
+const MUSCLE_RULES = [
+  // Arms & upper body
+  { re: /curl|hammer|zottman/i,                     p: ['biceps'],              s: ['forearms'] },
+  { re: /tricep|skull.?crush|pushdown|kickback/i,   p: ['triceps'],             s: [] },
+  { re: /dip/i,                                     p: ['triceps'],             s: ['chest','shoulders'] },
+  { re: /overhead.?press|shoulder.?press|military|arnold/i, p: ['shoulders'],   s: ['triceps'] },
+  { re: /lateral.?raise|side.?raise/i,              p: ['shoulders'],           s: [] },
+  { re: /front.?raise/i,                            p: ['shoulders'],           s: ['chest'] },
+  { re: /face.?pull/i,                              p: ['upper-back'],          s: ['shoulders','traps'] },
+  { re: /shrug/i,                                   p: ['traps'],               s: [] },
+  { re: /row/i,                                     p: ['upper-back'],          s: ['biceps','lats'] },
+  { re: /lat.?pull|pull.?down/i,                    p: ['lats'],                s: ['biceps'] },
+  { re: /pull.?up|chin.?up/i,                       p: ['lats'],                s: ['biceps'] },
+  { re: /push.?up/i,                                p: ['chest'],               s: ['triceps','shoulders'] },
+  { re: /chest.?press|bench|fly|flye/i,             p: ['chest'],               s: ['triceps','shoulders'] },
+  { re: /forearm|wrist.?curl/i,                     p: ['forearms'],            s: [] },
+  { re: /reverse.?curl/i,                           p: ['forearms'],            s: ['biceps'] },
+  // Core
+  { re: /side.?plank/i,                             p: ['obliques'],            s: ['abs'] },
+  { re: /plank/i,                                   p: ['abs'],                 s: ['shoulders','glutes'] },
+  { re: /crunch|sit.?up/i,                          p: ['abs'],                 s: ['hip-flexors'] },
+  { re: /russian.?twist|rotati/i,                   p: ['obliques'],            s: ['abs'] },
+  { re: /leg.?raise|hanging.?leg|knee.?raise/i,     p: ['hip-flexors'],         s: ['abs'] },
+  { re: /dead.?bug/i,                               p: ['abs'],                 s: ['hip-flexors'] },
+  { re: /bird.?dog/i,                               p: ['lower-back'],          s: ['glutes','abs'] },
+  { re: /superman|back.?extension/i,                p: ['lower-back'],          s: ['glutes','traps'] },
+  { re: /glute.?bridge|hip.?thrust|hip.?bridge/i,   p: ['glutes'],              s: ['hamstrings'] },
+  { re: /hollow/i,                                  p: ['abs'],                 s: ['hip-flexors'] },
+  { re: /mountain.?climber/i,                       p: ['abs'],                 s: ['shoulders','hip-flexors'] },
+  { re: /ab.?wheel|rollout/i,                       p: ['abs'],                 s: ['lats','shoulders'] },
+  { re: /v.?up|toe.?touch/i,                        p: ['abs'],                 s: ['hip-flexors'] },
+  { re: /flutter.?kick|scissor/i,                   p: ['hip-flexors'],         s: ['abs'] },
+  // Legs
+  { re: /squat/i,                                   p: ['quads'],               s: ['glutes','hamstrings'] },
+  { re: /lunge/i,                                   p: ['quads'],               s: ['glutes','hamstrings'] },
+  { re: /deadlift|rdl|hip.?hinge/i,                 p: ['hamstrings'],          s: ['glutes','lower-back'] },
+  { re: /calf.?raise|heel.?raise/i,                 p: ['calves'],              s: [] },
+  { re: /leg.?press/i,                              p: ['quads'],               s: ['glutes'] },
+  { re: /leg.?curl/i,                               p: ['hamstrings'],          s: ['glutes'] },
+  // Compound
+  { re: /burpee/i,                                  p: ['abs','chest'],         s: ['shoulders','quads'] },
+  { re: /jump/i,                                    p: ['quads'],               s: ['calves','glutes'] },
+];
+
+function getMuscles(name) {
+  for (const r of MUSCLE_RULES) {
+    if (r.re.test(name)) return { primary: r.p, secondary: r.s };
+  }
+  return null;
+}
+
+function bodyDiagramSVG(primary, secondary) {
+  const p = new Set(primary || []);
+  const s = new Set(secondary || []);
+  const mc = m => p.has(m) ? '#f97316' : s.has(m) ? '#eab308' : '#30363d';
+  const skin = '#21262d', line = '#484f58';
+
+  // Reusable body silhouette (local coords, applied twice via transform)
+  const body = `<circle cx="40" cy="13" r="11"/>
+    <rect x="36" y="24" width="8" height="8" rx="2"/>
+    <path d="M24,32 C19,35 16,46 16,58 L16,92 L25,92 L25,86 L55,86 L55,92 L64,92 L64,58 C64,46 61,35 56,32 Z"/>
+    <path d="M16,34 C11,37 9,46 10,56 L10,68 L22,68 L22,56 C23,46 21,37 16,34 Z"/>
+    <path d="M64,34 C69,37 71,46 70,56 L70,68 L58,68 L58,56 C57,46 59,37 64,34 Z"/>
+    <path d="M10,68 L9,87 C9,91 11,93 14,93 C17,93 19,91 19,87 L22,68 Z"/>
+    <path d="M70,68 L71,87 C71,91 69,93 66,93 C63,93 61,91 61,87 L58,68 Z"/>
+    <path d="M26,86 C22,89 20,99 21,112 L22,130 L38,130 L39,112 C40,99 38,89 34,86 Z"/>
+    <path d="M54,86 C58,89 60,99 59,112 L58,130 L42,130 L41,112 C40,99 42,89 46,86 Z"/>
+    <path d="M22,132 L22,158 C22,162 24,164 27,164 L33,164 C36,164 38,162 38,158 L38,132 Z"/>
+    <path d="M42,132 L42,158 C42,162 44,164 47,164 L53,164 C56,164 58,162 58,158 L58,132 Z"/>
+    <ellipse cx="29" cy="166" rx="9" ry="4"/>
+    <ellipse cx="51" cy="166" rx="9" ry="4"/>`;
+
+  return `<svg viewBox="0 0 160 178" xmlns="http://www.w3.org/2000/svg">
+  <g fill="${skin}" stroke="${line}" stroke-width="0.8">${body}</g>
+  <g fill="${skin}" stroke="${line}" stroke-width="0.8" transform="translate(80,0)">${body}</g>
+
+  <!-- front muscles -->
+  <ellipse cx="32" cy="49" rx="10" ry="9" fill="${mc('chest')}"/>
+  <ellipse cx="48" cy="49" rx="10" ry="9" fill="${mc('chest')}"/>
+  <ellipse cx="19" cy="40" rx="8" ry="7" fill="${mc('shoulders')}"/>
+  <ellipse cx="61" cy="40" rx="8" ry="7" fill="${mc('shoulders')}"/>
+  <ellipse cx="13" cy="56" rx="5" ry="9" fill="${mc('biceps')}"/>
+  <ellipse cx="67" cy="56" rx="5" ry="9" fill="${mc('biceps')}"/>
+  <ellipse cx="12" cy="78" rx="5" ry="8" fill="${mc('forearms')}"/>
+  <ellipse cx="68" cy="78" rx="5" ry="8" fill="${mc('forearms')}"/>
+  <rect x="34" y="58" width="12" height="26" rx="4" fill="${mc('abs')}"/>
+  <ellipse cx="27" cy="70" rx="6" ry="12" fill="${mc('obliques')}"/>
+  <ellipse cx="53" cy="70" rx="6" ry="12" fill="${mc('obliques')}"/>
+  <ellipse cx="31" cy="88" rx="7" ry="6" fill="${mc('hip-flexors')}"/>
+  <ellipse cx="49" cy="88" rx="7" ry="6" fill="${mc('hip-flexors')}"/>
+  <ellipse cx="29" cy="112" rx="8" ry="17" fill="${mc('quads')}"/>
+  <ellipse cx="51" cy="112" rx="8" ry="17" fill="${mc('quads')}"/>
+  <ellipse cx="35" cy="110" rx="4" ry="13" fill="${mc('adductors')}"/>
+  <ellipse cx="45" cy="110" rx="4" ry="13" fill="${mc('adductors')}"/>
+  <ellipse cx="28" cy="148" rx="6" ry="12" fill="${mc('calves')}"/>
+  <ellipse cx="52" cy="148" rx="6" ry="12" fill="${mc('calves')}"/>
+
+  <!-- back muscles -->
+  <ellipse cx="99" cy="40" rx="9" ry="7" fill="${mc('traps')}"/>
+  <ellipse cx="141" cy="40" rx="9" ry="7" fill="${mc('traps')}"/>
+  <rect x="115" y="36" width="10" height="22" rx="4" fill="${mc('upper-back')}"/>
+  <ellipse cx="100" cy="63" rx="9" ry="17" fill="${mc('lats')}"/>
+  <ellipse cx="140" cy="63" rx="9" ry="17" fill="${mc('lats')}"/>
+  <ellipse cx="93" cy="55" rx="5" ry="10" fill="${mc('triceps')}"/>
+  <ellipse cx="147" cy="55" rx="5" ry="10" fill="${mc('triceps')}"/>
+  <ellipse cx="92" cy="78" rx="5" ry="8" fill="${mc('forearms')}"/>
+  <ellipse cx="148" cy="78" rx="5" ry="8" fill="${mc('forearms')}"/>
+  <rect x="115" y="64" width="10" height="20" rx="3" fill="${mc('lower-back')}"/>
+  <ellipse cx="110" cy="90" rx="10" ry="9" fill="${mc('glutes')}"/>
+  <ellipse cx="130" cy="90" rx="10" ry="9" fill="${mc('glutes')}"/>
+  <ellipse cx="110" cy="112" rx="9" ry="17" fill="${mc('hamstrings')}"/>
+  <ellipse cx="130" cy="112" rx="9" ry="17" fill="${mc('hamstrings')}"/>
+  <ellipse cx="110" cy="148" rx="6" ry="12" fill="${mc('calves')}"/>
+  <ellipse cx="130" cy="148" rx="6" ry="12" fill="${mc('calves')}"/>
+
+  <text x="40" y="176" text-anchor="middle" font-size="8" fill="#8b949e" font-family="sans-serif">FRONT</text>
+  <text x="120" y="176" text-anchor="middle" font-size="8" fill="#8b949e" font-family="sans-serif">BACK</text>
+</svg>`;
 }
 
 // ═══════════════════════════════════════════════
@@ -1008,6 +1136,16 @@ function renderModal() {
   const isTimed = parsed.unit === 'sec';
   const isMax = parsed.unit === 'max' || parsed.unit === 'complex';
 
+  const muscles = getMuscles(ex.name);
+  const diagramHTML = muscles ? `
+  <div class="muscle-diagram">
+    <div class="muscle-legend">
+      <span><span style="color:#f97316;font-size:14px">●</span> Primary</span>
+      <span><span style="color:#eab308;font-size:14px">●</span> Secondary</span>
+    </div>
+    ${bodyDiagramSVG(muscles.primary, muscles.secondary)}
+  </div>` : '';
+
   const setsHTML = Array.from({length: ex.sets}, (_, s) => {
     const checked = log.setsState?.[s];
     return `
@@ -1049,6 +1187,7 @@ function renderModal() {
         ${ex.note ? `<div class="modal-note">${ex.note}</div>` : ''}
         ${ex.demo ? `<a class="modal-demo" href="${ex.demo}" target="_blank">▶ Watch Demo</a>` : ''}
         <div class="target-hint">Target: <strong>${ex.sets} × ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">↑ PROGRESSED</span>' : ''}</div>
+        ${diagramHTML}
         ${timerHTML}
         <div class="sets-section">${setsHTML}</div>
         <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it felt…" oninput="setNote(${i},this.value)">${log.notes}</textarea>
