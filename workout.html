@@ -1077,8 +1077,8 @@ function checkPR(i) {
   const ex = S.workout.exercises[i];
   const log = S.logs[i];
   if (!log?.done) return;
+  if (ex.block !== 'Finisher') return;
 
-  // Only track exercises with numeric values (skip burnout/interval/complex targets)
   const parsed = parseTarget(ex.target);
   if (parsed.unit === 'interval' || parsed.unit === 'complex') return;
 
