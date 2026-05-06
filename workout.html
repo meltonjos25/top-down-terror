@@ -174,6 +174,15 @@ input.field::placeholder{color:var(--muted)}
 .week-day-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .today-pill{background:var(--accent);color:#000;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.3px}
 .week-arrow{color:var(--muted);font-size:16px}
+
+/* ---- PERSONAL RECORDS ---- */
+.pr-badge{background:var(--yellow);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.3px}
+.exercise-row.pr-row{border-left:3px solid var(--yellow)}
+.pr-card{background:#d2992218;border:1px solid #d2992255;border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;gap:8px}
+.pr-card-title{font-size:12px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.8px}
+.pr-card-row{font-size:14px;color:var(--text);display:flex;justify-content:space-between;align-items:baseline}
+.pr-card-row span{font-size:12px;color:var(--muted)}
+.summary-ex.has-pr{border-left:3px solid var(--yellow)}
 </style>
 </head>
 <body>
@@ -229,6 +238,7 @@ const S = {
   progression: {},
   history: [],
   modal: null,
+  prs: {},         // exerciseName → { value, prevBest, unit } for PRs hit this session
   timerInterval: null,
   timerSec: 0,
   timerRunning: false,
@@ -569,6 +579,7 @@ async function selectDay(timestamp) {
   S.day = dateDay(date);
   S.workout = null;
   S.logs = {};
+  S.prs = {};
   S.modal = null;
   S.error = '';
   S.screen = 'loading';
@@ -641,14 +652,16 @@ function renderWorkout() {
       const prog = S.progression[ex.name];
       const target = prog?.target || ex.target;
       const progressed = prog?.progressed;
+      const pr = S.prs[ex.name];
       blockHTML += `
-      <div class="exercise-row${isDone ? ' done' : ''}" onclick="openModal(${i})">
+      <div class="exercise-row${isDone ? ' done' : ''}${pr ? ' pr-row' : ''}" onclick="openModal(${i})">
         <div class="exercise-check${isDone ? ' checked' : ''}">${isDone ? '✓' : ''}</div>
         <div class="exercise-info">
           <div class="exercise-name">${ex.name}</div>
           <div class="exercise-meta">
             <span>${ex.sets}×</span><span>${target}</span>
             ${progressed ? '<span class="prog-badge">↑ PROGRESSED</span>' : ''}
+            ${pr ? '<span class="pr-badge">🏆 PR</span>' : ''}
           </div>
         </div>
         <div class="exercise-arrow">›</div>
@@ -778,12 +791,44 @@ function toggleSet(i, s) {
   else render();
 }
 
+function checkPR(i) {
+  const ex = S.workout.exercises[i];
+  const log = S.logs[i];
+  if (!log?.done) return;
+
+  // Only track exercises with numeric values (skip burnout/interval/complex targets)
+  const parsed = parseTarget(ex.target);
+  if (parsed.unit === 'interval' || parsed.unit === 'complex') return;
+
+  const values = log.repsPerSet.map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
+  if (!values.length) return;
+  const sessionBest = Math.max(...values);
+  const unit = parsed.unit === 'sec' ? 'sec' : 'reps';
+
+  // Find all-time best from history (excludes current session)
+  let prevBest = null;
+  S.history.forEach(row => {
+    if (String(row[3]) !== ex.name) return;
+    const vals = String(row[5] || '').split(',')
+      .map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0);
+    if (vals.length) {
+      const m = Math.max(...vals);
+      if (prevBest === null || m > prevBest) prevBest = m;
+    }
+  });
+
+  if (prevBest === null || sessionBest > prevBest) {
+    S.prs[ex.name] = { value: sessionBest, prevBest, unit };
+  }
+}
+
 function markDone(i) {
   const log = S.logs[i];
   const ex = S.workout.exercises[i];
   log.done = true;
   log.setsCompleted = ex.sets;
   log.reps = log.repsPerSet.filter(r => r !== '').join(', ') || log.repsPerSet[0] || '';
+  checkPR(i);
   S.modal = null;
   clearInterval(S.timerInterval);
   S.timerRunning = false;
@@ -838,6 +883,40 @@ function renderSummary() {
     return a + (S.logs[realI]?.setsCompleted || 0);
   }, 0);
 
+  const prEntries = Object.entries(S.prs);
+  const prCardHTML = prEntries.length ? `
+    <div class="pr-card">
+      <div class="pr-card-title">🏆 Personal Records This Session</div>
+      ${prEntries.map(([name, p]) => {
+        const prevText = p.prevBest !== null
+          ? `<span>prev best: ${p.prevBest} ${p.unit}</span>`
+          : `<span>first time logged!</span>`;
+        return `<div class="pr-card-row"><strong>${name}</strong> ${p.value} ${p.unit} ${prevText}</div>`;
+      }).join('')}
+    </div>` : '';
+
+  const doneHTML = done.length ? `
+    <div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px">Completed</div>
+    <div class="summary-list">${done.map(ex => {
+      const i = w.exercises.indexOf(ex);
+      const log = S.logs[i];
+      const pr = S.prs[ex.name];
+      const prTag = pr ? ' <span class="pr-badge">🏆 PR</span>' : '';
+      const prDetail = pr
+        ? (pr.prevBest !== null ? ` · prev best: ${pr.prevBest} ${pr.unit}` : ' · first log!')
+        : '';
+      return `<div class="summary-ex${pr ? ' has-pr' : ''}">
+        <div class="summary-ex-name">${pr ? '🏆' : '✅'} ${ex.name}${prTag}</div>
+        <div class="summary-ex-log">${ex.sets} sets · ${log?.reps || 'logged'}${prDetail}${log?.notes ? ' · ' + log.notes : ''}</div>
+      </div>`;
+    }).join('')}</div>` : '';
+
+  const skippedHTML = skipped.length ? `
+    <div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-top:8px">Skipped</div>
+    <div class="summary-list">${skipped.map(ex =>
+      `<div class="summary-ex" style="opacity:.5"><div class="summary-ex-name">— ${ex.name}</div></div>`
+    ).join('')}</div>` : '';
+
   app.innerHTML = `
   <div class="header"><div class="header-title">Review Workout</div><button class="header-user" onclick="S.screen='workout';render()">← Back</button></div>
   <div class="body">
@@ -845,13 +924,10 @@ function renderSummary() {
       <h2>Workout Summary</h2>
       <div class="summary-stat"><span class="summary-stat-label">Exercises done</span><span class="summary-stat-value">${done.length} / ${w.exercises.length}</span></div>
       <div class="summary-stat"><span class="summary-stat-label">Sets completed</span><span class="summary-stat-value">${totalSets}</span></div>
+      ${prCardHTML}
       ${S.error ? `<div class="error-msg">${S.error}</div>` : ''}
-      ${done.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px">Completed</div><div class="summary-list">${done.map(ex => {
-        const i = w.exercises.indexOf(ex);
-        const log = S.logs[i];
-        return `<div class="summary-ex"><div class="summary-ex-name">✅ ${ex.name}</div><div class="summary-ex-log">${ex.sets} sets · ${log?.reps || 'logged'} ${log?.notes ? '· ' + log.notes : ''}</div></div>`;
-      }).join('')}</div>` : ''}
-      ${skipped.length ? `<div style="font-size:13px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.8px;margin-top:8px">Skipped</div><div class="summary-list">${skipped.map(ex => `<div class="summary-ex" style="opacity:.5"><div class="summary-ex-name">— ${ex.name}</div></div>`).join('')}</div>` : ''}
+      ${doneHTML}
+      ${skippedHTML}
     </div>
   </div>
   <div class="bottom-bar">
@@ -867,11 +943,23 @@ function renderUploading() {
 }
 
 function renderSuccess() {
+  const prEntries = Object.entries(S.prs);
+  const prHTML = prEntries.length ? `
+    <div style="background:var(--surface);border:1px solid #d2992255;border-radius:12px;padding:16px 20px;text-align:left;width:100%;max-width:320px;margin-top:4px">
+      <div style="font-size:12px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">🏆 New Personal Records</div>
+      ${prEntries.map(([name, p]) => `
+        <div style="font-size:14px;color:var(--text);margin-bottom:6px;display:flex;justify-content:space-between;gap:12px">
+          <span>${name}</span>
+          <strong>${p.value} ${p.unit}</strong>
+        </div>`).join('')}
+    </div>` : '';
+
   app.innerHTML = `
   <div class="success-screen">
-    <div class="check">🎉</div>
-    <h2>Workout Logged!</h2>
+    <div class="check">${prEntries.length ? '🏆' : '🎉'}</div>
+    <h2>${prEntries.length ? `${prEntries.length} New PR${prEntries.length > 1 ? 's' : ''}!` : 'Workout Logged!'}</h2>
     <p>Your ${S.workout.name} has been saved to Google Sheets. Great work${S.user === 'josh' ? ', Josh' : ''}!</p>
+    ${prHTML}
     <button class="btn btn-primary" style="max-width:300px;margin-top:16px" onclick="goHome()">Done</button>
   </div>`;
 }
