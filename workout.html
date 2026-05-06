@@ -189,12 +189,16 @@ input.field::placeholder{color:var(--muted)}
 .streak-badge{font-size:13px;font-weight:700;color:var(--yellow);margin-top:8px}
 
 /* ---- CALENDAR ---- */
-.cal-tabs{display:flex;border-bottom:1px solid var(--border);background:var(--surface)}
-.cal-tab{flex:1;padding:11px;background:transparent;border:none;border-bottom:2px solid transparent;margin-bottom:-1px;color:var(--muted);font-size:14px;font-weight:600;cursor:pointer;transition:color .15s,border-color .15s}
-.cal-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+.week-nav-link{background:transparent;border:none;color:var(--text);font-size:14px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:8px;transition:background .15s;display:flex;align-items:center;gap:4px}
+.week-nav-link:hover{background:var(--surface2)}
 .cal-dow-row{display:grid;grid-template-columns:repeat(7,1fr);padding:10px 14px 2px}
 .cal-dow{text-align:center;font-size:11px;font-weight:700;color:var(--muted)}
-.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;padding:0 14px 24px}
+.cal-grid{display:flex;flex-direction:column;gap:3px;padding:0 14px 24px}
+.cal-week{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;border-radius:8px;padding:2px}
+.cal-week.gold{background:#d2992218}
+.cal-week.gold .cal-day-num{color:var(--yellow)}
+.cal-week.gold .cal-check{color:var(--yellow)}
+.cal-week.gold .cal-day.is-today{outline-color:var(--yellow)}
 .cal-day{aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:8px;gap:1px}
 .cal-day.other-month{opacity:.18}
 .cal-day.is-today{background:var(--surface2);outline:1px solid var(--accent)}
@@ -758,7 +762,7 @@ function renderWeekBody() {
   return `
   <div class="week-nav">
     <button class="week-nav-btn" onclick="S.weekOffset--;render()">‹</button>
-    <div class="week-nav-title">${weekLabel}</div>
+    <button class="week-nav-link" onclick="S.calView='month';render()" title="Open monthly calendar">${weekLabel} &nbsp;📅</button>
     <button class="week-nav-btn" onclick="S.weekOffset++;render()">›</button>
   </div>
   ${rowsHTML}`;
@@ -783,21 +787,33 @@ function renderCalendarBody() {
   for (let i = firstDow - 1; i >= 0; i--)
     cells.push({ day: prevTotal - i, cur: false });
   for (let d = 1; d <= totalDays; d++) {
-    const dStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    cells.push({ day: d, cur: true, dStr, isToday: dStr === todayStr, logged: S.loggedDates.has(dStr) });
+    const date = new Date(year, month, d);
+    const dStr = localDateStr(date);
+    const dName = dateDay(date);
+    const scheduled = PLAN_SHEETS[S.user][dName] !== null;
+    cells.push({ day: d, cur: true, dStr, isToday: dStr === todayStr,
+                 logged: S.loggedDates.has(dStr), scheduled });
   }
   const tail = (7 - cells.length % 7) % 7;
   for (let d = 1; d <= tail; d++)
     cells.push({ day: d, cur: false });
 
-  const cellsHTML = cells.map(c => {
-    if (!c.cur) return `<div class="cal-day other-month"><span class="cal-day-num">${c.day}</span></div>`;
-    const cls = `cal-day${c.isToday ? ' is-today' : ''}${c.logged ? ' logged' : ''}`;
-    return `<div class="${cls}">
-      <span class="cal-day-num">${c.day}</span>
-      ${c.logged ? '<span class="cal-check">✓</span>' : ''}
-    </div>`;
-  }).join('');
+  // Group into week rows; detect gold weeks (all scheduled days logged)
+  const weeksHTML = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    const wk = cells.slice(i, i + 7);
+    const scheduledDays = wk.filter(c => c.cur && c.scheduled);
+    const isGold = scheduledDays.length > 0 && scheduledDays.every(c => c.logged);
+    const wkCells = wk.map(c => {
+      if (!c.cur) return `<div class="cal-day other-month"><span class="cal-day-num">${c.day}</span></div>`;
+      const cls = `cal-day${c.isToday ? ' is-today' : ''}${c.logged ? ' logged' : ''}`;
+      return `<div class="${cls}">
+        <span class="cal-day-num">${c.day}</span>
+        ${c.logged ? '<span class="cal-check">✓</span>' : ''}
+      </div>`;
+    }).join('');
+    weeksHTML.push(`<div class="cal-week${isGold ? ' gold' : ''}">${wkCells}</div>`);
+  }
 
   const DOW = ['Mo','Tu','We','Th','Fr','Sa','Su'];
   return `
@@ -807,7 +823,7 @@ function renderCalendarBody() {
     <button class="week-nav-btn" onclick="nextMonth()">›</button>
   </div>
   <div class="cal-dow-row">${DOW.map(d => `<div class="cal-dow">${d}</div>`).join('')}</div>
-  <div class="cal-grid">${cellsHTML}</div>`;
+  <div class="cal-grid">${weeksHTML.join('')}</div>`;
 }
 
 function prevMonth() {
@@ -824,16 +840,15 @@ function nextMonth() {
 function renderWeek() {
   if (!S.weekDurationsLoaded) loadWeekDurations();
   const userName = S.user === 'josh' ? 'Josh' : 'Wife';
+  const rightBtn = S.calView === 'month'
+    ? `<button class="header-user" onclick="S.calView='week';render()">← Week</button>`
+    : `<button class="header-user" onclick="S.screen='user';render()">Switch user</button>`;
   app.innerHTML = `
   <div class="header">
     <div class="header-title">🏋️ ${userName}</div>
-    <button class="header-user" onclick="S.screen='user';render()">Switch user</button>
+    ${rightBtn}
   </div>
   <div class="body">
-    <div class="cal-tabs">
-      <button class="cal-tab${S.calView==='week' ? ' active' : ''}" onclick="S.calView='week';render()">Week</button>
-      <button class="cal-tab${S.calView==='month' ? ' active' : ''}" onclick="S.calView='month';render()">Month</button>
-    </div>
     ${S.calView === 'month' ? renderCalendarBody() : renderWeekBody()}
   </div>`;
 }
