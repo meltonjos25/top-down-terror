@@ -304,6 +304,8 @@ const S = {
   prs: {},         // exerciseName → { value, prevBest, unit } for PRs hit this session
   streaks: { josh: null, wife: null },
   streaksLoading: false,
+  workoutStartTime: null,  // Date.now() when workout screen is first shown
+  workoutDuration: 0,      // seconds, set when submit is pressed
   timerInterval: null,
   timerSec: 0,
   timerRunning: false,
@@ -324,6 +326,17 @@ function fmtDate(d) { return `${MONTHS[d.getMonth()]} ${d.getDate()}`; }
 
 function localDateStr(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+function fmtDuration(sec) {
+  if (!sec) return '—';
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  if (m === 0) return `${s} sec`;
+  if (m < 60) return s > 0 ? `${m} min ${s} sec` : `${m} min`;
+  const h = Math.floor(m / 60);
+  const rem = m % 60;
+  return rem > 0 ? `${h}h ${rem} min` : `${h}h`;
 }
 
 // Returns array of 7 Date objects Mon–Sun for the week (offset weeks from now)
@@ -476,11 +489,13 @@ async function loadHistory() {
 }
 
 async function submitWorkout() {
+  S.workoutDuration = S.workoutStartTime ? Math.floor((Date.now() - S.workoutStartTime) / 1000) : 0;
   S.screen = 'uploading';
   render();
   try {
     const sheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
     const dateStr = localDateStr(S.selectedDate || new Date());
+    const durationStr = fmtDuration(S.workoutDuration);
     const rows = [];
     S.workout.exercises.forEach((ex, i) => {
       const log = S.logs[i];
@@ -493,7 +508,8 @@ async function submitWorkout() {
         String(log.setsCompleted || ex.sets),
         log.reps || '',
         log.notes || '',
-        '✅'
+        '✅',
+        durationStr
       ]);
     });
     if (rows.length) await gasWrite(sheet, rows);
@@ -714,6 +730,8 @@ async function selectDay(timestamp) {
   S.prs = {};
   S.modal = null;
   S.error = '';
+  S.workoutStartTime = null;
+  S.workoutDuration = 0;
   S.screen = 'loading';
   render();
   try {
@@ -723,6 +741,7 @@ async function selectDay(timestamp) {
     }
     await loadHistory();
     S.progression = calcProgression(S.workout.exercises, S.history);
+    S.workoutStartTime = Date.now();
     S.screen = 'workout';
   } catch(e) {
     S.error = e.message;
@@ -1056,6 +1075,7 @@ function renderSummary() {
       <h2>Workout Summary</h2>
       <div class="summary-stat"><span class="summary-stat-label">Exercises done</span><span class="summary-stat-value">${done.length} / ${w.exercises.length}</span></div>
       <div class="summary-stat"><span class="summary-stat-label">Sets completed</span><span class="summary-stat-value">${totalSets}</span></div>
+      <div class="summary-stat"><span class="summary-stat-label">Time elapsed</span><span class="summary-stat-value">${fmtDuration(S.workoutStartTime ? Math.floor((Date.now() - S.workoutStartTime) / 1000) : 0)}</span></div>
       ${prCardHTML}
       ${S.error ? `<div class="error-msg">${S.error}</div>` : ''}
       ${doneHTML}
@@ -1086,11 +1106,18 @@ function renderSuccess() {
         </div>`).join('')}
     </div>` : '';
 
+  const durHTML = S.workoutDuration ? `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 20px;text-align:center;width:100%;max-width:320px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">Workout Duration</div>
+      <div style="font-size:28px;font-weight:800;color:var(--accent)">${fmtDuration(S.workoutDuration)}</div>
+    </div>` : '';
+
   app.innerHTML = `
   <div class="success-screen">
     <div class="check">${prEntries.length ? '🏆' : '🎉'}</div>
     <h2>${prEntries.length ? `${prEntries.length} New PR${prEntries.length > 1 ? 's' : ''}!` : 'Workout Logged!'}</h2>
     <p>Your ${S.workout.name} has been saved to Google Sheets. Great work${S.user === 'josh' ? ', Josh' : ''}!</p>
+    ${durHTML}
     ${prHTML}
     <button class="btn btn-primary" style="max-width:300px;margin-top:16px" onclick="goHome()">Done</button>
   </div>`;
