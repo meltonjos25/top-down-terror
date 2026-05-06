@@ -183,6 +183,9 @@ input.field::placeholder{color:var(--muted)}
 .pr-card-row{font-size:14px;color:var(--text);display:flex;justify-content:space-between;align-items:baseline}
 .pr-card-row span{font-size:12px;color:var(--muted)}
 .summary-ex.has-pr{border-left:3px solid var(--yellow)}
+
+/* ---- STREAK ---- */
+.streak-badge{font-size:13px;font-weight:700;color:var(--yellow);margin-top:8px}
 </style>
 </head>
 <body>
@@ -239,6 +242,8 @@ const S = {
   history: [],
   modal: null,
   prs: {},         // exerciseName → { value, prevBest, unit } for PRs hit this session
+  streaks: { josh: null, wife: null },
+  streaksLoading: false,
   timerInterval: null,
   timerSec: 0,
   timerRunning: false,
@@ -272,6 +277,57 @@ function getWeekDates(offset) {
     d.setDate(monday.getDate() + i);
     return d;
   });
+}
+
+// ═══════════════════════════════════════════════
+// STREAK LOGIC
+// ═══════════════════════════════════════════════
+function calcStreak(user, loggedDates) {
+  const todayStr = localDateStr(new Date());
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  let streak = 0;
+  for (let i = 0; i < 365; i++) {
+    const dStr = localDateStr(d);
+    const isScheduled = PLAN_SHEETS[user][dateDay(d)] !== null;
+    if (!isScheduled) {
+      // Rest day — skip without breaking streak
+      d.setDate(d.getDate() - 1);
+      continue;
+    }
+    if (loggedDates.has(dStr)) {
+      streak++;
+      d.setDate(d.getDate() - 1);
+      continue;
+    }
+    // Scheduled workout day not yet logged — if it's today, skip (pending); otherwise stop
+    if (dStr === todayStr) {
+      d.setDate(d.getDate() - 1);
+      continue;
+    }
+    break;
+  }
+  return streak;
+}
+
+async function loadStreaks() {
+  if (S.streaksLoading) return;
+  S.streaksLoading = true;
+  try {
+    const [joshRows, wifeRows] = await Promise.all([
+      gasRead(JOSH_LOG_SHEET),
+      gasRead(WIFE_LOG_SHEET)
+    ]);
+    const joshDates = new Set(joshRows.map(r => String(r[0])).filter(Boolean));
+    const wifeDates = new Set(wifeRows.map(r => String(r[0])).filter(Boolean));
+    S.streaks.josh = calcStreak('josh', joshDates);
+    S.streaks.wife = calcStreak('wife', wifeDates);
+  } catch(e) {
+    S.streaks.josh = 0;
+    S.streaks.wife = 0;
+  }
+  S.streaksLoading = false;
+  render();
 }
 
 // ═══════════════════════════════════════════════
@@ -496,6 +552,15 @@ function trySkip() {
 
 // ---- USER SELECT ----
 function renderUserSelect() {
+  if (S.streaks.josh === null && !S.streaksLoading) loadStreaks();
+
+  function streakHTML(user) {
+    const n = S.streaks[user];
+    if (n === null) return '<div class="streak-badge">Loading streak…</div>';
+    if (n === 0) return '<div class="streak-badge" style="color:var(--muted)">No active streak — start today!</div>';
+    return `<div class="streak-badge">🔥 ${n} day streak</div>`;
+  }
+
   app.innerHTML = `
   <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="S.screen='setup';render()">⚙ Setup</button></div>
   <div class="user-select">
@@ -504,11 +569,13 @@ function renderUserSelect() {
       <div class="icon">💪</div>
       <h3>Josh</h3>
       <p>Core (Mon/Wed/Fri) · Arms (Tue/Thu/Sat)</p>
+      ${streakHTML('josh')}
     </div>
     <div class="user-card" onclick="selectUser('wife')">
       <div class="icon">🌟</div>
       <h3>Wife</h3>
       <p>Core (Mon/Wed/Fri) · Rest other days</p>
+      ${streakHTML('wife')}
     </div>
   </div>`;
 }
@@ -964,7 +1031,12 @@ function renderSuccess() {
   </div>`;
 }
 
-function goHome() { S.screen = 'week'; render(); }
+function goHome() {
+  S.streaks = { josh: null, wife: null };
+  S.streaksLoading = false;
+  S.screen = 'week';
+  render();
+}
 
 // ═══════════════════════════════════════════════
 // BOOT
