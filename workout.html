@@ -158,6 +158,22 @@ input.field::placeholder{color:var(--muted)}
 .divider{height:1px;background:var(--border);margin:0 20px}
 .skip-link{text-align:center;font-size:13px;color:var(--muted);padding:10px}
 .skip-link a{color:var(--blue);cursor:pointer;text-decoration:none}
+
+/* ---- WEEK VIEW ---- */
+.week-nav{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--border);background:var(--surface)}
+.week-nav-btn{background:var(--surface2);border:1px solid var(--border);color:var(--text);width:32px;height:32px;border-radius:8px;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.week-nav-btn:hover{background:var(--surface3)}
+.week-nav-title{font-size:14px;font-weight:700}
+.week-day-row{display:flex;align-items:center;padding:14px 20px;border-top:1px solid var(--border);cursor:pointer;transition:background .15s;gap:12px}
+.week-day-row:hover{background:var(--surface)}
+.week-day-row.is-today{background:var(--accent-glow)}
+.week-day-row.is-past{opacity:.6}
+.week-day-info{flex:1;min-width:0}
+.week-day-name{font-size:15px;font-weight:700}
+.week-day-subname{font-size:12px;color:var(--muted);margin-top:1px}
+.week-day-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.today-pill{background:var(--accent);color:#000;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.3px}
+.week-arrow{color:var(--muted);font-size:16px}
 </style>
 </head>
 <body>
@@ -202,10 +218,12 @@ const PLAN_SHEETS = {
 // APP STATE
 // ═══════════════════════════════════════════════
 const S = {
-  screen: 'setup',    // setup | user | workout | summary | uploading | success
+  screen: 'setup',    // setup | user | week | loading | workout | summary | uploading | success
   gasUrl: localStorage.getItem('gasUrl') || '',
   user: null,          // 'josh' | 'wife'
   day: null,
+  selectedDate: null,  // Date object for the workout being logged
+  weekOffset: 0,       // weeks relative to current week (0 = this week)
   workout: null,
   logs: {},
   progression: {},
@@ -219,6 +237,31 @@ const S = {
 
 function today() {
   return ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][new Date().getDay()];
+}
+
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const DAYS_LONG = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+function dateDay(d) { return DAYS_LONG[d.getDay()]; }
+
+function fmtDate(d) { return `${MONTHS[d.getMonth()]} ${d.getDate()}`; }
+
+function localDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
+// Returns array of 7 Date objects Mon–Sun for the week (offset weeks from now)
+function getWeekDates(offset) {
+  const now = new Date();
+  const monday = new Date(now);
+  monday.setDate(now.getDate() - ((now.getDay() + 6) % 7) + offset * 7);
+  monday.setHours(0, 0, 0, 0);
+  return Array.from({length: 7}, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
 }
 
 // ═══════════════════════════════════════════════
@@ -311,7 +354,7 @@ async function submitWorkout() {
   render();
   try {
     const sheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
-    const dateStr = new Date().toISOString().slice(0,10);
+    const dateStr = localDateStr(S.selectedDate || new Date());
     const rows = [];
     S.workout.exercises.forEach((ex, i) => {
       const log = S.logs[i];
@@ -345,6 +388,7 @@ const app = document.getElementById('app');
 function render() {
   if (S.screen === 'setup')     return renderSetup();
   if (S.screen === 'user')      return renderUserSelect();
+  if (S.screen === 'week')      return renderWeek();
   if (S.screen === 'loading')   return renderLoading();
   if (S.screen === 'workout')   return renderWorkout();
   if (S.screen === 'summary')   return renderSummary();
@@ -459,9 +503,70 @@ function renderUserSelect() {
   </div>`;
 }
 
-async function selectUser(who) {
+function selectUser(who) {
   S.user = who;
-  S.day = today();
+  S.weekOffset = 0;
+  S.error = '';
+  S.screen = 'week';
+  render();
+}
+
+// ---- WEEK VIEW ----
+function renderWeek() {
+  const dates = getWeekDates(S.weekOffset);
+  const todayStr = localDateStr(new Date());
+  const first = dates[0], last = dates[6];
+  const weekLabel = first.getMonth() === last.getMonth()
+    ? `${MONTHS[first.getMonth()]} ${first.getDate()}–${last.getDate()}, ${first.getFullYear()}`
+    : `${MONTHS[first.getMonth()]} ${first.getDate()} – ${MONTHS[last.getMonth()]} ${last.getDate()}, ${first.getFullYear()}`;
+
+  const TYPE_COLOR = { CORE: '#3fb950', ARMS: '#58a6ff', REST: '#d29922' };
+
+  let rowsHTML = '';
+  dates.forEach((date, idx) => {
+    const dName = dateDay(date);
+    const meta = PLAN_SHEETS[S.user][dName];
+    const type = meta ? meta.type : 'REST';
+    const workoutName = meta ? meta.name : 'Rest Day';
+    const color = TYPE_COLOR[type] || '#8b949e';
+    const dStr = localDateStr(date);
+    const isToday = dStr === todayStr;
+    const isPast  = date < new Date() && !isToday;
+    const rowClass = isToday ? ' is-today' : isPast ? ' is-past' : '';
+
+    rowsHTML += `
+    <div class="week-day-row${rowClass}" onclick="selectDay(${date.getTime()})">
+      <div class="week-day-info">
+        <div class="week-day-name">${DAYS_SHORT[date.getDay()]} ${fmtDate(date)}</div>
+        <div class="week-day-subname">${workoutName}</div>
+      </div>
+      <div class="week-day-right">
+        ${isToday ? '<span class="today-pill">Today</span>' : ''}
+        <span class="badge" style="border-color:${color}55;color:${color}">${type}</span>
+        ${meta ? '<span class="week-arrow">›</span>' : ''}
+      </div>
+    </div>`;
+  });
+
+  app.innerHTML = `
+  <div class="header">
+    <div class="header-title">🏋️ ${S.user === 'josh' ? 'Josh' : 'Wife'}</div>
+    <button class="header-user" onclick="S.screen='user';render()">Switch user</button>
+  </div>
+  <div class="body">
+    <div class="week-nav">
+      <button class="week-nav-btn" onclick="S.weekOffset--;render()">‹</button>
+      <div class="week-nav-title">${weekLabel}</div>
+      <button class="week-nav-btn" onclick="S.weekOffset++;render()">›</button>
+    </div>
+    ${rowsHTML}
+  </div>`;
+}
+
+async function selectDay(timestamp) {
+  const date = new Date(timestamp);
+  S.selectedDate = date;
+  S.day = dateDay(date);
   S.workout = null;
   S.logs = {};
   S.modal = null;
@@ -469,9 +574,8 @@ async function selectUser(who) {
   S.screen = 'loading';
   render();
   try {
-    S.workout = await fetchPlan(who, S.day);
+    S.workout = await fetchPlan(S.user, S.day);
     if (!S.workout) {
-      // rest day — build a minimal rest object
       S.workout = { name: 'Rest & Recovery', type: 'REST', duration: '—', exercises: [] };
     }
     await loadHistory();
@@ -479,17 +583,18 @@ async function selectUser(who) {
     S.screen = 'workout';
   } catch(e) {
     S.error = e.message;
-    S.screen = 'user';
+    S.screen = 'week';
   }
   render();
 }
 
 function renderLoading() {
+  const label = S.selectedDate ? `${S.day}, ${fmtDate(S.selectedDate)}` : 'today';
   app.innerHTML = `
   <div class="auth-screen">
     <div class="uploading" style="flex-direction:column;gap:16px">
       <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
-      <div style="font-size:15px">Loading today's workout…</div>
+      <div style="font-size:15px">Loading ${label}'s workout…</div>
     </div>
   </div>`;
 }
@@ -501,13 +606,14 @@ function renderWorkout() {
   if (!w) return;
 
   if (w.type === 'REST') {
+    const dateLabel = S.selectedDate ? `${S.day}, ${fmtDate(S.selectedDate)}` : S.day;
     app.innerHTML = `
-    <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button></div>
+    <div class="header"><div class="header-title">${dateLabel}</div><button class="header-user" onclick="S.screen='week';render()">← Week</button></div>
     <div class="rest-day">
       <div class="icon">😴</div>
       <h2>${w.name}</h2>
-      <p>Today is a rest day. Recovery is part of the program — enjoy it.</p>
-      <button class="btn btn-secondary" style="max-width:280px;margin-top:16px" onclick="S.screen='user';render()">← Change user</button>
+      <p>${dateLabel} is a rest day. Recovery is part of the program — enjoy it.</p>
+      <button class="btn btn-secondary" style="max-width:280px;margin-top:16px" onclick="S.screen='week';render()">← Back to week</button>
     </div>`;
     return;
   }
@@ -551,15 +657,16 @@ function renderWorkout() {
     blockHTML += '</div>';
   }
 
+  const dateLabel = S.selectedDate ? `${S.day}, ${fmtDate(S.selectedDate)}` : S.day;
   const canSubmit = done > 0;
   app.innerHTML = `
   <div class="header">
-    <div class="header-title">${S.day} · ${w.name}</div>
-    <button class="header-user" onclick="S.screen='user';render()">${S.user === 'josh' ? 'Josh' : 'Wife'}</button>
+    <div class="header-title">${dateLabel}</div>
+    <button class="header-user" onclick="S.screen='week';render()">← Week</button>
   </div>
   <div class="body">
     <div class="day-header">
-      <div class="day-label">${S.day}</div>
+      <div class="day-label">${dateLabel}</div>
       <div class="day-workout">${w.name}</div>
       <div class="day-meta">
         <span class="badge ${w.type.toLowerCase()}">${w.type}</span>
@@ -769,7 +876,7 @@ function renderSuccess() {
   </div>`;
 }
 
-function goHome() { S.user = null; S.screen = 'user'; render(); }
+function goHome() { S.screen = 'week'; render(); }
 
 // ═══════════════════════════════════════════════
 // BOOT
