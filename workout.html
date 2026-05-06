@@ -174,6 +174,7 @@ input.field::placeholder{color:var(--muted)}
 .week-day-right{display:flex;align-items:center;gap:8px;flex-shrink:0}
 .today-pill{background:var(--accent);color:#000;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;text-transform:uppercase;letter-spacing:.3px}
 .week-arrow{color:var(--muted);font-size:16px}
+.week-dur{font-size:12px;font-weight:600;color:var(--muted)}
 
 /* ---- PERSONAL RECORDS ---- */
 .pr-badge{background:var(--yellow);color:#000;font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;letter-spacing:.3px}
@@ -304,7 +305,9 @@ const S = {
   prs: {},         // exerciseName → { value, prevBest, unit } for PRs hit this session
   streaks: { josh: null, wife: null },
   streaksLoading: false,
-  workoutStartTime: null,  // Date.now() when workout screen is first shown
+  weekDurations: {},        // dateStr → formatted duration for completed workouts
+  weekDurationsLoaded: false,
+  workoutStartTime: null,  // Date.now() when first exercise is marked done
   workoutDuration: 0,      // seconds, set when submit is pressed
   timerInterval: null,
   timerSec: 0,
@@ -400,6 +403,23 @@ async function loadStreaks() {
     S.streaks.wife = 0;
   }
   S.streaksLoading = false;
+  render();
+}
+
+async function loadWeekDurations() {
+  if (S.weekDurationsLoaded) return;
+  S.weekDurationsLoaded = true;
+  try {
+    const sheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
+    const rows = await gasRead(sheet);
+    const map = {};
+    rows.forEach(row => {
+      const date = String(row[0] || '');
+      const dur  = String(row[8] || '').trim();
+      if (date && dur && !map[date]) map[date] = dur;
+    });
+    S.weekDurations = map;
+  } catch(e) {}
   render();
 }
 
@@ -513,6 +533,7 @@ async function submitWorkout() {
       ]);
     });
     if (rows.length) await gasWrite(sheet, rows);
+    if (durationStr) S.weekDurations[dateStr] = durationStr;
     S.screen = 'success';
     render();
   } catch(e) {
@@ -665,12 +686,15 @@ function selectUser(who) {
   S.user = who;
   S.weekOffset = 0;
   S.error = '';
+  S.weekDurations = {};
+  S.weekDurationsLoaded = false;
   S.screen = 'week';
   render();
 }
 
 // ---- WEEK VIEW ----
 function renderWeek() {
+  if (!S.weekDurationsLoaded) loadWeekDurations();
   const dates = getWeekDates(S.weekOffset);
   const todayStr = localDateStr(new Date());
   const first = dates[0], last = dates[6];
@@ -692,6 +716,7 @@ function renderWeek() {
     const isPast  = date < new Date() && !isToday;
     const rowClass = isToday ? ' is-today' : isPast ? ' is-past' : '';
 
+    const dur = meta ? (S.weekDurations[dStr] || '') : '';
     rowsHTML += `
     <div class="week-day-row${rowClass}" onclick="selectDay(${date.getTime()})">
       <div class="week-day-info">
@@ -700,6 +725,7 @@ function renderWeek() {
       </div>
       <div class="week-day-right">
         ${isToday ? '<span class="today-pill">Today</span>' : ''}
+        ${dur ? `<span class="week-dur">${dur}</span>` : ''}
         <span class="badge" style="border-color:${color}55;color:${color}">${type}</span>
         ${meta ? '<span class="week-arrow">›</span>' : ''}
       </div>
