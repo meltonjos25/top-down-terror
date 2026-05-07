@@ -281,6 +281,8 @@ input.field::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════════
 const JOSH_LOG_SHEET = 'Josh — Workout Log';
 const WIFE_LOG_SHEET = 'Wife — Workout Log';
+const JOSH_XP_SHEET  = 'Josh — XP Log';
+const WIFE_XP_SHEET  = 'Wife — XP Log';
 
 // ═══════════════════════════════════════════════
 // QUOTE OF THE DAY
@@ -538,6 +540,9 @@ const S = {
   allTimeRecords: {},
   badges: {},           // user → { badgeId: 'YYYY-MM-DD' }
   badgesLoaded: false,
+  xp: { josh: null, wife: null },
+  lastXPEarned: 0,
+  levelUpInfo: null,    // { level, title } while on success screen
   error: '',
 };
 
@@ -687,6 +692,69 @@ function badgeDateLabel(d) {
 }
 
 // ═══════════════════════════════════════════════
+// XP & LEVELING
+// ═══════════════════════════════════════════════
+// Total XP required to reach `level` from level 1
+function xpThreshold(level) { return level <= 1 ? 0 : 125 * (level - 1) * level; }
+
+function levelFromXP(xp) {
+  let lv = 1;
+  while (xpThreshold(lv + 1) <= xp) lv++;
+  return lv;
+}
+
+const LEVEL_TITLES = ['','Rookie','Trainee','Grinder','Athlete','Competitor','Warrior','Champion','Elite','Master','Legend'];
+function getLevelTitle(lv) { return LEVEL_TITLES[Math.min(lv, LEVEL_TITLES.length - 1)] || 'Legend'; }
+
+function xpProgressInfo(xp) {
+  xp = xp || 0;
+  const lv    = levelFromXP(xp);
+  const floor = xpThreshold(lv);
+  const ceil  = xpThreshold(lv + 1);
+  const cur   = xp - floor;
+  const need  = ceil - floor;
+  return { level: lv, title: getLevelTitle(lv), current: cur, needed: need, pct: Math.min(100, Math.round(cur / need * 100)) };
+}
+
+function calcWorkoutXP(exercisesDone, prCount, streak) {
+  let xp = 100;
+  xp += exercisesDone * 5;
+  xp += prCount * 50;
+  if (streak >= 30) xp += 75;
+  else if (streak >= 14) xp += 50;
+  else if (streak >= 7) xp += 25;
+  return xp;
+}
+
+function xpBarHTML(user) {
+  const xp = S.xp[user];
+  if (xp === null) return '<div style="font-size:12px;color:var(--muted);margin-top:8px">Loading level…</div>';
+  const info = xpProgressInfo(xp);
+  return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+      <span style="font-size:13px;font-weight:700;color:var(--accent)">Lv.${info.level} &middot; ${info.title}</span>
+      <span style="font-size:11px;color:var(--muted)">${info.current} / ${info.needed} XP</span>
+    </div>
+    <div style="height:6px;background:var(--surface3);border-radius:3px;overflow:hidden">
+      <div style="height:100%;background:var(--accent);border-radius:3px;width:${info.pct}%"></div>
+    </div>
+  </div>`;
+}
+
+function renderXPCard() {
+  if (!S.lastXPEarned) return '';
+  const info = xpProgressInfo(S.xp[S.user] || 0);
+  return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 20px;text-align:center;width:100%;max-width:320px">
+    <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">XP Earned</div>
+    <div style="font-size:30px;font-weight:800;color:var(--yellow)">+${S.lastXPEarned} XP</div>
+    ${S.levelUpInfo
+      ? `<div style="font-size:13px;color:var(--accent);font-weight:700;margin-top:6px">⭐ Level Up → Lv.${info.level} · ${info.title}!</div>`
+      : `<div style="font-size:12px;color:var(--muted);margin-top:6px">Lv.${info.level} · ${info.current}/${info.needed} XP to next level</div>`
+    }
+  </div>`;
+}
+
+// ═══════════════════════════════════════════════
 // STREAK LOGIC
 // ═══════════════════════════════════════════════
 
@@ -731,17 +799,36 @@ async function loadStreaks() {
   if (S.streaksLoading) return;
   S.streaksLoading = true;
   try {
-    const [joshRows, wifeRows] = await Promise.all([
+    const [joshRows, wifeRows, joshXPRows, wifeXPRows] = await Promise.all([
       gasRead(JOSH_LOG_SHEET),
-      gasRead(WIFE_LOG_SHEET)
+      gasRead(WIFE_LOG_SHEET),
+      gasRead(JOSH_XP_SHEET),
+      gasRead(WIFE_XP_SHEET)
     ]);
     const joshDates = new Set(joshRows.map(r => normDateStr(r[0])).filter(Boolean));
     const wifeDates = new Set(wifeRows.map(r => normDateStr(r[0])).filter(Boolean));
     S.streaks.josh = calcStreak('josh', joshDates);
     S.streaks.wife = calcStreak('wife', wifeDates);
+
+    // Compute XP totals; retroactively initialize if XP sheet is empty
+    const todayStr = localDateStr(new Date());
+    [['josh', joshXPRows, joshDates, JOSH_XP_SHEET],
+     ['wife', wifeXPRows, wifeDates, WIFE_XP_SHEET]].forEach(([user, xpRows, dates, sheet]) => {
+      if (xpRows.length > 0) {
+        S.xp[user] = xpRows.reduce((sum, r) => sum + (parseFloat(r[2]) || 0), 0);
+      } else {
+        const retroXP = dates.size * 150;
+        S.xp[user] = retroXP;
+        if (dates.size > 0) {
+          gasWrite(sheet, [[todayStr, 'retroactive', retroXP, `Retroactive: ${dates.size} workouts`]]).catch(() => {});
+        }
+      }
+    });
   } catch(e) {
     S.streaks.josh = 0;
     S.streaks.wife = 0;
+    S.xp.josh = 0;
+    S.xp.wife = 0;
   }
   S.streaksLoading = false;
   render();
@@ -883,9 +970,25 @@ async function submitWorkout() {
     S.loggedDates.add(dateStr);
     if (durationStr) S.weekDurations[dateStr] = durationStr;
     S.weekJustCompleted = isCurrentWeekComplete();
+
+    // XP
+    const exercisesDone = Object.values(S.logs).filter(l => l.done).length;
+    const prCount = Object.keys(S.prs).length;
+    const xpEarned = calcWorkoutXP(exercisesDone, prCount, S.streaks[S.user] || 0);
+    const prevXP   = S.xp[S.user] || 0;
+    const prevLevel = levelFromXP(prevXP);
+    S.xp[S.user]   = prevXP + xpEarned;
+    S.lastXPEarned  = xpEarned;
+    const newLevel  = levelFromXP(S.xp[S.user]);
+    S.levelUpInfo   = newLevel > prevLevel ? { level: newLevel, title: getLevelTitle(newLevel) } : null;
+    const xpNote = `${exercisesDone} ex${prCount > 0 ? `, ${prCount} PR` : ''}${(S.streaks[S.user]||0) >= 7 ? ', streak' : ''}`;
+    gasWrite(S.user === 'josh' ? JOSH_XP_SHEET : WIFE_XP_SHEET,
+      [[dateStr, S.workout.name, xpEarned, xpNote]]).catch(() => {});
+
     S.screen = 'success';
     render();
     checkAndNotifyNewBadges();
+    if (S.levelUpInfo) setTimeout(() => showLevelUpNotification(S.levelUpInfo), 700);
   } catch(e) {
     S.error = e.message;
     S.screen = 'summary';
@@ -1004,6 +1107,22 @@ function showBadgeNotification(badges) {
   setTimeout(() => { if (el.parentNode) el.remove(); }, 9000);
 }
 
+function showLevelUpNotification(info) {
+  const el = document.createElement('div');
+  el.className = 'badge-notif-overlay';
+  el.innerHTML = `
+    <div class="badge-notif-card" style="text-align:center">
+      <div style="font-size:54px;margin-bottom:8px">⭐</div>
+      <div style="font-size:13px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px">Level Up!</div>
+      <div style="font-size:40px;font-weight:800;margin-bottom:4px">Level ${info.level}</div>
+      <div style="font-size:17px;color:var(--muted);margin-bottom:24px">${info.title}</div>
+      <button onclick="this.closest('.badge-notif-overlay').remove()" style="width:100%;background:var(--accent);color:#000;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer">Let's Go! 💪</button>
+    </div>`;
+  document.body.appendChild(el);
+  launchConfetti('big');
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 9000);
+}
+
 function checkAndNotifyNewBadges() {
   const todayStr = localDateStr(new Date());
   const existing = S.badges[S.user] || {};
@@ -1105,8 +1224,8 @@ function doGet(e) {
 
   if (action === 'log') {
     var data = JSON.parse(decodeURIComponent(e.parameter.data));
-    var logSheet = ss.getSheetByName(data.sheet);
-    if (logSheet) data.rows.forEach(function(row){ logSheet.appendRow(row); });
+    var logSheet = ss.getSheetByName(data.sheet) || ss.insertSheet(data.sheet);
+    data.rows.forEach(function(row){ logSheet.appendRow(row); });
     return res({success: true});
   }
 
@@ -1224,12 +1343,14 @@ function renderUserSelect() {
       <h3>Josh</h3>
       <p>Core (Mon/Wed/Fri) · Arms (Tue/Thu/Sat)</p>
       ${streakHTML('josh')}
+      ${xpBarHTML('josh')}
     </div>
     <div class="user-card" onclick="selectUser('wife')">
       <div class="icon">🌟</div>
       <h3>Wife</h3>
       <p>Core (Mon/Wed/Fri) · Rest other days</p>
       ${streakHTML('wife')}
+      ${xpBarHTML('wife')}
     </div>
   </div>`;
 }
@@ -1802,6 +1923,7 @@ function renderSuccess() {
     <div class="check">${prEntries.length ? '🏆' : '🎉'}</div>
     <h2>${prEntries.length ? `${prEntries.length} New PR${prEntries.length > 1 ? 's' : ''}!` : 'Workout Logged!'}</h2>
     <p>Your ${S.workout.name} has been saved to Google Sheets. Great work${S.user === 'josh' ? ', Josh' : ''}!</p>
+    ${renderXPCard()}
     ${durHTML}
     ${prHTML}
     <button class="btn btn-primary" style="max-width:300px;margin-top:16px" onclick="goHome()">Done</button>
@@ -1815,6 +1937,9 @@ function goHome() {
   S.recordsLoaded = false;
   S.recordsLoading = false;
   S.allTimeRecords = {};
+  S.lastXPEarned = 0;
+  S.levelUpInfo = null;
+  S.xp = { josh: null, wife: null };
   S.screen = 'week';
   render();
 }
@@ -1844,9 +1969,25 @@ function renderProgressBody() {
     }).join('')}</div>`
   ).join('');
 
+  const lvInfo = xpProgressInfo(S.xp[S.user] || 0);
   return `
   <div style="padding:20px">
     <div style="font-size:20px;font-weight:800;margin-bottom:16px">Progress</div>
+    <div style="background:var(--surface);border:2px solid var(--accent);border-radius:14px;padding:18px;margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div style="font-size:26px;font-weight:800;line-height:1">Level ${lvInfo.level}</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:3px">${lvInfo.title}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-size:14px;font-weight:700;color:var(--accent)">${S.xp[S.user] || 0} XP total</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">${lvInfo.current} / ${lvInfo.needed} to Lv.${lvInfo.level + 1}</div>
+        </div>
+      </div>
+      <div style="height:8px;background:var(--surface3);border-radius:4px;overflow:hidden">
+        <div style="height:100%;background:var(--accent);border-radius:4px;width:${lvInfo.pct}%;transition:width .4s ease"></div>
+      </div>
+    </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
         <div style="font-size:30px;font-weight:800;color:var(--accent)">${totalWorkouts}</div>
