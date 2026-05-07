@@ -536,6 +536,16 @@ function themeBtn() {
 // ═══════════════════════════════════════════════
 // STREAK LOGIC
 // ═══════════════════════════════════════════════
+
+// Normalize whatever date format GAS returns to YYYY-MM-DD
+function normDateStr(v) {
+  if (!v) return '';
+  const s = String(v).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0, 10); // ISO or already YYYY-MM-DD
+  const slash = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (slash) return `${slash[3]}-${slash[1].padStart(2,'0')}-${slash[2].padStart(2,'0')}`;
+  return '';
+}
 function calcStreak(user, loggedDates) {
   const todayStr = localDateStr(new Date());
   const d = new Date();
@@ -572,8 +582,8 @@ async function loadStreaks() {
       gasRead(JOSH_LOG_SHEET),
       gasRead(WIFE_LOG_SHEET)
     ]);
-    const joshDates = new Set(joshRows.map(r => String(r[0])).filter(Boolean));
-    const wifeDates = new Set(wifeRows.map(r => String(r[0])).filter(Boolean));
+    const joshDates = new Set(joshRows.map(r => normDateStr(r[0])).filter(Boolean));
+    const wifeDates = new Set(wifeRows.map(r => normDateStr(r[0])).filter(Boolean));
     S.streaks.josh = calcStreak('josh', joshDates);
     S.streaks.wife = calcStreak('wife', wifeDates);
   } catch(e) {
@@ -593,7 +603,7 @@ async function loadWeekDurations() {
     const map = {};
     const dateSet = new Set();
     rows.forEach(row => {
-      const date = String(row[0] || '');
+      const date = normDateStr(row[0]);
       const dur  = String(row[8] || '').trim();
       if (date) dateSet.add(date);
       if (date && dur && !map[date]) map[date] = dur;
@@ -628,7 +638,8 @@ function calcProgression(exercises, history) {
   history.forEach(row => {
     const name = row[3];
     const reps = row[5];
-    const date = row[0];
+    const date = normDateStr(row[0]);
+    if (!date) return;
     if (!byName[name] || date > byName[name].date) byName[name] = {date, reps};
   });
   const NO_PROGRESS = new Set(['Warm-Up', 'Cool-Down', 'Finisher']);
