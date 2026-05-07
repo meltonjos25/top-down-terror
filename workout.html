@@ -1907,33 +1907,15 @@ async function loadRecordsData() {
   render();
   try {
     const logSheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
+    const logRows = await gasRead(logSheet);
 
-    // Unique plan sheets for this user (e.g. 'Josh — Core', 'Josh — Arms')
-    const planSheetNames = [...new Set(
-      Object.values(PLAN_SHEETS[S.user]).filter(Boolean).map(m => m.sheet)
-    )];
+    const TRACKED = new Set(['Max Plank Hold', 'Push-Up Burnout', 'Pike Push-Up Burnout']);
 
-    // Fetch log + all plan sheets in parallel
-    const [logRows, ...planRowsArr] = await Promise.all([
-      gasRead(logSheet),
-      ...planSheetNames.map(s => gasRead(s))
-    ]);
-
-    // Plan columns: [0]=Day [1]=Block [2]=Exercise ...
-    // Build set of exercise names that appear in the Finisher block
-    const finisherNames = new Set();
-    planRowsArr.forEach(rows => {
-      rows.forEach(row => {
-        if (String(row[1]).trim() === 'Finisher') finisherNames.add(String(row[2]).trim());
-      });
-    });
-
-    // Compute all-time best per finisher exercise only
     const bests = {};
     logRows.forEach(row => {
       const name = String(row[3] || '').trim();
       const repsStr = String(row[5] || '').trim();
-      if (!name || !repsStr || !finisherNames.has(name)) return;
+      if (!name || !repsStr || !TRACKED.has(name)) return;
       const vals = repsStr.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0);
       if (!vals.length) return;
       const best = Math.max(...vals);
