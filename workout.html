@@ -201,8 +201,26 @@ input.field::placeholder{color:var(--muted)}
 .pr-card-row span{font-size:12px;color:var(--muted)}
 .summary-ex.has-pr{border-left:3px solid var(--yellow)}
 
-/* ---- STREAK ---- */
-.streak-badge{font-size:13px;font-weight:700;color:var(--yellow);margin-top:8px}
+/* ---- STREAK FLAME ---- */
+.streak-badge{display:flex;align-items:center;justify-content:center;gap:7px;margin-top:8px;font-size:13px;font-weight:700}
+.streak-count{color:var(--text)}
+.flame-wrap{flex-shrink:0;transform-origin:50% 100%;animation:flame-body var(--fd,1s) linear infinite}
+.flame-inner{animation:flame-inner-pulse var(--fd,1s) linear infinite}
+.flame-core{animation:flame-inner-pulse var(--fd,1s) linear infinite;animation-delay:calc(var(--fd,1s)*-.3)}
+@keyframes flame-body{
+  0%  {transform:scaleX(1)   scaleY(1)   rotate(-1deg)}
+  15% {transform:scaleX(.96) scaleY(1.04)rotate(.8deg)}
+  30% {transform:scaleX(1.03)scaleY(.97) rotate(-1.2deg)}
+  50% {transform:scaleX(.98) scaleY(1.02)rotate(.5deg)}
+  65% {transform:scaleX(1.02)scaleY(.98) rotate(-.8deg)}
+  80% {transform:scaleX(.97) scaleY(1.03)rotate(1deg)}
+  100%{transform:scaleX(1)   scaleY(1)   rotate(-1deg)}
+}
+@keyframes flame-inner-pulse{
+  0%,100%{opacity:.85}
+  40%    {opacity:1}
+  70%    {opacity:.6}
+}
 
 /* ---- CALENDAR ---- */
 .week-nav-link{background:transparent;border:none;color:var(--text);font-size:14px;font-weight:700;cursor:pointer;padding:4px 10px;border-radius:8px;transition:background .15s;display:flex;align-items:center;gap:4px}
@@ -939,9 +957,33 @@ function renderUserSelect() {
 
   function streakHTML(user) {
     const n = S.streaks[user];
-    if (n === null) return '<div class="streak-badge">Loading streak…</div>';
+    if (n === null) return '<div class="streak-badge" style="color:var(--muted)">Loading streak…</div>';
     if (n === 0) return '<div class="streak-badge" style="color:var(--muted)">No active streak — start today!</div>';
-    return `<div class="streak-badge">🔥 ${n} day streak</div>`;
+
+    let W, H, outer, inner, core, fd;
+    if (n >= 30) {
+      W=34;H=51;outer='#93c5fd';inner='#e0f2fe';core='#ffffff';fd='.5s';
+    } else if (n >= 14) {
+      W=28;H=42;outer='#ef4444';inner='#f97316';core='#fde68a';fd='.7s';
+    } else if (n >= 7) {
+      W=23;H=35;outer='#f97316';inner='#fb923c';core='#fef08a';fd='.9s';
+    } else if (n >= 4) {
+      W=19;H=29;outer='#fbbf24';inner='#fde68a';core='#fefce8';fd='1.1s';
+    } else {
+      W=16;H=24;outer='#fde68a';inner='#fef9c3';core='#ffffff';fd='1.4s';
+    }
+
+    const label = n === 1 ? '1 day streak' : `${n} day streak`;
+    return `<div class="streak-badge" style="--fd:${fd}">
+      <div class="flame-wrap">
+        <svg viewBox="0 0 24 36" width="${W}" height="${H}" style="display:block;overflow:visible">
+          <path fill="${outer}" d="M12,35 C5,35 0,26 0,19 C0,12 4,9 8,6 C8,11 10,14 10,14 C10,8 13,3 12,0 C15,5 17,10 16,15 C18,10 18,7 16,5 C20,10 24,16 22,21 C21,28 18,35 12,35Z"/>
+          <path class="flame-inner" fill="${inner}" d="M12,30 C7,30 3,24 3,19 C3,14 6,11 9,8 C9,12 11,15 11,15 C11,11 13,7 12,4 C14,9 16,13 15,17 C17,13 17,10 15,8 C18,12 20,17 19,21 C18,26 15,30 12,30Z"/>
+          <ellipse class="flame-core" cx="12" cy="27" rx="4.5" ry="5.5" fill="${core}" opacity=".75"/>
+        </svg>
+      </div>
+      <span class="streak-count">${label}</span>
+    </div>`;
   }
 
   const q = quoteOfDay();
