@@ -261,6 +261,15 @@ input.field::placeholder{color:var(--muted)}
 .act-dot.logged{background:var(--accent)}
 .act-dot.rest{background:var(--surface2);opacity:.35}
 .act-dot.future{background:var(--surface2);opacity:.15}
+
+/* ---- BADGE NOTIFICATION ---- */
+.badge-notif-overlay{position:fixed;inset:0;z-index:9998;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.78);animation:bfadein .25s ease}
+.badge-notif-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:24px;width:100%;max-width:380px;box-shadow:0 20px 60px rgba(0,0,0,.5);animation:bslideup .3s cubic-bezier(.22,1,.36,1)}
+.badge-notif-row{display:flex;align-items:center;gap:14px;padding:12px 0;border-bottom:1px solid var(--border)}
+.badge-notif-row:last-of-type{border-bottom:none}
+.badge-notif-icon{font-size:34px;width:46px;text-align:center;flex-shrink:0;line-height:1}
+@keyframes bfadein{from{opacity:0}to{opacity:1}}
+@keyframes bslideup{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
 </style>
 </head>
 <body>
@@ -327,6 +336,20 @@ function quoteOfDay() {
   const dayIndex = Math.floor(Date.now() / 86400000);
   return QUOTES[dayIndex % QUOTES.length];
 }
+
+// ═══════════════════════════════════════════════
+// BADGE DEFINITIONS
+// ═══════════════════════════════════════════════
+const BADGE_DEFS = [
+  { id: 'first_workout', icon: '🏋️', name: 'First Steps',     desc: 'Completed your first workout' },
+  { id: 'workouts_10',   icon: '💪', name: 'Ten Strong',       desc: 'Completed 10 workouts' },
+  { id: 'workouts_50',   icon: '🔥', name: 'Fifty & Fierce',   desc: 'Completed 50 workouts' },
+  { id: 'workouts_100',  icon: '💯', name: 'Century Club',     desc: 'Completed 100 workouts' },
+  { id: 'streak_7',      icon: '⚡', name: 'Week Warrior',     desc: 'Maintained a 7-day streak' },
+  { id: 'streak_30',     icon: '🌟', name: 'Iron Habit',       desc: 'Maintained a 30-day streak' },
+  { id: 'first_pr',      icon: '🏆', name: 'Personal Best',    desc: 'Logged your first personal record' },
+  { id: 'prs_5',         icon: '👑', name: 'Record Breaker',   desc: 'Logged 5 personal records' },
+];
 
 // ═══════════════════════════════════════════════
 // MUSCLE HEATMAP
@@ -513,6 +536,8 @@ const S = {
   recordsLoading: false,
   recordsLoaded: false,
   allTimeRecords: {},
+  badges: {},           // user → { badgeId: 'YYYY-MM-DD' }
+  badgesLoaded: false,
   error: '',
 };
 
@@ -570,6 +595,95 @@ function toggleTheme() {
 function themeBtn() {
   const light = document.documentElement.getAttribute('data-theme') === 'light';
   return `<button class="theme-toggle" onclick="toggleTheme()" title="${light ? 'Dark mode' : 'Light mode'}">${light ? '🌙' : '☀️'}</button>`;
+}
+
+// ═══════════════════════════════════════════════
+// BADGE LOGIC
+// ═══════════════════════════════════════════════
+
+// Max ever-achieved streak (scanning forward through history)
+function calcMaxStreak(user, loggedDates) {
+  if (!loggedDates.size) return 0;
+  const todayStr = localDateStr(new Date());
+  const sorted = [...loggedDates].sort();
+  const d = new Date(sorted[0]); d.setHours(0,0,0,0);
+  const end = new Date(); end.setHours(0,0,0,0);
+  let max = 0, cur = 0;
+  while (d <= end) {
+    const dStr = localDateStr(d);
+    if (PLAN_SHEETS[user][dateDay(d)] !== null) {
+      if (loggedDates.has(dStr)) { cur++; if (cur > max) max = cur; }
+      else if (dStr < todayStr) cur = 0;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return max;
+}
+
+// Return the date when streak first hit `target`, or null
+function findStreakEarnedDate(user, loggedDates, target) {
+  if (!loggedDates.size) return null;
+  const todayStr = localDateStr(new Date());
+  const sorted = [...loggedDates].sort();
+  const d = new Date(sorted[0]); d.setHours(0,0,0,0);
+  const end = new Date(); end.setHours(0,0,0,0);
+  let cur = 0;
+  while (d <= end) {
+    const dStr = localDateStr(d);
+    if (PLAN_SHEETS[user][dateDay(d)] !== null) {
+      if (loggedDates.has(dStr)) { cur++; if (cur === target) return dStr; }
+      else if (dStr < todayStr) cur = 0;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return null;
+}
+
+// Compute earned badges (with earn dates) from raw log rows + date set
+function computeBadgesFromRows(user, rows, dateSet) {
+  const sorted = [...dateSet].sort();
+  const total = sorted.length;
+
+  const streak7Date  = findStreakEarnedDate(user, dateSet, 7);
+  const streak30Date = findStreakEarnedDate(user, dateSet, 30);
+
+  // Sort rows by date to find when Nth distinct exercise was first logged w/ a value
+  const sortedRows = [...rows].sort((a, b) => {
+    const da = normDateStr(a[0]), db = normDateStr(b[0]);
+    return da < db ? -1 : da > db ? 1 : 0;
+  });
+  const seen = new Set();
+  let pr1Date = null, pr5Date = null;
+  for (const row of sortedRows) {
+    const name = String(row[3] || '').trim();
+    if (!name || seen.has(name)) continue;
+    const repsStr = String(row[5] || '').trim();
+    const hasVal = repsStr.split(',').some(v => { const n = parseFloat(v.trim()); return !isNaN(n) && n > 0; });
+    if (hasVal) {
+      seen.add(name);
+      const d = normDateStr(row[0]);
+      if (seen.size === 1) pr1Date = d;
+      if (seen.size === 5) { pr5Date = d; break; }
+    }
+  }
+
+  const earned = {};
+  if (total >= 1)   earned.first_workout = sorted[0];
+  if (total >= 10)  earned.workouts_10   = sorted[9];
+  if (total >= 50)  earned.workouts_50   = sorted[49];
+  if (total >= 100) earned.workouts_100  = sorted[99];
+  if (streak7Date)  earned.streak_7  = streak7Date;
+  if (streak30Date) earned.streak_30 = streak30Date;
+  if (pr1Date) earned.first_pr = pr1Date;
+  if (pr5Date) earned.prs_5    = pr5Date;
+  return earned;
+}
+
+function badgeDateLabel(d) {
+  if (!d) return '';
+  const parts = d.split('-');
+  if (parts.length !== 3) return d;
+  return `${MONTHS[parseInt(parts[1])-1]} ${parseInt(parts[2])}, ${parts[0]}`;
 }
 
 // ═══════════════════════════════════════════════
@@ -649,7 +763,9 @@ async function loadWeekDurations() {
     });
     S.weekDurations = map;
     S.loggedDates = dateSet;
+    S.badges[S.user] = computeBadgesFromRows(S.user, rows, dateSet);
   } catch(e) {}
+  S.badgesLoaded = true;
   render();
 }
 
@@ -769,6 +885,7 @@ async function submitWorkout() {
     S.weekJustCompleted = isCurrentWeekComplete();
     S.screen = 'success';
     render();
+    checkAndNotifyNewBadges();
   } catch(e) {
     S.error = e.message;
     S.screen = 'summary';
@@ -859,6 +976,66 @@ function launchConfetti(type) {
     requestAnimationFrame(loop);
   }
   requestAnimationFrame(loop);
+}
+
+// ═══════════════════════════════════════════════
+// BADGE NOTIFICATIONS
+// ═══════════════════════════════════════════════
+function showBadgeNotification(badges) {
+  if (!badges.length) return;
+  const el = document.createElement('div');
+  el.className = 'badge-notif-overlay';
+  const rowsHTML = badges.map(b => `
+    <div class="badge-notif-row">
+      <div class="badge-notif-icon">${b.icon}</div>
+      <div>
+        <div style="font-size:15px;font-weight:700">${b.name}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:2px;line-height:1.4">${b.desc}</div>
+      </div>
+    </div>`).join('');
+  el.innerHTML = `
+    <div class="badge-notif-card">
+      <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Badge${badges.length>1?'s':''} Unlocked!</div>
+      <div style="font-size:22px;font-weight:800;margin-bottom:16px">Achievement${badges.length>1?'s':''} Earned 🎉</div>
+      ${rowsHTML}
+      <button onclick="this.closest('.badge-notif-overlay').remove()" style="width:100%;margin-top:18px;background:var(--accent);color:#000;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer">Awesome!</button>
+    </div>`;
+  document.body.appendChild(el);
+  setTimeout(() => { if (el.parentNode) el.remove(); }, 9000);
+}
+
+function checkAndNotifyNewBadges() {
+  const todayStr = localDateStr(new Date());
+  const existing = S.badges[S.user] || {};
+  const total = S.loggedDates.size;
+  const maxStreak = calcMaxStreak(S.user, S.loggedDates);
+  // PR count: session PRs + any already-known PR badge baseline
+  const sessionPrs = Object.keys(S.prs).length;
+  const prCount = existing.prs_5 ? 5 : existing.first_pr ? Math.max(1, sessionPrs) : sessionPrs;
+
+  const checks = [
+    { id: 'first_workout', earned: total >= 1 },
+    { id: 'workouts_10',   earned: total >= 10 },
+    { id: 'workouts_50',   earned: total >= 50 },
+    { id: 'workouts_100',  earned: total >= 100 },
+    { id: 'streak_7',      earned: maxStreak >= 7 },
+    { id: 'streak_30',     earned: maxStreak >= 30 },
+    { id: 'first_pr',      earned: prCount >= 1 },
+    { id: 'prs_5',         earned: prCount >= 5 },
+  ];
+
+  const newBadgeDefs = [];
+  for (const c of checks) {
+    if (c.earned && !existing[c.id]) {
+      const def = BADGE_DEFS.find(b => b.id === c.id);
+      if (def) {
+        if (!S.badges[S.user]) S.badges[S.user] = {};
+        S.badges[S.user][c.id] = todayStr;
+        newBadgeDefs.push(def);
+      }
+    }
+  }
+  if (newBadgeDefs.length) setTimeout(() => showBadgeNotification(newBadgeDefs), 800);
 }
 
 // ═══════════════════════════════════════════════
@@ -1070,6 +1247,7 @@ function selectUser(who) {
   S.recordsLoaded = false;
   S.recordsLoading = false;
   S.allTimeRecords = {};
+  S.badgesLoaded = false;
   S.screen = 'week';
   render();
 }
@@ -1695,7 +1873,31 @@ function renderProgressBody() {
         <span><span style="display:inline-block;width:10px;height:10px;background:var(--surface2);border-radius:2px;vertical-align:middle;margin-right:4px;opacity:.35"></span>Rest</span>
       </div>
     </div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-top:24px;margin-bottom:10px">Achievements</div>
+    ${renderBadgeGrid()}
   </div>`;
+}
+
+function renderBadgeGrid() {
+  if (!S.badgesLoaded) return `<div class="uploading" style="padding:16px 0;justify-content:flex-start;gap:10px"><div class="spinner"></div><span style="font-size:14px;color:var(--muted)">Loading badges…</span></div>`;
+  const earned = S.badges[S.user] || {};
+  const earnedCount = Object.keys(earned).length;
+  return `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+    ${BADGE_DEFS.map(b => {
+      const earnDate = earned[b.id];
+      const isEarned = !!earnDate;
+      return `<div style="background:var(--surface);border:1px solid ${isEarned?'var(--accent)':'var(--border)'};border-radius:12px;padding:14px;${isEarned?'':'opacity:.42'}">
+        <div style="font-size:26px;line-height:1;margin-bottom:8px">${b.icon}</div>
+        <div style="font-size:13px;font-weight:700;line-height:1.2;margin-bottom:4px">${b.name}</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.4;margin-bottom:6px">${b.desc}</div>
+        ${isEarned
+          ? `<div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.3px">✓ ${badgeDateLabel(earnDate)}</div>`
+          : `<div style="font-size:10px;color:var(--muted)">🔒 Locked</div>`}
+      </div>`;
+    }).join('')}
+  </div>
+  <div style="font-size:12px;color:var(--muted);text-align:center;margin-top:12px">${earnedCount} / ${BADGE_DEFS.length} badges earned</div>`;
 }
 
 // ---- RECORDS TAB ----
