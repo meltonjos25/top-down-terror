@@ -1233,7 +1233,11 @@ function openModal(i) {
   S.timerRunning = false;
   if (!S.logs[i]) {
     const ex = S.workout.exercises[i];
-    S.logs[i] = { done: false, setsCompleted: 0, repsPerSet: Array(ex.sets).fill(''), notes: '', setsState: Array(ex.sets).fill(false) };
+    const prog = S.progression[ex.name];
+    const target = prog?.target || ex.target;
+    const parsed = parseTarget(target);
+    const prefill = parsed.value != null ? String(parsed.value) : '';
+    S.logs[i] = { done: false, setsCompleted: 0, repsPerSet: Array(ex.sets).fill(prefill), notes: '', setsState: Array(ex.sets).fill(false) };
   }
   render();
 }
