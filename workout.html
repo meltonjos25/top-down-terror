@@ -12,6 +12,12 @@
   --text:#e6edf3;--muted:#8b949e;--red:#f85149;--yellow:#d29922;--blue:#58a6ff;
   --border:#30363d;--r:14px;
 }
+[data-theme="light"]{
+  --bg:#ffffff;--surface:#f6f8fa;--surface2:#eaeef2;--surface3:#d0d7de;
+  --accent:#1f883d;--accent-dim:#dafbe1;--accent-glow:#1f883d18;
+  --text:#1f2328;--muted:#57606a;--red:#d1242f;--yellow:#9a6700;--blue:#0969da;
+  --border:#d0d7de;
+}
 html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
 #app{max-width:480px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
 
@@ -19,6 +25,10 @@ html,body{height:100%;background:var(--bg);color:var(--text);font-family:-apple-
 .header{display:flex;align-items:center;justify-content:space-between;padding:16px 20px 12px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--bg);z-index:10}
 .header-title{font-size:17px;font-weight:700;letter-spacing:.3px}
 .header-user{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:13px;font-weight:600;cursor:pointer;color:var(--accent)}
+.header-user:hover{background:var(--surface3)}
+.theme-toggle{background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:5px 10px;font-size:15px;cursor:pointer;line-height:1;transition:background .15s;flex-shrink:0}
+.theme-toggle:hover{background:var(--surface3)}
+.header-right{display:flex;align-items:center;gap:8px}
 .header-user:hover{background:var(--accent-dim)}
 
 /* ---- SCROLL BODY ---- */
@@ -507,6 +517,22 @@ function getWeekDates(offset) {
 }
 
 // ═══════════════════════════════════════════════
+// THEME
+// ═══════════════════════════════════════════════
+function applyTheme(t) {
+  document.documentElement.setAttribute('data-theme', t);
+  localStorage.setItem('theme', t);
+}
+function toggleTheme() {
+  applyTheme(document.documentElement.getAttribute('data-theme') === 'light' ? 'dark' : 'light');
+  render();
+}
+function themeBtn() {
+  const light = document.documentElement.getAttribute('data-theme') === 'light';
+  return `<button class="theme-toggle" onclick="toggleTheme()" title="${light ? 'Dark mode' : 'Light mode'}">${light ? '🌙' : '☀️'}</button>`;
+}
+
+// ═══════════════════════════════════════════════
 // STREAK LOGIC
 // ═══════════════════════════════════════════════
 function calcStreak(user, loggedDates) {
@@ -759,6 +785,7 @@ function res(data) {
 
 function renderSetup() {
   app.innerHTML = `
+  <div class="header" style="border-bottom:none"><div></div>${themeBtn()}</div>
   <div class="setup">
     <div style="font-size:48px;margin-bottom:-8px">🏋️</div>
     <h1>Morning Workout<br>Josh & Wife</h1>
@@ -815,7 +842,7 @@ function renderUserSelect() {
 
   const q = quoteOfDay();
   app.innerHTML = `
-  <div class="header"><div class="header-title">🏋️ Morning Workout</div><button class="header-user" onclick="S.screen='setup';render()">⚙ Setup</button></div>
+  <div class="header"><div class="header-title">🏋️ Morning Workout</div><div class="header-right">${themeBtn()}<button class="header-user" onclick="S.screen='setup';render()">⚙ Setup</button></div></div>
   <div class="user-select">
     <h2>Who's working out?</h2>
     <div class="quote-card">
@@ -974,7 +1001,7 @@ function renderWeek() {
   app.innerHTML = `
   <div class="header">
     <div class="header-title">🏋️ ${userName}</div>
-    ${rightBtn}
+    <div class="header-right">${themeBtn()}${rightBtn}</div>
   </div>
   <div class="body">
     ${S.calView === 'month' ? renderCalendarBody() : renderWeekBody()}
@@ -1029,7 +1056,7 @@ function renderWorkout() {
   if (w.type === 'REST') {
     const dateLabel = S.selectedDate ? `${S.day}, ${fmtDate(S.selectedDate)}` : S.day;
     app.innerHTML = `
-    <div class="header"><div class="header-title">${dateLabel}</div><button class="header-user" onclick="S.screen='week';render()">← Week</button></div>
+    <div class="header"><div class="header-title">${dateLabel}</div><div class="header-right">${themeBtn()}<button class="header-user" onclick="S.screen='week';render()">← Week</button></div></div>
     <div class="rest-day">
       <div class="icon">😴</div>
       <h2>${w.name}</h2>
@@ -1085,7 +1112,7 @@ function renderWorkout() {
   app.innerHTML = `
   <div class="header">
     <div class="header-title">${dateLabel}</div>
-    <button class="header-user" onclick="S.screen='week';render()">← Week</button>
+    <div class="header-right">${themeBtn()}<button class="header-user" onclick="S.screen='week';render()">← Week</button></div>
   </div>
   <div class="body">
     <div class="day-header">
@@ -1340,7 +1367,7 @@ function renderSummary() {
     ).join('')}</div>` : '';
 
   app.innerHTML = `
-  <div class="header"><div class="header-title">Review Workout</div><button class="header-user" onclick="S.screen='workout';render()">← Back</button></div>
+  <div class="header"><div class="header-title">Review Workout</div><div class="header-right">${themeBtn()}<button class="header-user" onclick="S.screen='workout';render()">← Back</button></div></div>
   <div class="body">
     <div class="summary">
       <h2>Workout Summary</h2>
@@ -1405,6 +1432,7 @@ function goHome() {
 // BOOT
 // ═══════════════════════════════════════════════
 window.addEventListener('load', () => {
+  applyTheme(localStorage.getItem('theme') || 'dark');
   if (S.gasUrl) S.screen = 'user';
   render();
 });
