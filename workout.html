@@ -1539,8 +1539,9 @@ function renderModal() {
   const prog = S.progression[ex.name];
   const target = prog?.target || ex.target;
   const parsed = parseTarget(target);
-  const isTimed = parsed.unit === 'sec';
-  const isMax = parsed.unit === 'max' || parsed.unit === 'complex';
+  const isTimedByName = /plank|hold/i.test(ex.name);
+  const isTimed = parsed.unit === 'sec' || (isTimedByName && parsed.unit === 'max');
+  const isMax = !isTimed && (parsed.unit === 'max' || parsed.unit === 'complex');
 
   const muscles = getMuscles(ex.name);
   const diagramHTML = muscles ? `
@@ -1630,7 +1631,7 @@ function checkPR(i) {
   const values = log.repsPerSet.map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
   if (!values.length) return;
   const sessionBest = Math.max(...values);
-  const unit = parsed.unit === 'sec' ? 'sec' : 'reps';
+  const unit = (parsed.unit === 'sec' || /plank|hold/i.test(ex.name)) ? 'sec' : 'reps';
 
   // Find all-time best from history (excludes current session)
   let prevBest = null;
