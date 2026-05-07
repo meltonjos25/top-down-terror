@@ -473,6 +473,7 @@ const S = {
   timerInterval: null,
   timerSec: 0,
   timerRunning: false,
+  weekJustCompleted: false,
   error: '',
 };
 
@@ -715,6 +716,7 @@ async function submitWorkout() {
     if (rows.length) await gasWrite(sheet, rows);
     S.loggedDates.add(dateStr);
     if (durationStr) S.weekDurations[dateStr] = durationStr;
+    S.weekJustCompleted = isCurrentWeekComplete();
     S.screen = 'success';
     render();
   } catch(e) {
@@ -722,6 +724,91 @@ async function submitWorkout() {
     S.screen = 'summary';
     render();
   }
+}
+
+function isCurrentWeekComplete() {
+  if (!S.user || !PLAN_SHEETS[S.user]) return false;
+  return getWeekDates(0)
+    .filter(d => PLAN_SHEETS[S.user][dateDay(d)] !== null)
+    .every(d => S.loggedDates.has(localDateStr(d)));
+}
+
+function launchConfetti(type) {
+  const existing = document.getElementById('confetti-canvas');
+  if (existing) existing.remove();
+  const canvas = document.createElement('canvas');
+  canvas.id = 'confetti-canvas';
+  canvas.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:9999';
+  document.body.appendChild(canvas);
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  const W = canvas.width, H = canvas.height;
+  const colors = ['#f97316','#eab308','#22c55e','#3b82f6','#a855f7','#ec4899','#ef4444','#06b6d4','#84cc16','#f43f5e'];
+  const DURATION = 3200;
+  const FADE_START = DURATION * 0.6;
+  const start = performance.now();
+  const particles = [];
+
+  function mkParticle(x, y, vx, vy) {
+    return {
+      x, y, vx, vy,
+      rotation: Math.random() * Math.PI * 2,
+      rotSpeed: (Math.random() - 0.5) * 0.3,
+      w: 6 + Math.random() * 7,
+      h: 4 + Math.random() * 5,
+      color: colors[Math.floor(Math.random() * colors.length)],
+      shape: Math.random() < 0.6 ? 'rect' : 'circle',
+      gravity: 0.15 + Math.random() * 0.15,
+      drag: 0.98 + Math.random() * 0.01,
+    };
+  }
+
+  if (type === 'pr') {
+    const ox = W / 2, oy = H * 0.15;
+    for (let i = 0; i < 90; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 4 + Math.random() * 10;
+      particles.push(mkParticle(ox, oy, Math.cos(angle) * speed, Math.sin(angle) * speed - 3));
+    }
+  } else {
+    [[W * 0.1, H], [W * 0.9, H]].forEach(([ox, oy]) => {
+      for (let i = 0; i < 100; i++) {
+        const spread = (Math.random() - 0.5) * 14;
+        const up = -(12 + Math.random() * 10);
+        particles.push(mkParticle(ox, oy, spread, up));
+      }
+    });
+  }
+
+  function loop(now) {
+    const elapsed = now - start;
+    if (elapsed > DURATION) { canvas.remove(); return; }
+    ctx.clearRect(0, 0, W, H);
+    const alpha = elapsed > FADE_START ? 1 - (elapsed - FADE_START) / (DURATION - FADE_START) : 1;
+    particles.forEach(p => {
+      p.vx *= p.drag;
+      p.vy = p.vy * p.drag + p.gravity;
+      p.x += p.vx;
+      p.y += p.vy;
+      p.rotation += p.rotSpeed;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = p.color;
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rotation);
+      if (p.shape === 'rect') {
+        ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      } else {
+        ctx.beginPath();
+        ctx.arc(0, 0, p.h / 2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    });
+    requestAnimationFrame(loop);
+  }
+  requestAnimationFrame(loop);
 }
 
 // ═══════════════════════════════════════════════
@@ -1267,7 +1354,9 @@ function checkPR(i) {
 
   if (prevBest === null || sessionBest > prevBest) {
     S.prs[ex.name] = { value: sessionBest, prevBest, unit };
+    return true;
   }
+  return false;
 }
 
 function markDone(i) {
@@ -1277,11 +1366,12 @@ function markDone(i) {
   log.done = true;
   log.setsCompleted = ex.sets;
   log.reps = log.repsPerSet.filter(r => r !== '').join(', ') || log.repsPerSet[0] || '';
-  checkPR(i);
+  const gotPR = checkPR(i);
   S.modal = null;
   clearInterval(S.timerInterval);
   S.timerRunning = false;
   render();
+  if (gotPR) setTimeout(() => launchConfetti('pr'), 150);
 }
 
 // ---- TIMER ----
@@ -1393,6 +1483,10 @@ function renderUploading() {
 }
 
 function renderSuccess() {
+  if (S.weekJustCompleted) {
+    S.weekJustCompleted = false;
+    setTimeout(() => launchConfetti('big'), 300);
+  }
   const prEntries = Object.entries(S.prs);
   const prHTML = prEntries.length ? `
     <div style="background:var(--surface);border:1px solid #d2992255;border-radius:12px;padding:16px 20px;text-align:left;width:100%;max-width:320px;margin-top:4px">
