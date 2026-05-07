@@ -250,6 +250,17 @@ input.field::placeholder{color:var(--muted)}
 .quote-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:16px 20px;text-align:center}
 .quote-text{font-size:14px;line-height:1.65;color:var(--muted);font-style:italic}
 .quote-author{font-size:11px;color:var(--surface3);margin-top:8px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;filter:brightness(1.8)}
+
+/* ---- NAV BAR ---- */
+.nav-bar{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--surface);border-top:1px solid var(--border);display:flex;z-index:50;padding-bottom:env(safe-area-inset-bottom,0)}
+.nav-item{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:10px 0 8px;border:none;background:transparent;cursor:pointer;color:var(--muted);transition:color .15s;gap:3px}
+.nav-item.active{color:var(--accent)}
+.nav-item svg{width:22px;height:22px;flex-shrink:0}
+.nav-label{font-size:10px;font-weight:600;letter-spacing:.3px}
+.act-dot{width:11px;height:11px;border-radius:3px;background:var(--surface3)}
+.act-dot.logged{background:var(--accent)}
+.act-dot.rest{background:var(--surface2);opacity:.35}
+.act-dot.future{background:var(--surface2);opacity:.15}
 </style>
 </head>
 <body>
@@ -498,6 +509,10 @@ const S = {
   timerSec: 0,
   timerRunning: false,
   weekJustCompleted: false,
+  navTab: 'workout',    // 'workout' | 'calendar' | 'progress' | 'records'
+  recordsLoading: false,
+  recordsLoaded: false,
+  allTimeRecords: {},
   error: '',
 };
 
@@ -847,6 +862,34 @@ function launchConfetti(type) {
 }
 
 // ═══════════════════════════════════════════════
+// NAV BAR
+// ═══════════════════════════════════════════════
+function navIcon(tab) {
+  if (tab === 'workout') return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="0" y="7" width="3.5" height="10" rx="1.5"/><rect x="3.5" y="9.5" width="3" height="5" rx="1"/><rect x="6.5" y="11" width="11" height="2" rx="1"/><rect x="17.5" y="9.5" width="3" height="5" rx="1"/><rect x="20.5" y="7" width="3.5" height="10" rx="1.5"/></svg>`;
+  if (tab === 'calendar') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><circle cx="8" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none"/></svg>`;
+  if (tab === 'progress') return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="14" width="5" height="8" rx="1"/><rect x="9.5" y="9" width="5" height="13" rx="1"/><rect x="17" y="4" width="5" height="18" rx="1"/></svg>`;
+  if (tab === 'records') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4"/><path d="M6 3h12v8a6 6 0 01-12 0V3z"/><path d="M6 7H3.5a2.5 2.5 0 000 5H6M18 7h2.5a2.5 2.5 0 010 5H18"/></svg>`;
+  return '';
+}
+
+function renderNavBar() {
+  const tabs = [
+    {id:'workout',  label:'Workout'},
+    {id:'calendar', label:'Calendar'},
+    {id:'progress', label:'Progress'},
+    {id:'records',  label:'Records'},
+  ];
+  return `<nav class="nav-bar">${tabs.map(t =>
+    `<button class="nav-item${S.navTab===t.id?' active':''}" onclick="navTo('${t.id}')">${navIcon(t.id)}<span class="nav-label">${t.label}</span></button>`
+  ).join('')}</nav>`;
+}
+
+function navTo(tab) {
+  S.navTab = tab;
+  render();
+}
+
+// ═══════════════════════════════════════════════
 // RENDER
 // ═══════════════════════════════════════════════
 const app = document.getElementById('app');
@@ -1021,9 +1064,12 @@ function selectUser(who) {
   S.weekDurations = {};
   S.weekDurationsLoaded = false;
   S.loggedDates = new Set();
-  S.calView = 'week';
   S.calendarYear = null;
   S.calendarMonth = null;
+  S.navTab = 'workout';
+  S.recordsLoaded = false;
+  S.recordsLoading = false;
+  S.allTimeRecords = {};
   S.screen = 'week';
   render();
 }
@@ -1067,7 +1113,7 @@ function renderWeekBody() {
   return `
   <div class="week-nav">
     <button class="week-nav-btn" onclick="S.weekOffset--;render()">‹</button>
-    <button class="week-nav-link" onclick="S.calView='month';render()" title="Open monthly calendar">${weekLabel} &nbsp;📅</button>
+    <button class="week-nav-link" onclick="navTo('calendar')" title="Open monthly calendar">${weekLabel} &nbsp;📅</button>
     <button class="week-nav-btn" onclick="S.weekOffset++;render()">›</button>
   </div>
   ${rowsHTML}`;
@@ -1145,17 +1191,18 @@ function nextMonth() {
 function renderWeek() {
   if (!S.weekDurationsLoaded) loadWeekDurations();
   const userName = S.user === 'josh' ? 'Josh' : 'Wife';
-  const rightBtn = S.calView === 'month'
-    ? `<button class="header-user" onclick="S.calView='week';render()">← Week</button>`
-    : `<button class="header-user" onclick="S.screen='user';render()">Switch user</button>`;
+  let bodyContent;
+  if (S.navTab === 'calendar') bodyContent = renderCalendarBody();
+  else if (S.navTab === 'progress') bodyContent = renderProgressBody();
+  else if (S.navTab === 'records') bodyContent = renderRecordsBody();
+  else bodyContent = renderWeekBody();
   app.innerHTML = `
   <div class="header">
     <div class="header-title">🏋️ ${userName}</div>
-    <div class="header-right">${themeBtn()}${rightBtn}</div>
+    <div class="header-right">${themeBtn()}<button class="header-user" onclick="S.screen='user';render()">Switch</button></div>
   </div>
-  <div class="body">
-    ${S.calView === 'month' ? renderCalendarBody() : renderWeekBody()}
-  </div>`;
+  <div class="body">${bodyContent}</div>
+  ${renderNavBar()}`;
 }
 
 async function selectDay(timestamp) {
@@ -1585,10 +1632,130 @@ function renderSuccess() {
 function goHome() {
   S.streaks = { josh: null, wife: null };
   S.streaksLoading = false;
+  S.navTab = 'workout';
+  S.recordsLoaded = false;
+  S.recordsLoading = false;
+  S.allTimeRecords = {};
   S.screen = 'week';
   render();
 }
 
+// ---- PROGRESS TAB ----
+function renderProgressBody() {
+  const totalWorkouts = S.loggedDates.size;
+  const streak = S.user ? (S.streaks[S.user] ?? '—') : '—';
+  const thisWeekDates = getWeekDates(0);
+  const thisWeekDone = thisWeekDates.filter(d => S.loggedDates.has(localDateStr(d))).length;
+
+  const durVals = Object.values(S.weekDurations)
+    .map(s => { const m = s.match(/(\d+)\s*min/); return m ? parseInt(m[1]) : null; })
+    .filter(v => v !== null);
+  const avgDur = durVals.length ? Math.round(durVals.reduce((a,b) => a+b, 0) / durVals.length) : null;
+
+  const todayObj = new Date(); todayObj.setHours(23,59,59,999);
+  const weeks = Array.from({length:12}, (_, i) => getWeekDates(i - 11));
+
+  const gridHTML = weeks.map(weekDates =>
+    `<div style="display:flex;flex-direction:column;gap:4px">${weekDates.map(d => {
+      const dStr = localDateStr(d);
+      const meta = PLAN_SHEETS[S.user][dateDay(d)];
+      if (d > todayObj) return `<div class="act-dot future"></div>`;
+      if (!meta) return `<div class="act-dot rest"></div>`;
+      return `<div class="act-dot${S.loggedDates.has(dStr) ? ' logged' : ''}"></div>`;
+    }).join('')}</div>`
+  ).join('');
+
+  return `
+  <div style="padding:20px">
+    <div style="font-size:20px;font-weight:800;margin-bottom:16px">Progress</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:24px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:30px;font-weight:800;color:var(--accent)">${totalWorkouts}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;font-weight:600">Total Workouts</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:30px;font-weight:800;color:var(--accent)">${streak}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;font-weight:600">Day Streak</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:30px;font-weight:800;color:var(--accent)">${thisWeekDone}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;font-weight:600">This Week</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;text-align:center">
+        <div style="font-size:30px;font-weight:800;color:var(--accent)">${avgDur ? avgDur+' min' : '—'}</div>
+        <div style="font-size:12px;color:var(--muted);margin-top:4px;font-weight:600">Avg Duration</div>
+      </div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">12-Week Activity</div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px">
+      <div style="display:flex;gap:4px;justify-content:center">${gridHTML}</div>
+      <div style="display:flex;gap:16px;margin-top:12px;font-size:11px;color:var(--muted)">
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--accent);border-radius:2px;vertical-align:middle;margin-right:4px"></span>Logged</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--surface3);border-radius:2px;vertical-align:middle;margin-right:4px"></span>Missed</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:var(--surface2);border-radius:2px;vertical-align:middle;margin-right:4px;opacity:.35"></span>Rest</span>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ---- RECORDS TAB ----
+async function loadRecordsData() {
+  if (S.recordsLoading || S.recordsLoaded) return;
+  S.recordsLoading = true;
+  render();
+  try {
+    const sheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
+    const rows = await gasRead(sheet);
+    const bests = {};
+    rows.forEach(row => {
+      const name = String(row[3] || '').trim();
+      const repsStr = String(row[5] || '').trim();
+      if (!name || !repsStr) return;
+      const vals = repsStr.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0);
+      if (!vals.length) return;
+      const best = Math.max(...vals);
+      if (!bests[name] || best > bests[name].value) {
+        const parsed = parseTarget(String(row[4] || ''));
+        bests[name] = { value: best, unit: parsed.unit === 'sec' ? 'sec' : 'reps' };
+      }
+    });
+    S.allTimeRecords = bests;
+    S.recordsLoaded = true;
+  } catch(e) {}
+  S.recordsLoading = false;
+  render();
+}
+
+function renderRecordsBody() {
+  if (!S.recordsLoaded && !S.recordsLoading) loadRecordsData();
+
+  if (S.recordsLoading) return `
+  <div style="padding:20px">
+    <div style="font-size:20px;font-weight:800;margin-bottom:16px">Records</div>
+    <div class="uploading"><div class="spinner"></div>Loading records…</div>
+  </div>`;
+
+  const entries = Object.entries(S.allTimeRecords).sort((a,b) => a[0].localeCompare(b[0]));
+
+  if (!entries.length) return `
+  <div style="padding:20px">
+    <div style="font-size:20px;font-weight:800;margin-bottom:16px">Records</div>
+    <div style="color:var(--muted);text-align:center;padding:40px 0;font-size:14px">No records logged yet.</div>
+  </div>`;
+
+  const listHTML = entries.map(([name, r]) =>
+    `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+      <div style="font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+      <div style="font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${r.value} <span style="font-size:12px;color:var(--muted);font-weight:600">${r.unit}</span></div>
+    </div>`
+  ).join('');
+
+  return `
+  <div style="padding:20px">
+    <div style="font-size:20px;font-weight:800;margin-bottom:16px">All-Time Records</div>
+    <div style="display:flex;flex-direction:column;gap:8px">${listHTML}</div>
+  </div>`;
+}
 
 // ═══════════════════════════════════════════════
 // BOOT
