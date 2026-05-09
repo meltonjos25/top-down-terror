@@ -2743,6 +2743,7 @@ async function loadRecordsData() {
     const logRows = await gasRead(logSheet);
 
     const TRACKED = new Set(['Max Plank Hold', 'Push-Up Burnout', 'Pike Push-Up Burnout']);
+    const TIMED_RECORDS = new Set(['Max Plank Hold']);
 
     const bests = {};
     logRows.forEach(row => {
@@ -2754,7 +2755,8 @@ async function loadRecordsData() {
       const best = Math.max(...vals);
       if (!bests[name] || best > bests[name].value) {
         const parsed = parseTarget(String(row[4] || ''));
-        bests[name] = { value: best, unit: parsed.unit === 'sec' ? 'sec' : 'reps' };
+        const unit = TIMED_RECORDS.has(name) ? 'sec' : (parsed.unit === 'sec' ? 'sec' : 'reps');
+        bests[name] = { value: best, unit };
       }
     });
     S.allTimeRecords = bests;
@@ -2781,12 +2783,22 @@ function renderRecordsBody() {
     <div style="color:var(--muted);text-align:center;padding:40px 0;font-size:14px">No finisher records logged yet.</div>
   </div>`;
 
-  const listHTML = entries.map(([name, r]) =>
-    `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+  const listHTML = entries.map(([name, r]) => {
+    let valDisplay;
+    if (r.unit === 'sec') {
+      const m = Math.floor(r.value / 60);
+      const s = Math.round(r.value % 60);
+      valDisplay = m > 0
+        ? `${m}<span style="font-size:12px;color:var(--muted);font-weight:600">m</span> ${String(s).padStart(2,'0')}<span style="font-size:12px;color:var(--muted);font-weight:600">s</span>`
+        : `${s}<span style="font-size:12px;color:var(--muted);font-weight:600">s</span>`;
+    } else {
+      valDisplay = `${r.value} <span style="font-size:12px;color:var(--muted);font-weight:600">${r.unit}</span>`;
+    }
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
       <div style="font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
-      <div style="font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${r.value} <span style="font-size:12px;color:var(--muted);font-weight:600">${r.unit}</span></div>
-    </div>`
-  ).join('');
+      <div style="font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${valDisplay}</div>
+    </div>`;
+  }).join('');
 
   return `
   <div style="padding:20px">
