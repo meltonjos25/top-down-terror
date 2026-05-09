@@ -2982,7 +2982,7 @@ async function loadTogetherRecords() {
     const wifeDates = new Set(wifeRows.map(r => normDateStr(r[0])).filter(Boolean));
     const joshTotal = joshDates.size;
     const wifeTotal = wifeDates.size;
-    const combinedTotal = joshTotal + wifeTotal;
+    const combinedTotal = [...joshDates].filter(d => wifeDates.has(d)).length;
     const currentStreak = calcCurrentCombinedStreak(joshDates, wifeDates);
     const bestStreak = calcBestCombinedStreak(joshDates, wifeDates);
     S.togetherRecords = { combinedTotal, joshTotal, wifeTotal, currentStreak, bestStreak };
@@ -3072,7 +3072,7 @@ function renderRecordsBody() {
       <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
         <div>
           <div style="font-size:14px;font-weight:600">Combined Workouts</div>
-          <div style="font-size:12px;color:var(--muted);margin-top:2px">Josh ${tr.joshTotal} · Wife ${tr.wifeTotal}</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Days you both logged a workout</div>
         </div>
         <div style="font-size:22px;font-weight:800;color:var(--accent);flex-shrink:0">${tr.combinedTotal} <span style="font-size:12px;color:var(--muted);font-weight:600">total</span></div>
       </div>
