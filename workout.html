@@ -584,11 +584,11 @@ const PLAN_SHEETS = {
     Sunday:    null,
   },
   wife: {
-    Monday:    { sheet: 'Wife — Core', name: 'Core Workout A',  type: 'CORE', duration: '30 min' },
-    Tuesday:   null,
-    Wednesday: { sheet: 'Wife — Core', name: 'Core Workout B',  type: 'CORE', duration: '30 min' },
-    Thursday:  null,
-    Friday:    { sheet: 'Wife — Core', name: 'Core Workout C',  type: 'CORE', duration: '30 min' },
+    Monday:    { sheet: 'Wife — Core',  name: 'Core Workout A',  type: 'CORE',  duration: '30 min' },
+    Tuesday:   { sheet: 'Wife — Bands', name: 'Bands Workout A', type: 'BANDS', duration: '30 min' },
+    Wednesday: { sheet: 'Wife — Core',  name: 'Core Workout B',  type: 'CORE',  duration: '30 min' },
+    Thursday:  { sheet: 'Wife — Bands', name: 'Bands Workout B', type: 'BANDS', duration: '30 min' },
+    Friday:    { sheet: 'Wife — Core',  name: 'Core Workout C',  type: 'CORE',  duration: '30 min' },
     Saturday:  null,
     Sunday:    null,
   }
@@ -2107,7 +2107,7 @@ function renderWeekBody() {
     ? `${MONTHS[first.getMonth()]} ${first.getDate()}–${last.getDate()}, ${first.getFullYear()}`
     : `${MONTHS[first.getMonth()]} ${first.getDate()} – ${MONTHS[last.getMonth()]} ${last.getDate()}, ${first.getFullYear()}`;
 
-  const TYPE_COLOR = { CORE: '#3fb950', ARMS: '#58a6ff', REST: '#d29922' };
+  const TYPE_COLOR = { CORE: '#3fb950', ARMS: '#58a6ff', REST: '#d29922', BANDS: '#a371f7' };
   let rowsHTML = '';
   dates.forEach(date => {
     const dName = dateDay(date);
