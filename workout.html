@@ -285,6 +285,7 @@ const JOSH_XP_SHEET         = 'Josh — XP Log';
 const WIFE_XP_SHEET         = 'Wife — XP Log';
 const JOSH_PR_HISTORY_SHEET = 'Josh — PR History';
 const WIFE_PR_HISTORY_SHEET = 'Wife — PR History';
+const MESSAGES_SHEET        = 'Messages';
 
 function getBirthday(user) { return localStorage.getItem(`birthday_${user}`) || ''; }
 function setBirthday(user, val) { localStorage.setItem(`birthday_${user}`, val); }
@@ -630,6 +631,12 @@ const S = {
   badges: {},           // user → { badgeId: 'YYYY-MM-DD' }
   badgesLoaded: false,
   champion: null,       // 'josh' | 'wife' | 'tie' | null (last month winner)
+  messages: null,       // { sent: [], received: [] } once loaded
+  messagesLoading: false,
+  messagesLoaded: false,
+  messageDraft: '',
+  messageSending: false,
+  messageSendError: '',
   xp: { josh: null, wife: null },
   lastXPEarned: 0,
   levelUpInfo: null,    // { level, title } while on success screen
@@ -1803,6 +1810,7 @@ function navIcon(tab) {
   if (tab === 'calendar') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><circle cx="8" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none"/></svg>`;
   if (tab === 'progress') return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="14" width="5" height="8" rx="1"/><rect x="9.5" y="9" width="5" height="13" rx="1"/><rect x="17" y="4" width="5" height="18" rx="1"/></svg>`;
   if (tab === 'records') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4"/><path d="M6 3h12v8a6 6 0 01-12 0V3z"/><path d="M6 7H3.5a2.5 2.5 0 000 5H6M18 7h2.5a2.5 2.5 0 010 5H18"/></svg>`;
+  if (tab === 'messages') return `<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
   return '';
 }
 
@@ -1812,6 +1820,7 @@ function renderNavBar() {
     {id:'calendar', label:'Calendar'},
     {id:'progress', label:'Progress'},
     {id:'records',  label:'Records'},
+    {id:'messages', label:'Messages'},
   ];
   return `<nav class="nav-bar">${tabs.map(t =>
     `<button class="nav-item${S.navTab===t.id?' active':''}" onclick="navTo('${t.id}')">${navIcon(t.id)}<span class="nav-label">${t.label}</span></button>`
@@ -2013,8 +2022,15 @@ function selectUser(who) {
   S.recordsLoading = false;
   S.allTimeRecords = {};
   S.badgesLoaded = false;
+  S.messages = null;
+  S.messagesLoaded = false;
+  S.messagesLoading = false;
+  S.messageDraft = '';
+  S.messageSending = false;
+  S.messageSendError = '';
   S.screen = 'week';
   render();
+  checkAndShowDedicationPopup(who);
 }
 
 // ---- WEEK VIEW ----
@@ -2135,9 +2151,10 @@ function renderWeek() {
   if (!S.weekDurationsLoaded) loadWeekDurations();
   const userName = S.user === 'josh' ? 'Josh' : 'Wife';
   let bodyContent;
-  if (S.navTab === 'calendar') bodyContent = renderCalendarBody();
-  else if (S.navTab === 'progress') bodyContent = renderProgressBody();
-  else if (S.navTab === 'records') bodyContent = renderRecordsBody();
+  if (S.navTab === 'calendar')  bodyContent = renderCalendarBody();
+  else if (S.navTab === 'progress')  bodyContent = renderProgressBody();
+  else if (S.navTab === 'records')   bodyContent = renderRecordsBody();
+  else if (S.navTab === 'messages')  bodyContent = renderMessagesBody();
   else bodyContent = renderWeekBody();
   app.innerHTML = `
   <div class="header">
@@ -2731,6 +2748,167 @@ function saveBday(user, val) {
   if (!val) { setBirthday(user, ''); return; }
   const m = val.match(/^\d{4}-(\d{2}-\d{2})$/);
   if (m) setBirthday(user, m[1]);
+}
+
+// ---- MESSAGES TAB ----
+async function loadMessages() {
+  if (S.messagesLoading) return;
+  S.messagesLoading = true;
+  render();
+  try {
+    const rows = await gasRead(MESSAGES_SHEET);
+    const user = S.user;
+    const sent = [], received = [];
+    rows.forEach(row => {
+      const date = String(row[0] || '').trim();
+      const time = String(row[1] || '').trim();
+      const from = String(row[2] || '').trim().toLowerCase();
+      const to   = String(row[3] || '').trim().toLowerCase();
+      const text = String(row[4] || '').trim();
+      if (!date || !text) return;
+      const msg = { date, time, from, to, text };
+      if (from === user) sent.unshift(msg);
+      else if (to === user) received.unshift(msg);
+    });
+    S.messages = { sent, received };
+  } catch(e) {
+    S.messages = { sent: [], received: [] };
+  }
+  S.messagesLoaded = true;
+  S.messagesLoading = false;
+  render();
+}
+
+async function sendDedicationMessage() {
+  const text = (S.messageDraft || '').trim();
+  if (!text || S.messageSending) return;
+  S.messageSending = true;
+  S.messageSendError = '';
+  render();
+  try {
+    const to      = S.user === 'josh' ? 'wife' : 'josh';
+    const dateStr = localDateStr(new Date());
+    const timeStr = new Date().toTimeString().slice(0, 5);
+    await gasWrite(MESSAGES_SHEET, [[dateStr, timeStr, S.user, to, text]]);
+    const newMsg = { date: dateStr, time: timeStr, from: S.user, to, text };
+    if (!S.messages) S.messages = { sent: [], received: [] };
+    S.messages.sent.unshift(newMsg);
+    S.messageDraft = '';
+  } catch(e) {
+    S.messageSendError = 'Failed to send — please try again.';
+  }
+  S.messageSending = false;
+  render();
+}
+
+function renderMessagesBody() {
+  if (!S.messagesLoaded && !S.messagesLoading) loadMessages();
+
+  const otherName = S.user === 'josh' ? 'Wife' : 'Josh';
+  const msgs = S.messages || { sent: [], received: [] };
+
+  const composerHTML = `
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:24px">
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Write to ${otherName}</div>
+    <textarea id="msg-draft" rows="3"
+      placeholder="Write something kind… (optional)"
+      oninput="S.messageDraft=this.value"
+      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:14px;line-height:1.5;resize:vertical;outline:none;font-family:inherit">${escapeHtml(S.messageDraft)}</textarea>
+    ${S.messageSendError ? `<div style="font-size:12px;color:var(--red);margin-top:6px">${S.messageSendError}</div>` : ''}
+    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px">
+      <button class="btn btn-ghost btn-sm" onclick="S.messageDraft='';S.messageSendError='';render()">Clear</button>
+      <button class="btn btn-primary btn-sm" onclick="sendDedicationMessage()" ${S.messageSending?'disabled':''}>
+        ${S.messageSending ? 'Sending…' : 'Send ❤️'}
+      </button>
+    </div>
+  </div>`;
+
+  function msgCard(m, isSent) {
+    const label = isSent
+      ? `To ${S.user === 'josh' ? 'Wife' : 'Josh'}`
+      : `From ${S.user === 'josh' ? 'Wife' : 'Josh'}`;
+    const labelColor = isSent ? 'var(--blue)' : 'var(--accent)';
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
+        <div style="font-size:11px;font-weight:700;color:${labelColor};text-transform:uppercase;letter-spacing:.5px">${label}</div>
+        <div style="font-size:11px;color:var(--muted)">${m.date}${m.time ? ' · ' + m.time : ''}</div>
+      </div>
+      <div style="font-size:14px;line-height:1.55;color:var(--text)">${escapeHtml(m.text)}</div>
+    </div>`;
+  }
+
+  const loading = S.messagesLoading
+    ? `<div class="uploading" style="justify-content:flex-start;gap:10px;padding:12px 0"><div class="spinner"></div><span style="font-size:14px;color:var(--muted)">Loading messages…</span></div>`
+    : '';
+
+  const receivedHTML = !S.messagesLoaded ? loading
+    : msgs.received.length
+      ? msgs.received.map(m => msgCard(m, false)).join('')
+      : `<div style="font-size:13px;color:var(--muted);text-align:center;padding:20px 0">No messages yet.</div>`;
+
+  const sentHTML = !S.messagesLoaded ? ''
+    : msgs.sent.length
+      ? msgs.sent.map(m => msgCard(m, true)).join('')
+      : `<div style="font-size:13px;color:var(--muted);text-align:center;padding:20px 0">Nothing sent yet.</div>`;
+
+  return `<div style="padding:20px">
+    <div style="font-size:20px;font-weight:800;margin-bottom:4px">❤️ Dedications</div>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Leave a note for your partner</div>
+    ${composerHTML}
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Received</div>
+    ${receivedHTML}
+    ${S.messagesLoaded && msgs.sent.length >= 0 ? `
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;margin-top:20px">Sent</div>
+    ${sentHTML}` : ''}
+  </div>`;
+}
+
+function escapeHtml(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function checkAndShowDedicationPopup(user) {
+  gasRead(MESSAGES_SHEET).then(rows => {
+    const lastRead = localStorage.getItem(`lastRead_${user}`) || '0000-00-00 00:00';
+    const unread = [];
+    rows.forEach(row => {
+      const date = String(row[0] || '').trim();
+      const time = String(row[1] || '').trim();
+      const to   = String(row[3] || '').trim().toLowerCase();
+      const text = String(row[4] || '').trim();
+      if (to !== user || !date || !text) return;
+      const sentAt = `${date} ${time || '00:00'}`;
+      if (sentAt > lastRead) unread.push({ date, time, from: String(row[2]||'').trim(), text });
+    });
+    if (unread.length) {
+      const nowStamp = `${localDateStr(new Date())} ${new Date().toTimeString().slice(0,5)}`;
+      localStorage.setItem(`lastRead_${user}`, nowStamp);
+      setTimeout(() => showDedicationPopup(unread, user), 400);
+    }
+  }).catch(() => {});
+}
+
+function showDedicationPopup(messages, user) {
+  const fromName = user === 'josh' ? 'Wife' : 'Josh';
+  const el = document.createElement('div');
+  el.className = 'badge-notif-overlay';
+  const msgsHTML = messages.map(m => `
+    <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:8px;text-align:left">
+      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${m.date}${m.time ? ' · ' + m.time : ''}</div>
+      <div style="font-size:15px;line-height:1.55;color:var(--text)">${escapeHtml(m.text)}</div>
+    </div>`).join('');
+  el.innerHTML = `
+    <div class="badge-notif-card">
+      <div style="font-size:40px;text-align:center;margin-bottom:8px">❤️</div>
+      <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;text-align:center">From ${fromName}</div>
+      <div style="font-size:20px;font-weight:800;margin-bottom:16px;text-align:center">${messages.length > 1 ? messages.length + ' new dedications' : 'A dedication for you'}</div>
+      ${msgsHTML}
+      <button onclick="this.closest('.badge-notif-overlay').remove()"
+        style="width:100%;margin-top:18px;background:var(--accent);color:#000;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer">
+        ❤️ Thank you!
+      </button>
+    </div>`;
+  document.body.appendChild(el);
 }
 
 // ---- RECORDS TAB ----
