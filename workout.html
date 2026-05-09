@@ -1272,6 +1272,11 @@ function calcStreak(user, loggedDates) {
   return streak;
 }
 
+function isBothScheduled(d) {
+  const day = dateDay(d);
+  return PLAN_SHEETS.josh[day] !== null && PLAN_SHEETS.wife[day] !== null;
+}
+
 function calcCurrentCombinedStreak(joshDates, wifeDates) {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -1279,15 +1284,19 @@ function calcCurrentCombinedStreak(joshDates, wifeDates) {
   let streak = 0;
   for (let i = 0; i < 1000; i++) {
     const dStr = localDateStr(d);
+    if (!isBothScheduled(d)) {
+      // Not a shared workout day — skip without affecting streak
+      d.setDate(d.getDate() - 1);
+      continue;
+    }
     const jLogged = joshDates.has(dStr);
     const wLogged = wifeDates.has(dStr);
     if (jLogged && wLogged) {
       streak++;
-    } else if (!jLogged && !wLogged) {
-      // Neither logged — rest/pending day, skip
+    } else if (dStr === todayStr) {
+      // Today not yet logged — skip (pending)
     } else {
-      // Only one logged — if today, skip (other may still log); otherwise break
-      if (dStr !== todayStr) break;
+      break;
     }
     d.setDate(d.getDate() - 1);
   }
@@ -1303,16 +1312,15 @@ function calcBestCombinedStreak(joshDates, wifeDates) {
   let best = 0, current = 0;
   const d = new Date(start);
   while (d <= end) {
-    const dStr = localDateStr(d);
-    const jLogged = joshDates.has(dStr);
-    const wLogged = wifeDates.has(dStr);
-    if (jLogged && wLogged) {
-      current++;
-      if (current > best) best = current;
-    } else if (!jLogged && !wLogged) {
-      // Rest day — don't break
-    } else {
-      current = 0;
+    if (isBothScheduled(d)) {
+      const dStr = localDateStr(d);
+      const bothLogged = joshDates.has(dStr) && wifeDates.has(dStr);
+      if (bothLogged) {
+        current++;
+        if (current > best) best = current;
+      } else if (dStr < localDateStr(end)) {
+        current = 0;
+      }
     }
     d.setDate(d.getDate() + 1);
   }
