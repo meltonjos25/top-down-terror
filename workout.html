@@ -283,9 +283,10 @@ const JOSH_LOG_SHEET        = 'Josh — Workout Log';
 const WIFE_LOG_SHEET        = 'Wife — Workout Log';
 const JOSH_XP_SHEET         = 'Josh — XP Log';
 const WIFE_XP_SHEET         = 'Wife — XP Log';
-const JOSH_PR_HISTORY_SHEET = 'Josh — PR History';
-const WIFE_PR_HISTORY_SHEET = 'Wife — PR History';
-const MESSAGES_SHEET        = 'Messages';
+const JOSH_PR_HISTORY_SHEET  = 'Josh — PR History';
+const WIFE_PR_HISTORY_SHEET  = 'Wife — PR History';
+const MESSAGES_SHEET         = 'Messages';
+const TOGETHER_RECORDS_SHEET = 'Together Records';
 
 function getBirthday(user) { return localStorage.getItem(`birthday_${user}`) || ''; }
 function setBirthday(user, val) { localStorage.setItem(`birthday_${user}`, val); }
@@ -628,6 +629,9 @@ const S = {
   recordsLoading: false,
   recordsLoaded: false,
   allTimeRecords: {},
+  togetherRecords: null,       // { combinedTotal, joshTotal, wifeTotal, currentStreak, bestStreak }
+  togetherRecordsLoading: false,
+  togetherRecordsLoaded: false,
   badges: {},           // user → { badgeId: 'YYYY-MM-DD' }
   badgesLoaded: false,
   champion: null,       // 'josh' | 'wife' | 'tie' | null (last month winner)
@@ -1268,6 +1272,53 @@ function calcStreak(user, loggedDates) {
   return streak;
 }
 
+function calcCurrentCombinedStreak(joshDates, wifeDates) {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  const todayStr = localDateStr(d);
+  let streak = 0;
+  for (let i = 0; i < 1000; i++) {
+    const dStr = localDateStr(d);
+    const jLogged = joshDates.has(dStr);
+    const wLogged = wifeDates.has(dStr);
+    if (jLogged && wLogged) {
+      streak++;
+    } else if (!jLogged && !wLogged) {
+      // Neither logged — rest/pending day, skip
+    } else {
+      // Only one logged — if today, skip (other may still log); otherwise break
+      if (dStr !== todayStr) break;
+    }
+    d.setDate(d.getDate() - 1);
+  }
+  return streak;
+}
+
+function calcBestCombinedStreak(joshDates, wifeDates) {
+  const allDates = [...new Set([...joshDates, ...wifeDates])].sort();
+  if (!allDates.length) return 0;
+  const start = new Date(allDates[0] + 'T00:00:00');
+  const end = new Date();
+  end.setHours(0, 0, 0, 0);
+  let best = 0, current = 0;
+  const d = new Date(start);
+  while (d <= end) {
+    const dStr = localDateStr(d);
+    const jLogged = joshDates.has(dStr);
+    const wLogged = wifeDates.has(dStr);
+    if (jLogged && wLogged) {
+      current++;
+      if (current > best) best = current;
+    } else if (!jLogged && !wLogged) {
+      // Rest day — don't break
+    } else {
+      current = 0;
+    }
+    d.setDate(d.getDate() + 1);
+  }
+  return best;
+}
+
 async function loadStreaks() {
   if (S.streaksLoading) return;
   S.streaksLoading = true;
@@ -1559,6 +1610,9 @@ async function submitWorkout() {
     gasWrite(S.user === 'josh' ? JOSH_XP_SHEET : WIFE_XP_SHEET,
       [[dateStr, S.workout.name, xpEarned, xpNote]]).catch(() => {});
 
+    S.togetherRecordsLoaded = false;
+    S.togetherRecordsLoading = false;
+    S.togetherRecords = null;
     S.screen = 'success';
     render();
     checkAndNotifyNewBadges();
@@ -2021,6 +2075,9 @@ function selectUser(who) {
   S.recordsLoaded = false;
   S.recordsLoading = false;
   S.allTimeRecords = {};
+  S.togetherRecordsLoaded = false;
+  S.togetherRecordsLoading = false;
+  S.togetherRecords = null;
   S.badgesLoaded = false;
   S.messages = null;
   S.messagesLoaded = false;
@@ -2911,6 +2968,32 @@ function showDedicationPopup(messages, user) {
   document.body.appendChild(el);
 }
 
+// ---- TOGETHER RECORDS ----
+async function loadTogetherRecords() {
+  if (S.togetherRecordsLoading || S.togetherRecordsLoaded) return;
+  S.togetherRecordsLoading = true;
+  render();
+  try {
+    const [joshRows, wifeRows] = await Promise.all([
+      gasRead(JOSH_LOG_SHEET),
+      gasRead(WIFE_LOG_SHEET)
+    ]);
+    const joshDates = new Set(joshRows.map(r => normDateStr(r[0])).filter(Boolean));
+    const wifeDates = new Set(wifeRows.map(r => normDateStr(r[0])).filter(Boolean));
+    const joshTotal = joshDates.size;
+    const wifeTotal = wifeDates.size;
+    const combinedTotal = joshTotal + wifeTotal;
+    const currentStreak = calcCurrentCombinedStreak(joshDates, wifeDates);
+    const bestStreak = calcBestCombinedStreak(joshDates, wifeDates);
+    S.togetherRecords = { combinedTotal, joshTotal, wifeTotal, currentStreak, bestStreak };
+    S.togetherRecordsLoaded = true;
+    const dateStr = localDateStr(new Date());
+    gasWrite(TOGETHER_RECORDS_SHEET, [[dateStr, joshTotal, wifeTotal, combinedTotal, currentStreak, bestStreak]]).catch(() => {});
+  } catch(e) {}
+  S.togetherRecordsLoading = false;
+  render();
+}
+
 // ---- RECORDS TAB ----
 async function loadRecordsData() {
   if (S.recordsLoading || S.recordsLoaded) return;
@@ -2946,42 +3029,80 @@ async function loadRecordsData() {
 
 function renderRecordsBody() {
   if (!S.recordsLoaded && !S.recordsLoading) loadRecordsData();
+  if (!S.togetherRecordsLoaded && !S.togetherRecordsLoading) loadTogetherRecords();
 
-  if (S.recordsLoading) return `
-  <div style="padding:20px">
-    <div style="font-size:20px;font-weight:800;margin-bottom:16px">Records</div>
-    <div class="uploading"><div class="spinner"></div>Loading records…</div>
-  </div>`;
-
-  const entries = Object.entries(S.allTimeRecords).sort((a,b) => a[0].localeCompare(b[0]));
-
-  if (!entries.length) return `
-  <div style="padding:20px">
-    <div style="font-size:20px;font-weight:800;margin-bottom:16px">Records</div>
-    <div style="color:var(--muted);text-align:center;padding:40px 0;font-size:14px">No finisher records logged yet.</div>
-  </div>`;
-
-  const listHTML = entries.map(([name, r]) => {
-    let valDisplay;
-    if (r.unit === 'sec') {
-      const m = Math.floor(r.value / 60);
-      const s = Math.round(r.value % 60);
-      valDisplay = m > 0
-        ? `${m}<span style="font-size:12px;color:var(--muted);font-weight:600">m</span> ${String(s).padStart(2,'0')}<span style="font-size:12px;color:var(--muted);font-weight:600">s</span>`
-        : `${s}<span style="font-size:12px;color:var(--muted);font-weight:600">s</span>`;
+  // Personal Records section
+  let personalHTML;
+  if (S.recordsLoading) {
+    personalHTML = `<div class="uploading"><div class="spinner"></div>Loading…</div>`;
+  } else {
+    const entries = Object.entries(S.allTimeRecords).sort((a,b) => a[0].localeCompare(b[0]));
+    if (!entries.length) {
+      personalHTML = `<div style="color:var(--muted);text-align:center;padding:24px 0;font-size:14px">No finisher records logged yet.</div>`;
     } else {
-      valDisplay = `${r.value} <span style="font-size:12px;color:var(--muted);font-weight:600">${r.unit}</span>`;
+      personalHTML = entries.map(([name, r]) => {
+        let valDisplay;
+        if (r.unit === 'sec') {
+          const m = Math.floor(r.value / 60);
+          const s = Math.round(r.value % 60);
+          valDisplay = m > 0
+            ? `${m}<span style="font-size:12px;color:var(--muted);font-weight:600">m</span> ${String(s).padStart(2,'0')}<span style="font-size:12px;color:var(--muted);font-weight:600">s</span>`
+            : `${s}<span style="font-size:12px;color:var(--muted);font-weight:600">s</span>`;
+        } else {
+          valDisplay = `${r.value} <span style="font-size:12px;color:var(--muted);font-weight:600">${r.unit}</span>`;
+        }
+        return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+          <div style="font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+          <div style="font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${valDisplay}</div>
+        </div>`;
+      }).join('');
     }
-    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
-      <div style="font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
-      <div style="font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${valDisplay}</div>
-    </div>`;
-  }).join('');
+  }
+
+  // Together Records section
+  let togetherHTML;
+  if (S.togetherRecordsLoading) {
+    togetherHTML = `<div class="uploading"><div class="spinner"></div>Loading…</div>`;
+  } else if (!S.togetherRecords) {
+    togetherHTML = `<div style="color:var(--muted);text-align:center;padding:24px 0;font-size:14px">No together records yet.</div>`;
+  } else {
+    const tr = S.togetherRecords;
+    const streakColor = tr.currentStreak > 0 ? 'var(--accent)' : 'var(--muted)';
+    togetherHTML = `
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
+        <div>
+          <div style="font-size:14px;font-weight:600">Combined Workouts</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px">Josh ${tr.joshTotal} · Wife ${tr.wifeTotal}</div>
+        </div>
+        <div style="font-size:22px;font-weight:800;color:var(--accent);flex-shrink:0">${tr.combinedTotal} <span style="font-size:12px;color:var(--muted);font-weight:600">total</span></div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
+        <div style="font-size:14px;font-weight:600;margin-bottom:10px">Combined Streak</div>
+        <div style="display:flex;gap:10px">
+          <div style="flex:1;background:var(--surface2);border-radius:8px;padding:10px 12px;text-align:center">
+            <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">Current</div>
+            <div style="font-size:26px;font-weight:800;color:${streakColor}">${tr.currentStreak}</div>
+            <div style="font-size:11px;color:var(--muted)">${tr.currentStreak === 1 ? 'day' : 'days'}</div>
+          </div>
+          <div style="flex:1;background:var(--surface2);border-radius:8px;padding:10px 12px;text-align:center">
+            <div style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px">All-Time Best</div>
+            <div style="font-size:26px;font-weight:800;color:var(--yellow)">${tr.bestStreak}</div>
+            <div style="font-size:11px;color:var(--muted)">${tr.bestStreak === 1 ? 'day' : 'days'}</div>
+          </div>
+        </div>
+      </div>`;
+  }
 
   return `
-  <div style="padding:20px">
-    <div style="font-size:20px;font-weight:800;margin-bottom:16px">All-Time Records</div>
-    <div style="display:flex;flex-direction:column;gap:8px">${listHTML}</div>
+  <div style="padding:20px;display:flex;flex-direction:column;gap:24px">
+    <div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:12px">Personal Records</div>
+      <div style="display:flex;flex-direction:column;gap:8px">${personalHTML}</div>
+    </div>
+    <div>
+      <div style="font-size:18px;font-weight:800;margin-bottom:12px">Together Records 💑</div>
+      <div style="display:flex;flex-direction:column;gap:8px">${togetherHTML}</div>
+    </div>
   </div>`;
 }
 
