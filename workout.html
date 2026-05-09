@@ -279,10 +279,39 @@ input.field::placeholder{color:var(--muted)}
 // ═══════════════════════════════════════════════
 // CONFIG
 // ═══════════════════════════════════════════════
-const JOSH_LOG_SHEET = 'Josh — Workout Log';
-const WIFE_LOG_SHEET = 'Wife — Workout Log';
-const JOSH_XP_SHEET  = 'Josh — XP Log';
-const WIFE_XP_SHEET  = 'Wife — XP Log';
+const JOSH_LOG_SHEET        = 'Josh — Workout Log';
+const WIFE_LOG_SHEET        = 'Wife — Workout Log';
+const JOSH_XP_SHEET         = 'Josh — XP Log';
+const WIFE_XP_SHEET         = 'Wife — XP Log';
+const JOSH_PR_HISTORY_SHEET = 'Josh — PR History';
+const WIFE_PR_HISTORY_SHEET = 'Wife — PR History';
+
+function getBirthday(user) { return localStorage.getItem(`birthday_${user}`) || ''; }
+function setBirthday(user, val) { localStorage.setItem(`birthday_${user}`, val); }
+
+const US_HOLIDAYS_FIXED = new Set(['01-01','02-14','07-04','11-11','12-24','12-25','12-26','10-31']);
+function isUSHoliday(dateStr) {
+  if (!dateStr) return false;
+  if (US_HOLIDAYS_FIXED.has(dateStr.slice(5))) return true;
+  const d = new Date(dateStr); d.setHours(0,0,0,0);
+  const m = d.getMonth(), dow = d.getDay(), day = d.getDate();
+  if (m === 10 && dow === 4 && day >= 22 && day <= 28) return true; // Thanksgiving
+  if (m === 4  && dow === 1 && day >= 25 && day <= 31) return true; // Memorial Day
+  if (m === 8  && dow === 1 && day >= 1  && day <= 7)  return true; // Labor Day
+  return false;
+}
+
+function parseDurMinutes(dur) {
+  if (!dur || dur === '—') return null;
+  let total = 0;
+  const h = dur.match(/(\d+)h/);
+  const m = dur.match(/(\d+)\s*min/);
+  const s = dur.match(/(\d+)\s*sec/);
+  if (h) total += parseInt(h[1]) * 60;
+  if (m) total += parseInt(m[1]);
+  if (s) total += parseInt(s[1]) / 60;
+  return total > 0 ? total : null;
+}
 
 // ═══════════════════════════════════════════════
 // QUOTE OF THE DAY
@@ -343,14 +372,74 @@ function quoteOfDay() {
 // BADGE DEFINITIONS
 // ═══════════════════════════════════════════════
 const BADGE_DEFS = [
-  { id: 'first_workout', icon: '🏋️', name: 'First Steps',     desc: 'Completed your first workout' },
-  { id: 'workouts_10',   icon: '💪', name: 'Ten Strong',       desc: 'Completed 10 workouts' },
-  { id: 'workouts_50',   icon: '🔥', name: 'Fifty & Fierce',   desc: 'Completed 50 workouts' },
-  { id: 'workouts_100',  icon: '💯', name: 'Century Club',     desc: 'Completed 100 workouts' },
-  { id: 'streak_7',      icon: '⚡', name: 'Week Warrior',     desc: 'Maintained a 7-day streak' },
-  { id: 'streak_30',     icon: '🌟', name: 'Iron Habit',       desc: 'Maintained a 30-day streak' },
-  { id: 'first_pr',      icon: '🏆', name: 'Personal Best',    desc: 'Logged your first personal record' },
-  { id: 'prs_5',         icon: '👑', name: 'Record Breaker',   desc: 'Logged 5 personal records' },
+  // Milestones
+  { id: 'first_workout', icon: '🏋️', name: 'First Steps',          desc: 'Completed your first workout',          cat: 'Milestones' },
+  { id: 'workouts_10',   icon: '💪',  name: 'Ten Strong',            desc: 'Completed 10 workouts',                 cat: 'Milestones' },
+  { id: 'workouts_25',   icon: '🥈',  name: 'Quarter Century',       desc: 'Completed 25 workouts',                 cat: 'Milestones' },
+  { id: 'workouts_50',   icon: '🔥',  name: 'Fifty & Fierce',        desc: 'Completed 50 workouts',                 cat: 'Milestones' },
+  { id: 'workouts_100',  icon: '💯',  name: 'Century Club',          desc: 'Completed 100 workouts',                cat: 'Milestones' },
+  { id: 'workouts_200',  icon: '🏅',  name: 'Double Century',        desc: 'Completed 200 workouts',                cat: 'Milestones' },
+  { id: 'workouts_365',  icon: '🎖️', name: 'Full Year Fighter',     desc: 'Completed 365 workouts',                cat: 'Milestones' },
+
+  // Streaks
+  { id: 'streak_7',      icon: '⚡',  name: 'Week Warrior',          desc: 'Maintained a 7-day streak',             cat: 'Streaks' },
+  { id: 'streak_14',     icon: '🔗',  name: 'Two Week Titan',        desc: 'Maintained a 14-day streak',            cat: 'Streaks' },
+  { id: 'streak_30',     icon: '🌟',  name: 'Iron Habit',            desc: 'Maintained a 30-day streak',            cat: 'Streaks' },
+  { id: 'streak_60',     icon: '🔥',  name: 'Two Month Machine',     desc: 'Maintained a 60-day streak',            cat: 'Streaks' },
+  { id: 'streak_100',    icon: '💎',  name: 'Century Streak',        desc: 'Maintained a 100-day streak',           cat: 'Streaks' },
+  { id: 'streak_200',    icon: '🌙',  name: 'Bicentennial Beast',    desc: 'Maintained a 200-day streak',           cat: 'Streaks' },
+  { id: 'streak_365',    icon: '🏆',  name: 'Year of Iron',          desc: 'Maintained a 365-day streak — the ultimate', cat: 'Streaks' },
+
+  // Personal Records
+  { id: 'first_pr',      icon: '🏆',  name: 'Personal Best',         desc: 'Logged your first personal record',     cat: 'Records' },
+  { id: 'prs_5',         icon: '👑',  name: 'Record Breaker',        desc: 'Logged 5 personal records',             cat: 'Records' },
+  { id: 'prs_10',        icon: '🎯',  name: 'PR Hunter',             desc: 'Logged 10 personal records',            cat: 'Records' },
+  { id: 'prs_25',        icon: '📈',  name: 'Record Chaser',         desc: 'Logged 25 personal records',            cat: 'Records' },
+  { id: 'prs_50',        icon: '🥇',  name: 'Legend Logger',         desc: 'Logged 50 personal records',            cat: 'Records' },
+  { id: 'pr_3weeks',     icon: '🔥',  name: 'Hot Streak',            desc: 'Broke a PR three weeks in a row',       cat: 'Records' },
+
+  // Levels
+  { id: 'level_10',      icon: '🌱',  name: 'Level 10 Reached',      desc: 'Reached Level 10',                      cat: 'Levels' },
+  { id: 'level_25',      icon: '🌿',  name: 'Level 25 Reached',      desc: 'Reached Level 25',                      cat: 'Levels' },
+  { id: 'level_50',      icon: '🌳',  name: 'Level 50 Reached',      desc: 'Reached Level 50',                      cat: 'Levels' },
+  { id: 'level_75',      icon: '🔥',  name: 'Level 75 Reached',      desc: 'Reached Level 75',                      cat: 'Levels' },
+  { id: 'level_100',     icon: '👑',  name: 'Level 100 Legend',      desc: 'Reached Level 100 — the pinnacle',      cat: 'Levels' },
+
+  // Consistency
+  { id: 'perfect_2weeks',  icon: '✅', name: 'Fortnight Flawless',   desc: 'All scheduled workouts for 2 weeks straight',  cat: 'Consistency' },
+  { id: 'perfect_month',   icon: '📅', name: 'Month Master',         desc: 'Every scheduled workout in a full calendar month', cat: 'Consistency' },
+  { id: 'perfect_4weeks',  icon: '🗓️',name: 'Four Week Flawless',   desc: 'All scheduled workouts for 4 weeks straight',  cat: 'Consistency' },
+  { id: 'perfect_8weeks',  icon: '⭐', name: 'Eight Week Elite',     desc: 'All scheduled workouts for 8 weeks straight',  cat: 'Consistency' },
+  { id: 'perfect_3months', icon: '💪', name: 'Quarter Commitment',   desc: 'Never missed a scheduled workout for 3 months', cat: 'Consistency' },
+  { id: 'no_miss_mon_1m',  icon: '🗓️',name: 'Monday Must-Do',       desc: 'Never missed a Monday workout in a full month', cat: 'Consistency' },
+  { id: 'no_miss_mon_2m',  icon: '📆', name: 'Monday Maniac',        desc: 'Never missed a Monday workout for 2 months',   cat: 'Consistency' },
+  { id: 'no_miss_mon_6m',  icon: '👑', name: 'Monday Legend',        desc: 'Never missed a Monday workout for 6 months',   cat: 'Consistency' },
+  { id: 'perfect_sats_1m', icon: '🌟', name: 'Saturday Slayer',      desc: 'Completed every Saturday workout in a full month', cat: 'Consistency' },
+
+  // Special
+  { id: 'reps_10000',       icon: '💯', name: '10K Club',            desc: 'Logged 10,000 total reps across all workouts', cat: 'Special' },
+  { id: 'workout_under_20', icon: '⚡', name: 'Speed Demon',         desc: 'Completed a workout in under 20 minutes',     cat: 'Special' },
+  { id: 'january_12',       icon: '🎆', name: 'New Year Warrior',    desc: 'Completed 12 workouts in January',             cat: 'Special' },
+  { id: 'summer_grind',     icon: '☀️', name: 'Summer Grind',        desc: 'All scheduled workouts in a full summer month',cat: 'Special' },
+  { id: 'holiday_hero',     icon: '🎉', name: 'Holiday Hero',        desc: 'Worked out on a holiday',                     cat: 'Special' },
+  { id: 'early_bird',       icon: '🌅', name: 'Early Bird',          desc: 'Logged a workout before 7am',                 cat: 'Special' },
+  { id: 'birthday_gains',   icon: '🎂', name: 'Birthday Gains',      desc: 'Completed a workout on your birthday',        cat: 'Special' },
+
+  // Duo
+  { id: 'duo_50_workouts',    icon: '5️⃣0️⃣', name: 'Fifty Together',       desc: 'Both Josh & Wife reached 50 total workouts',     cat: 'Duo' },
+  { id: 'duo_100_workouts',   icon: '💯',    name: 'Century Together',     desc: 'Both Josh & Wife reached 100 total workouts',    cat: 'Duo' },
+  { id: 'duo_valentines',     icon: '❤️',    name: "Valentine's Fit",      desc: "Both worked out on Valentine's Day",              cat: 'Duo' },
+  { id: 'duo_new_year',       icon: '🎆',    name: 'New Year Together',    desc: "Both completed a workout on New Year's Day",      cat: 'Duo' },
+  { id: 'duo_streak_7_sync',  icon: '⚡',    name: 'Streak Twins',         desc: 'Both maintained 7-day streaks at the same time',  cat: 'Duo' },
+  { id: 'duo_streak_30',      icon: '🔗',    name: 'Dynamic Duo',          desc: 'Both maintained 30-day streaks at the same time', cat: 'Duo' },
+  { id: 'duo_same_day_7',     icon: '👫',    name: 'Workout Buddies',      desc: 'Both logged workouts on the same day, 7 times in a row', cat: 'Duo' },
+  { id: 'duo_perfect_week',   icon: '💑',    name: 'Power Couple Week',    desc: 'Both completed all scheduled workouts in the same week', cat: 'Duo' },
+  { id: 'duo_no_miss_2wks',   icon: '🤝',    name: 'No Excuses',           desc: 'Neither missed a scheduled workout for 2 weeks straight', cat: 'Duo' },
+  { id: 'duo_same_day_month', icon: '📅',    name: 'Month of Togetherness',desc: 'Both logged workouts on every shared training day in a month', cat: 'Duo' },
+  { id: 'duo_perfect_month',  icon: '🏆',    name: 'Perfect Month Together',desc: 'Both completed every scheduled workout in the same month', cat: 'Duo' },
+  { id: 'duo_before_8am',     icon: '🌄',    name: 'Early Birds Together', desc: 'Both finished a workout before 8am on the same day', cat: 'Duo' },
+  { id: 'duo_same_hour',      icon: '⏱️',   name: 'Twin Training',        desc: 'Both completed a workout within the same hour on the same day', cat: 'Duo' },
+  { id: 'duo_champion',       icon: '👑',    name: 'Monthly Champion',     desc: 'Won more workouts than your partner last month',  cat: 'Duo' },
 ];
 
 // ═══════════════════════════════════════════════
@@ -540,6 +629,7 @@ const S = {
   allTimeRecords: {},
   badges: {},           // user → { badgeId: 'YYYY-MM-DD' }
   badgesLoaded: false,
+  champion: null,       // 'josh' | 'wife' | 'tie' | null (last month winner)
   xp: { josh: null, wife: null },
   lastXPEarned: 0,
   levelUpInfo: null,    // { level, title } while on success screen
@@ -647,18 +737,25 @@ function findStreakEarnedDate(user, loggedDates, target) {
 // Compute earned badges (with earn dates) from raw log rows + date set
 function computeBadgesFromRows(user, rows, dateSet) {
   const sorted = [...dateSet].sort();
-  const total = sorted.length;
+  const total  = sorted.length;
+  const todayStr = localDateStr(new Date());
 
-  const streak7Date  = findStreakEarnedDate(user, dateSet, 7);
-  const streak30Date = findStreakEarnedDate(user, dateSet, 30);
+  // ── Streaks ──────────────────────────────────────────────────
+  const streak7Date   = findStreakEarnedDate(user, dateSet, 7);
+  const streak14Date  = findStreakEarnedDate(user, dateSet, 14);
+  const streak30Date  = findStreakEarnedDate(user, dateSet, 30);
+  const streak60Date  = findStreakEarnedDate(user, dateSet, 60);
+  const streak100Date = findStreakEarnedDate(user, dateSet, 100);
+  const streak200Date = findStreakEarnedDate(user, dateSet, 200);
+  const streak365Date = findStreakEarnedDate(user, dateSet, 365);
 
-  // Sort rows by date to find when Nth distinct exercise was first logged w/ a value
+  // ── PR count (unique exercises ever logged w/ a value) ───────
   const sortedRows = [...rows].sort((a, b) => {
     const da = normDateStr(a[0]), db = normDateStr(b[0]);
     return da < db ? -1 : da > db ? 1 : 0;
   });
   const seen = new Set();
-  let pr1Date = null, pr5Date = null;
+  let pr1Date = null, pr5Date = null, pr10Date = null, pr25Date = null, pr50Date = null;
   for (const row of sortedRows) {
     const name = String(row[3] || '').trim();
     if (!name || seen.has(name)) continue;
@@ -667,20 +764,389 @@ function computeBadgesFromRows(user, rows, dateSet) {
     if (hasVal) {
       seen.add(name);
       const d = normDateStr(row[0]);
-      if (seen.size === 1) pr1Date = d;
-      if (seen.size === 5) { pr5Date = d; break; }
+      if (seen.size === 1)  pr1Date  = d;
+      if (seen.size === 5)  pr5Date  = d;
+      if (seen.size === 10) pr10Date = d;
+      if (seen.size === 25) pr25Date = d;
+      if (seen.size === 50) { pr50Date = d; break; }
     }
   }
 
+  // ── Total reps ───────────────────────────────────────────────
+  let runningReps = 0, reps10kDate = null;
+  for (const row of sortedRows) {
+    if (reps10kDate) break;
+    const repsStr = String(row[5] || '').trim();
+    repsStr.split(',').forEach(v => { const n = parseFloat(v.trim()); if (!isNaN(n) && n > 0) runningReps += n; });
+    if (runningReps >= 10000) reps10kDate = normDateStr(row[0]);
+  }
+
+  // ── Under 20 min ─────────────────────────────────────────────
+  let under20Date = null;
+  for (const row of sortedRows) {
+    const mins = parseDurMinutes(String(row[8] || '').trim());
+    if (mins !== null && mins < 20) { under20Date = normDateStr(row[0]); break; }
+  }
+
+  // ── Early bird (before 7am) — needs timestamp in row[9] ──────
+  let earlyBirdDate = null;
+  for (const row of sortedRows) {
+    const t = String(row[9] || '').trim();
+    if (/^\d{2}:\d{2}$/.test(t)) {
+      const [h, m] = t.split(':').map(Number);
+      if (h * 60 + m < 420) { earlyBirdDate = normDateStr(row[0]); break; }
+    }
+  }
+
+  // ── Birthday ─────────────────────────────────────────────────
+  const bday = getBirthday(user);
+  const birthdayDate = bday ? (sorted.find(d => d.slice(5) === bday) || null) : null;
+
+  // ── Holiday ──────────────────────────────────────────────────
+  const holidayDate = sorted.find(d => isUSHoliday(d)) || null;
+
+  // ── Group by year-month for month-based checks ───────────────
+  const byYM = {};
+  for (const d of sorted) {
+    const ym = d.slice(0, 7);
+    (byYM[ym] = byYM[ym] || []).push(d);
+  }
+
+  // ── January challenge (12 workouts in January) ───────────────
+  let jan12Date = null;
+  for (const [ym, dates] of Object.entries(byYM)) {
+    if (ym.slice(5) === '01' && dates.length >= 12 && !jan12Date) jan12Date = dates[11];
+  }
+
+  // ── Summer grind (all scheduled in a complete summer month) ──
+  let summerDate = null;
+  for (const [ym, dates] of Object.entries(byYM).sort()) {
+    if (summerDate) break;
+    const mo = ym.slice(5);
+    if (!['06','07','08'].includes(mo)) continue;
+    const [yr] = ym.split('-');
+    const year = parseInt(yr), month = parseInt(mo) - 1;
+    const lastDay = localDateStr(new Date(year, month + 1, 0));
+    if (lastDay >= todayStr) continue;
+    const logSet = new Set(dates);
+    let ok = true; let hasSched = false; let last = null;
+    for (let d = 1; d <= new Date(year, month + 1, 0).getDate(); d++) {
+      const date = new Date(year, month, d);
+      const dStr = localDateStr(date);
+      if (PLAN_SHEETS[user][dateDay(date)] !== null) {
+        hasSched = true;
+        if (!logSet.has(dStr)) { ok = false; break; }
+        last = dStr;
+      }
+    }
+    if (ok && hasSched && last) summerDate = last;
+  }
+
+  // ── Perfect month (all scheduled in a completed calendar month) ──
+  let perfectMonthDate = null;
+  for (const [ym, dates] of Object.entries(byYM).sort()) {
+    if (perfectMonthDate) break;
+    const [yr, mo] = ym.split('-');
+    const year = parseInt(yr), month = parseInt(mo) - 1;
+    const lastDay = localDateStr(new Date(year, month + 1, 0));
+    if (lastDay >= todayStr) continue;
+    const logSet = new Set(dates);
+    let ok = true; let hasSched = false; let last = null;
+    for (let d = 1; d <= new Date(year, month + 1, 0).getDate(); d++) {
+      const date = new Date(year, month, d);
+      if (PLAN_SHEETS[user][dateDay(date)] !== null) {
+        hasSched = true;
+        if (!logSet.has(localDateStr(date))) { ok = false; break; }
+        last = localDateStr(date);
+      }
+    }
+    if (ok && hasSched && last) perfectMonthDate = last;
+  }
+
+  // ── Perfect N consecutive weeks ──────────────────────────────
+  function findPerfectWeeks(target) {
+    if (!sorted.length) return null;
+    const firstDate = new Date(sorted[0]); firstDate.setHours(0,0,0,0);
+    const dow = firstDate.getDay();
+    const weekMon = new Date(firstDate);
+    weekMon.setDate(weekMon.getDate() + (dow === 0 ? -6 : 1 - dow));
+    let consec = 0;
+    const wm = new Date(weekMon);
+    while (localDateStr(wm) <= todayStr) {
+      let weekOk = true; let hasSched = false; let last = null;
+      for (let i = 0; i < 7; i++) {
+        const wday = new Date(wm); wday.setDate(wday.getDate() + i);
+        const dStr = localDateStr(wday);
+        if (dStr > todayStr) break;
+        if (PLAN_SHEETS[user][dateDay(wday)] !== null) {
+          hasSched = true;
+          if (!dateSet.has(dStr)) weekOk = false;
+          else last = dStr;
+        }
+      }
+      if (weekOk && hasSched && last) { consec++; if (consec >= target) return last; }
+      else consec = 0;
+      wm.setDate(wm.getDate() + 7);
+    }
+    return null;
+  }
+
+  // ── Perfect N consecutive months ─────────────────────────────
+  function findPerfectMonths(target) {
+    let consec = 0; let last = null;
+    for (const [ym, dates] of Object.entries(byYM).sort()) {
+      const [yr, mo] = ym.split('-');
+      const year = parseInt(yr), month = parseInt(mo) - 1;
+      const lastDay = localDateStr(new Date(year, month + 1, 0));
+      if (lastDay >= todayStr) break;
+      const logSet = new Set(dates);
+      let ok = true; let hasSched = false; let mLast = null;
+      for (let d = 1; d <= new Date(year, month + 1, 0).getDate(); d++) {
+        const date = new Date(year, month, d);
+        if (PLAN_SHEETS[user][dateDay(date)] !== null) {
+          hasSched = true;
+          if (!logSet.has(localDateStr(date))) { ok = false; break; }
+          mLast = localDateStr(date);
+        }
+      }
+      if (ok && hasSched && mLast) { consec++; last = mLast; if (consec >= target) return last; }
+      else { consec = 0; last = null; }
+    }
+    return null;
+  }
+
+  // ── Monday consistency ───────────────────────────────────────
+  function findMondayConsistency(targetMonths) {
+    if (!PLAN_SHEETS[user]['Monday']) return null;
+    let consec = 0; let last = null;
+    for (const [ym, dates] of Object.entries(byYM).sort()) {
+      const [yr, mo] = ym.split('-');
+      const year = parseInt(yr), month = parseInt(mo) - 1;
+      const lastDay = localDateStr(new Date(year, month + 1, 0));
+      if (lastDay >= todayStr) break;
+      const logSet = new Set(dates);
+      let ok = true; let hasMon = false; let mLast = null;
+      for (let d = 1; d <= new Date(year, month + 1, 0).getDate(); d++) {
+        const date = new Date(year, month, d);
+        const dStr = localDateStr(date);
+        if (date.getDay() === 1) {
+          hasMon = true;
+          if (!logSet.has(dStr)) { ok = false; break; }
+          mLast = dStr;
+        }
+      }
+      if (ok && hasMon && mLast) { consec++; last = mLast; if (consec >= targetMonths) return last; }
+      else { consec = 0; last = null; }
+    }
+    return null;
+  }
+
+  // ── Saturday consistency ─────────────────────────────────────
+  let perfectSats1mDate = null;
+  if (PLAN_SHEETS[user]['Saturday'] !== null) {
+    for (const [ym, dates] of Object.entries(byYM).sort()) {
+      if (perfectSats1mDate) break;
+      const [yr, mo] = ym.split('-');
+      const year = parseInt(yr), month = parseInt(mo) - 1;
+      const lastDay = localDateStr(new Date(year, month + 1, 0));
+      if (lastDay >= todayStr) continue;
+      const logSet = new Set(dates);
+      let ok = true; let hasSat = false; let sLast = null;
+      for (let d = 1; d <= new Date(year, month + 1, 0).getDate(); d++) {
+        const date = new Date(year, month, d);
+        const dStr = localDateStr(date);
+        if (date.getDay() === 6) {
+          hasSat = true;
+          if (!logSet.has(dStr)) { ok = false; break; }
+          sLast = dStr;
+        }
+      }
+      if (ok && hasSat && sLast) perfectSats1mDate = sLast;
+    }
+  }
+
+  // ── Build earned map ─────────────────────────────────────────
   const earned = {};
+  // Workout counts
   if (total >= 1)   earned.first_workout = sorted[0];
   if (total >= 10)  earned.workouts_10   = sorted[9];
+  if (total >= 25)  earned.workouts_25   = sorted[24];
   if (total >= 50)  earned.workouts_50   = sorted[49];
   if (total >= 100) earned.workouts_100  = sorted[99];
-  if (streak7Date)  earned.streak_7  = streak7Date;
-  if (streak30Date) earned.streak_30 = streak30Date;
-  if (pr1Date) earned.first_pr = pr1Date;
-  if (pr5Date) earned.prs_5    = pr5Date;
+  if (total >= 200) earned.workouts_200  = sorted[199];
+  if (total >= 365) earned.workouts_365  = sorted[364];
+  // Streaks
+  if (streak7Date)   earned.streak_7   = streak7Date;
+  if (streak14Date)  earned.streak_14  = streak14Date;
+  if (streak30Date)  earned.streak_30  = streak30Date;
+  if (streak60Date)  earned.streak_60  = streak60Date;
+  if (streak100Date) earned.streak_100 = streak100Date;
+  if (streak200Date) earned.streak_200 = streak200Date;
+  if (streak365Date) earned.streak_365 = streak365Date;
+  // PRs
+  if (pr1Date)  earned.first_pr = pr1Date;
+  if (pr5Date)  earned.prs_5   = pr5Date;
+  if (pr10Date) earned.prs_10  = pr10Date;
+  if (pr25Date) earned.prs_25  = pr25Date;
+  if (pr50Date) earned.prs_50  = pr50Date;
+  // Consistency
+  const p2w = findPerfectWeeks(2);  if (p2w) earned.perfect_2weeks  = p2w;
+  const p4w = findPerfectWeeks(4);  if (p4w) earned.perfect_4weeks  = p4w;
+  const p8w = findPerfectWeeks(8);  if (p8w) earned.perfect_8weeks  = p8w;
+  if (perfectMonthDate)             earned.perfect_month   = perfectMonthDate;
+  const p3m = findPerfectMonths(3); if (p3m) earned.perfect_3months = p3m;
+  const m1 = findMondayConsistency(1); if (m1) earned.no_miss_mon_1m = m1;
+  const m2 = findMondayConsistency(2); if (m2) earned.no_miss_mon_2m = m2;
+  const m6 = findMondayConsistency(6); if (m6) earned.no_miss_mon_6m = m6;
+  if (perfectSats1mDate) earned.perfect_sats_1m = perfectSats1mDate;
+  // Special
+  if (reps10kDate)    earned.reps_10000       = reps10kDate;
+  if (under20Date)    earned.workout_under_20  = under20Date;
+  if (earlyBirdDate)  earned.early_bird        = earlyBirdDate;
+  if (jan12Date)      earned.january_12        = jan12Date;
+  if (summerDate)     earned.summer_grind      = summerDate;
+  if (holidayDate)    earned.holiday_hero      = holidayDate;
+  if (birthdayDate)   earned.birthday_gains    = birthdayDate;
+  return earned;
+}
+
+// ── Duo badge computation (runs with both users' data) ──────────────────
+function computeDuoBadges(joshDates, wifeDates, joshRows, wifeRows) {
+  const todayStr = localDateStr(new Date());
+  const jSorted  = [...joshDates].sort();
+  const wSorted  = [...wifeDates].sort();
+  const earned   = {};
+
+  // Both reach 50 / 100 workouts
+  if (jSorted.length >= 50  && wSorted.length >= 50)
+    earned.duo_50_workouts = [jSorted[49],  wSorted[49]].sort().pop();
+  if (jSorted.length >= 100 && wSorted.length >= 100)
+    earned.duo_100_workouts = [jSorted[99], wSorted[99]].sort().pop();
+
+  // Valentine's Day & New Year's Day
+  const jVal = jSorted.find(d => d.slice(5) === '02-14');
+  const wVal = wSorted.find(d => d.slice(5) === '02-14');
+  if (jVal && wVal) earned.duo_valentines = [jVal, wVal].sort().pop();
+
+  const jNY = jSorted.find(d => d.slice(5) === '01-01');
+  const wNY = wSorted.find(d => d.slice(5) === '01-01');
+  if (jNY && wNY) earned.duo_new_year = [jNY, wNY].sort().pop();
+
+  // Both 7-day and 30-day streaks simultaneously
+  const j7  = findStreakEarnedDate('josh', joshDates, 7);
+  const w7  = findStreakEarnedDate('wife', wifeDates, 7);
+  const j30 = findStreakEarnedDate('josh', joshDates, 30);
+  const w30 = findStreakEarnedDate('wife', wifeDates, 30);
+  if (j7  && w7)  earned.duo_streak_7_sync = [j7,  w7].sort().pop();
+  if (j30 && w30) earned.duo_streak_30     = [j30, w30].sort().pop();
+
+  // 7 consecutive calendar dates where BOTH logged
+  const allBothDates = jSorted.filter(d => wifeDates.has(d));
+  let run = 1;
+  for (let i = 1; i < allBothDates.length && !earned.duo_same_day_7; i++) {
+    const prev = new Date(allBothDates[i-1]), curr = new Date(allBothDates[i]);
+    const diff = Math.round((curr - prev) / 86400000);
+    if (diff === 1) { run++; if (run >= 7) earned.duo_same_day_7 = allBothDates[i]; }
+    else run = 1;
+  }
+
+  // Helper: check if all scheduled days in a week are logged for a user
+  function weekOkFor(user, weekMon, logSet) {
+    let hasSched = false;
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekMon); d.setDate(d.getDate() + i);
+      const dStr = localDateStr(d);
+      if (dStr > todayStr) break;
+      if (PLAN_SHEETS[user][dateDay(d)] !== null) {
+        hasSched = true;
+        if (!logSet.has(dStr)) return false;
+      }
+    }
+    return hasSched;
+  }
+
+  // Iterate all calendar weeks from first logged date
+  function iterateWeeks(fn) {
+    const allFirst = [...jSorted, ...wSorted].sort()[0];
+    if (!allFirst) return;
+    const firstDate = new Date(allFirst); firstDate.setHours(0,0,0,0);
+    const dow = firstDate.getDay();
+    const wm = new Date(firstDate);
+    wm.setDate(wm.getDate() + (dow === 0 ? -6 : 1 - dow));
+    while (localDateStr(wm) <= todayStr) {
+      fn(new Date(wm));
+      wm.setDate(wm.getDate() + 7);
+    }
+  }
+
+  // Perfect week together & no-miss 2 weeks together
+  let consecGood = 0;
+  iterateWeeks(wm => {
+    if (earned.duo_perfect_week && earned.duo_no_miss_2wks) return;
+    const lastDay = localDateStr(new Date(wm.getTime() + 6 * 86400000));
+    if (weekOkFor('josh', wm, joshDates) && weekOkFor('wife', wm, wifeDates)) {
+      if (!earned.duo_perfect_week) earned.duo_perfect_week = lastDay;
+      consecGood++;
+      if (consecGood >= 2 && !earned.duo_no_miss_2wks) earned.duo_no_miss_2wks = lastDay;
+    } else {
+      consecGood = 0;
+    }
+  });
+
+  // Perfect month together & same-day month
+  const allYMs = new Set([...jSorted, ...wSorted].map(d => d.slice(0,7)));
+  for (const ym of [...allYMs].sort()) {
+    if (earned.duo_perfect_month && earned.duo_same_day_month) break;
+    const [yr, mo] = ym.split('-');
+    const year = parseInt(yr), month = parseInt(mo) - 1;
+    const lastDay = localDateStr(new Date(year, month + 1, 0));
+    if (lastDay >= todayStr) continue;
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    let jAllOk = true, jHas = false, jLast = null;
+    let wAllOk = true, wHas = false, wLast = null;
+    let sharedOk = true, hasShared = false, sharedLast = null;
+    for (let d = 1; d <= totalDays; d++) {
+      const date = new Date(year, month, d);
+      const dStr = localDateStr(date);
+      const jSched = PLAN_SHEETS['josh'][dateDay(date)] !== null;
+      const wSched = PLAN_SHEETS['wife'][dateDay(date)] !== null;
+      if (jSched) { jHas = true; if (!joshDates.has(dStr)) jAllOk = false; else jLast = dStr; }
+      if (wSched) { wHas = true; if (!wifeDates.has(dStr)) wAllOk = false; else wLast = dStr; }
+      if (jSched && wSched) {
+        hasShared = true;
+        if (!joshDates.has(dStr) || !wifeDates.has(dStr)) sharedOk = false;
+        else sharedLast = dStr;
+      }
+    }
+    if (!earned.duo_perfect_month && jAllOk && jHas && jLast && wAllOk && wHas && wLast)
+      earned.duo_perfect_month = [jLast, wLast].sort().pop();
+    if (!earned.duo_same_day_month && sharedOk && hasShared && sharedLast)
+      earned.duo_same_day_month = sharedLast;
+  }
+
+  // Time-based duo badges (needs row[9] timestamp "HH:MM")
+  function buildTimeMap(rows) {
+    const map = {};
+    rows.forEach(row => {
+      const date = normDateStr(row[0]);
+      const t = String(row[9] || '').trim();
+      if (date && /^\d{2}:\d{2}$/.test(t) && !map[date]) map[date] = t;
+    });
+    return map;
+  }
+  const jTimes = buildTimeMap(joshRows);
+  const wTimes = buildTimeMap(wifeRows);
+
+  for (const d of allBothDates.sort()) {
+    const jt = jTimes[d], wt = wTimes[d];
+    if (!jt || !wt) continue;
+    const jMin = parseInt(jt.split(':')[0]) * 60 + parseInt(jt.split(':')[1]);
+    const wMin = parseInt(wt.split(':')[0]) * 60 + parseInt(wt.split(':')[1]);
+    if (!earned.duo_before_8am && jMin < 480 && wMin < 480) earned.duo_before_8am = d;
+    if (!earned.duo_same_hour  && Math.abs(jMin - wMin) <= 60) earned.duo_same_hour = d;
+    if (earned.duo_before_8am && earned.duo_same_hour) break;
+  }
+
   return earned;
 }
 
@@ -824,6 +1290,60 @@ async function loadStreaks() {
         }
       }
     });
+
+    // Compute duo badges (shown for both users)
+    const duoBadges = computeDuoBadges(joshDates, wifeDates, joshRows, wifeRows);
+    ['josh', 'wife'].forEach(user => {
+      if (!S.badges[user]) S.badges[user] = {};
+      Object.assign(S.badges[user], duoBadges);
+    });
+
+    // Level badges — award based on current XP total
+    function levelBadgeDate(user) {
+      // Find the XP row where cumulative XP crossed each level threshold
+      const xpRows = user === 'josh' ? joshXPRows : wifeXPRows;
+      const levels = [10, 25, 50, 75, 100];
+      const result = {};
+      let cumXP = 0;
+      const sortedXP = [...xpRows].sort((a,b) => normDateStr(a[0]) < normDateStr(b[0]) ? -1 : 1);
+      let li = 0;
+      for (const row of sortedXP) {
+        cumXP += parseFloat(row[2]) || 0;
+        const lv = levelFromXP(cumXP);
+        while (li < levels.length && lv >= levels[li]) {
+          result[`level_${levels[li]}`] = normDateStr(row[0]) || todayStr;
+          li++;
+        }
+        if (li >= levels.length) break;
+      }
+      return result;
+    }
+    ['josh','wife'].forEach(user => {
+      const lvBadges = levelBadgeDate(user);
+      if (!S.badges[user]) S.badges[user] = {};
+      Object.assign(S.badges[user], lvBadges);
+    });
+
+    // Champion badge: who won last month?
+    const now = new Date();
+    const lastMonthYM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const lastYM = `${lastMonthYM.getFullYear()}-${String(lastMonthYM.getMonth()+1).padStart(2,'0')}`;
+    const jCount = [...joshDates].filter(d => d.startsWith(lastYM)).length;
+    const wCount = [...wifeDates].filter(d => d.startsWith(lastYM)).length;
+    if (jCount > 0 || wCount > 0) {
+      if (jCount > wCount) S.champion = 'josh';
+      else if (wCount > jCount) S.champion = 'wife';
+      else S.champion = 'tie';
+    } else {
+      S.champion = null;
+    }
+    // Award champion badge to winner
+    if (S.champion && S.champion !== 'tie') {
+      const champDate = lastYM + '-' + String(new Date(now.getFullYear(), now.getMonth(), 0).getDate()).padStart(2,'0');
+      if (!S.badges[S.champion]) S.badges[S.champion] = {};
+      S.badges[S.champion].duo_champion = champDate;
+    }
+
   } catch(e) {
     S.streaks.josh = 0;
     S.streaks.wife = 0;
@@ -838,8 +1358,9 @@ async function loadWeekDurations() {
   if (S.weekDurationsLoaded) return;
   S.weekDurationsLoaded = true;
   try {
-    const sheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
-    const rows = await gasRead(sheet);
+    const logSheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
+    const prSheet  = S.user === 'josh' ? JOSH_PR_HISTORY_SHEET : WIFE_PR_HISTORY_SHEET;
+    const [rows, prHistRows] = await Promise.all([gasRead(logSheet), gasRead(prSheet).catch(() => [])]);
     const map = {};
     const dateSet = new Set();
     rows.forEach(row => {
@@ -850,10 +1371,47 @@ async function loadWeekDurations() {
     });
     S.weekDurations = map;
     S.loggedDates = dateSet;
-    S.badges[S.user] = computeBadgesFromRows(S.user, rows, dateSet);
+    const baseBadges = computeBadgesFromRows(S.user, rows, dateSet);
+
+    // PR streak badge: check if any exercise has PRs in 3 consecutive calendar weeks
+    const pr3Date = computePR3WeeksBadge(prHistRows);
+    if (pr3Date) baseBadges.pr_3weeks = pr3Date;
+
+    // Merge with any duo/level badges already computed in loadStreaks
+    S.badges[S.user] = Object.assign({}, S.badges[S.user] || {}, baseBadges);
   } catch(e) {}
   S.badgesLoaded = true;
   render();
+}
+
+function computePR3WeeksBadge(prHistRows) {
+  if (!prHistRows.length) return null;
+  // Group by exercise → list of { week: 'YYYY-Www', date }
+  const byEx = {};
+  prHistRows.forEach(row => {
+    const date = normDateStr(row[0]);
+    const name = String(row[1] || '').trim();
+    if (!date || !name) return;
+    const d = new Date(date); d.setHours(0,0,0,0);
+    const startOfYear = new Date(d.getFullYear(), 0, 1);
+    const weekNum = Math.ceil(((d - startOfYear) / 86400000 + startOfYear.getDay() + 1) / 7);
+    const weekKey = `${d.getFullYear()}-W${String(weekNum).padStart(2,'0')}`;
+    if (!byEx[name]) byEx[name] = [];
+    byEx[name].push({ weekKey, date });
+  });
+  for (const [, entries] of Object.entries(byEx)) {
+    const weeks = [...new Set(entries.map(e => e.weekKey))].sort();
+    for (let i = 2; i < weeks.length; i++) {
+      const [y1,w1] = weeks[i-2].split('-W').map(Number);
+      const [y2,w2] = weeks[i-1].split('-W').map(Number);
+      const [y3,w3] = weeks[i].split('-W').map(Number);
+      if (y1 === y2 && y2 === y3 && w2 === w1+1 && w3 === w2+1) {
+        const earnDate = entries.filter(e => e.weekKey === weeks[i]).map(e => e.date).sort().pop();
+        return earnDate;
+      }
+    }
+  }
+  return null;
 }
 
 // ═══════════════════════════════════════════════
@@ -950,6 +1508,7 @@ async function submitWorkout() {
     const sheet = S.user === 'josh' ? JOSH_LOG_SHEET : WIFE_LOG_SHEET;
     const dateStr = localDateStr(S.selectedDate || new Date());
     const durationStr = fmtDuration(S.workoutDuration);
+    const timeStr = new Date().toTimeString().slice(0,5); // "HH:MM"
     const rows = [];
     S.workout.exercises.forEach((ex, i) => {
       const log = S.logs[i];
@@ -963,10 +1522,18 @@ async function submitWorkout() {
         log.reps || '',
         log.notes || '',
         '✅',
-        durationStr
+        durationStr,
+        timeStr
       ]);
     });
     if (rows.length) await gasWrite(sheet, rows);
+
+    // Write PR history (for "PR 3 weeks in a row" badge tracking)
+    if (Object.keys(S.prs).length > 0) {
+      const prSheet = S.user === 'josh' ? JOSH_PR_HISTORY_SHEET : WIFE_PR_HISTORY_SHEET;
+      const prRows = Object.keys(S.prs).map(name => [dateStr, name, S.prs[name].value || '']);
+      gasWrite(prSheet, prRows).catch(() => {});
+    }
     S.loggedDates.add(dateStr);
     if (durationStr) S.weekDurations[dateStr] = durationStr;
     S.weekJustCompleted = isCurrentWeekComplete();
@@ -1128,19 +1695,90 @@ function checkAndNotifyNewBadges() {
   const existing = S.badges[S.user] || {};
   const total = S.loggedDates.size;
   const maxStreak = calcMaxStreak(S.user, S.loggedDates);
-  // PR count: session PRs + any already-known PR badge baseline
   const sessionPrs = Object.keys(S.prs).length;
-  const prCount = existing.prs_5 ? 5 : existing.first_pr ? Math.max(1, sessionPrs) : sessionPrs;
+
+  // Estimate historical PR count from already-earned badges
+  let prCount = 0;
+  if (existing.prs_50) prCount = 50;
+  else if (existing.prs_25) prCount = 25;
+  else if (existing.prs_10) prCount = 10;
+  else if (existing.prs_5)  prCount = 5;
+  else if (existing.first_pr) prCount = 1;
+  prCount = Math.max(prCount, sessionPrs);
+
+  const xp    = S.xp[S.user] || 0;
+  const level = levelFromXP(xp);
+  const now   = new Date();
+  const curMD = `${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+  const timeStr = now.toTimeString().slice(0,5);
+  const [tH, tM] = timeStr.split(':').map(Number);
+  const todayMinutes = tH * 60 + tM;
+  const durMinutes = S.workoutDuration ? S.workoutDuration / 60 : null;
+
+  // Check if current month is now a perfect month (all scheduled days logged up through today)
+  let currentMonthPerfect = false;
+  {
+    const year = now.getFullYear(), month = now.getMonth();
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    let ok = true; let hasSched = false;
+    // Check every scheduled day this month that has already passed (or is today)
+    // AND verify no scheduled days remain unlogged before today
+    for (let d = 1; d <= totalDays; d++) {
+      const date = new Date(year, month, d);
+      const dStr = localDateStr(date);
+      if (dStr > todayStr) break;
+      if (PLAN_SHEETS[S.user][dateDay(date)] !== null) {
+        hasSched = true;
+        if (!S.loggedDates.has(dStr)) { ok = false; break; }
+      }
+    }
+    // Only award if today IS the last scheduled day of this month (month complete)
+    let lastSchedDay = null;
+    for (let d = totalDays; d >= 1; d--) {
+      const date = new Date(year, month, d);
+      if (PLAN_SHEETS[S.user][dateDay(date)] !== null) { lastSchedDay = localDateStr(date); break; }
+    }
+    currentMonthPerfect = ok && hasSched && lastSchedDay === todayStr;
+  }
 
   const checks = [
-    { id: 'first_workout', earned: total >= 1 },
-    { id: 'workouts_10',   earned: total >= 10 },
-    { id: 'workouts_50',   earned: total >= 50 },
-    { id: 'workouts_100',  earned: total >= 100 },
-    { id: 'streak_7',      earned: maxStreak >= 7 },
-    { id: 'streak_30',     earned: maxStreak >= 30 },
-    { id: 'first_pr',      earned: prCount >= 1 },
-    { id: 'prs_5',         earned: prCount >= 5 },
+    // Workout milestones
+    { id: 'first_workout',  earned: total >= 1 },
+    { id: 'workouts_10',    earned: total >= 10 },
+    { id: 'workouts_25',    earned: total >= 25 },
+    { id: 'workouts_50',    earned: total >= 50 },
+    { id: 'workouts_100',   earned: total >= 100 },
+    { id: 'workouts_200',   earned: total >= 200 },
+    { id: 'workouts_365',   earned: total >= 365 },
+    // Streaks
+    { id: 'streak_7',       earned: maxStreak >= 7 },
+    { id: 'streak_14',      earned: maxStreak >= 14 },
+    { id: 'streak_30',      earned: maxStreak >= 30 },
+    { id: 'streak_60',      earned: maxStreak >= 60 },
+    { id: 'streak_100',     earned: maxStreak >= 100 },
+    { id: 'streak_200',     earned: maxStreak >= 200 },
+    { id: 'streak_365',     earned: maxStreak >= 365 },
+    // PRs
+    { id: 'first_pr',       earned: prCount >= 1 },
+    { id: 'prs_5',          earned: prCount >= 5 },
+    { id: 'prs_10',         earned: prCount >= 10 },
+    { id: 'prs_25',         earned: prCount >= 25 },
+    { id: 'prs_50',         earned: prCount >= 50 },
+    // Levels
+    { id: 'level_10',       earned: level >= 10 },
+    { id: 'level_25',       earned: level >= 25 },
+    { id: 'level_50',       earned: level >= 50 },
+    { id: 'level_75',       earned: level >= 75 },
+    { id: 'level_100',      earned: level >= 100 },
+    // Special — immediate triggers
+    { id: 'workout_under_20', earned: durMinutes !== null && durMinutes < 20 },
+    { id: 'early_bird',       earned: todayMinutes < 420 },
+    { id: 'holiday_hero',     earned: isUSHoliday(todayStr) },
+    { id: 'birthday_gains',   earned: !!getBirthday(S.user) && curMD === getBirthday(S.user) },
+    // Consistency — perfect month (only if today completes it)
+    { id: 'perfect_month',    earned: currentMonthPerfect },
+    // January challenge
+    { id: 'january_12',       earned: now.getMonth() === 0 && [...S.loggedDates].filter(d => d.startsWith(String(now.getFullYear()) + '-01')).length >= 12 },
   ];
 
   const newBadgeDefs = [];
@@ -1339,14 +1977,20 @@ function renderUserSelect() {
       <div class="quote-author">— ${q.author}</div>
     </div>
     <div class="user-card" onclick="selectUser('josh')">
-      <div class="icon">💪</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px">
+        <div class="icon" style="margin:0">💪</div>
+        ${S.champion==='josh' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
+      </div>
       <h3>Josh</h3>
       <p>Core (Mon/Wed/Fri) · Arms (Tue/Thu/Sat)</p>
       ${streakHTML('josh')}
       ${xpBarHTML('josh')}
     </div>
     <div class="user-card" onclick="selectUser('wife')">
-      <div class="icon">🌟</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:8px">
+        <div class="icon" style="margin:0">🌟</div>
+        ${S.champion==='wife' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
+      </div>
       <h3>Wife</h3>
       <p>Core (Mon/Wed/Fri) · Rest other days</p>
       ${streakHTML('wife')}
@@ -2023,23 +2667,70 @@ function renderProgressBody() {
 function renderBadgeGrid() {
   if (!S.badgesLoaded) return `<div class="uploading" style="padding:16px 0;justify-content:flex-start;gap:10px"><div class="spinner"></div><span style="font-size:14px;color:var(--muted)">Loading badges…</span></div>`;
   const earned = S.badges[S.user] || {};
-  const earnedCount = Object.keys(earned).length;
-  return `
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
-    ${BADGE_DEFS.map(b => {
+  const earnedCount = Object.keys(earned).filter(id => BADGE_DEFS.some(b => b.id === id)).length;
+  const total = BADGE_DEFS.length;
+
+  const CATS = ['Milestones','Streaks','Records','Levels','Consistency','Special','Duo'];
+  const CAT_ICONS = { Milestones:'🏋️', Streaks:'🔥', Records:'🏆', Levels:'⭐', Consistency:'📅', Special:'✨', Duo:'👫' };
+
+  const sections = CATS.map(cat => {
+    const badges = BADGE_DEFS.filter(b => b.cat === cat);
+    const catEarned = badges.filter(b => earned[b.id]).length;
+    const cards = badges.map(b => {
       const earnDate = earned[b.id];
       const isEarned = !!earnDate;
-      return `<div style="background:var(--surface);border:1px solid ${isEarned?'var(--accent)':'var(--border)'};border-radius:12px;padding:14px;${isEarned?'':'opacity:.42'}">
+      const isChamp = b.id === 'duo_champion';
+      return `<div style="background:var(--surface);border:1px solid ${isEarned?'var(--accent)':'var(--border)'};border-radius:12px;padding:14px;${isEarned?'':'opacity:.42'}${isChamp&&isEarned?';background:var(--accent-dim)':''}" >
         <div style="font-size:26px;line-height:1;margin-bottom:8px">${b.icon}</div>
         <div style="font-size:13px;font-weight:700;line-height:1.2;margin-bottom:4px">${b.name}</div>
         <div style="font-size:11px;color:var(--muted);line-height:1.4;margin-bottom:6px">${b.desc}</div>
         ${isEarned
-          ? `<div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.3px">✓ ${badgeDateLabel(earnDate)}</div>`
+          ? `<div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.3px">✓ ${isChamp ? 'Current champion' : badgeDateLabel(earnDate)}</div>`
           : `<div style="font-size:10px;color:var(--muted)">🔒 Locked</div>`}
       </div>`;
-    }).join('')}
-  </div>
-  <div style="font-size:12px;color:var(--muted);text-align:center;margin-top:12px">${earnedCount} / ${BADGE_DEFS.length} badges earned</div>`;
+    }).join('');
+    return `
+    <div style="margin-top:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">${CAT_ICONS[cat]} ${cat}</div>
+        <div style="font-size:11px;color:var(--muted)">${catEarned}/${badges.length}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">${cards}</div>
+    </div>`;
+  }).join('');
+
+  // Birthday config section
+  const jBday = getBirthday('josh');
+  const wBday = getBirthday('wife');
+  const bdaySection = `
+  <div style="margin-top:28px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px">
+    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">🎂 Birthday Settings</div>
+    <div style="display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px;width:48px;font-weight:600">Josh</span>
+        <input type="date" id="bday-josh" value="${jBday ? new Date().getFullYear() + '-' + jBday : ''}"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;outline:none"
+          oninput="saveBday('josh',this.value)">
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:13px;width:48px;font-weight:600">Wife</span>
+        <input type="date" id="bday-wife" value="${wBday ? new Date().getFullYear() + '-' + wBday : ''}"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;outline:none"
+          oninput="saveBday('wife',this.value)">
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:8px">Year is ignored — only month & day matter.</div>
+  </div>`;
+
+  return `${sections}
+  <div style="font-size:12px;color:var(--muted);text-align:center;margin-top:16px">${earnedCount} / ${total} badges earned</div>
+  ${bdaySection}`;
+}
+
+function saveBday(user, val) {
+  if (!val) { setBirthday(user, ''); return; }
+  const m = val.match(/^\d{4}-(\d{2}-\d{2})$/);
+  if (m) setBirthday(user, m[1]);
 }
 
 // ---- RECORDS TAB ----
