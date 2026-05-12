@@ -1213,7 +1213,7 @@ function xpBarHTML(user) {
       <span style="font-size:11px;color:var(--muted)">${info.current} / ${info.needed} XP</span>
     </div>
     <div style="height:6px;background:var(--surface3);border-radius:3px;overflow:hidden">
-      <div style="height:100%;background:var(--accent);border-radius:3px;width:${info.pct}%"></div>
+      <div id="xp-bar-${user}" data-pct="${info.pct}" style="height:100%;background:var(--accent);border-radius:3px;width:0%;transition:width 1.5s ease-out"></div>
     </div>
   </div>`;
 }
@@ -2068,6 +2068,12 @@ function renderUserSelect() {
       ${xpBarHTML('wife')}
     </div>
   </div>`;
+  setTimeout(function() {
+    ['josh','wife'].forEach(function(user) {
+      var el = document.getElementById('xp-bar-' + user);
+      if (el) el.style.width = el.getAttribute('data-pct') + '%';
+    });
+  }, 50);
 }
 
 function selectUser(who) {
@@ -3121,6 +3127,9 @@ window.addEventListener('load', () => {
   applyTheme(localStorage.getItem('theme') || 'dark');
   if (S.gasUrl) S.screen = 'user';
   render();
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(() => {});
+  }
 });
 </script>
 </body>
