@@ -2597,11 +2597,15 @@ function playAlarm() {
     chime(t + 1.4);
   };
 
-  // Resume first in case iOS suspended the context between tap and alarm
-  if (ctx.state === 'suspended') ctx.resume().then(doPlay); else doPlay();
-
-  // Vibration: 3 pulses — works on Android, silently ignored on iOS
-  if (navigator.vibrate) navigator.vibrate([350, 150, 350, 150, 350]);
+  // Resume first in case iOS suspended the context between tap and alarm,
+  // then repeat the full alarm 3 times with a 2.5-second gap between each
+  const fireOnce = () => {
+    if (ctx.state === 'suspended') ctx.resume().then(doPlay); else doPlay();
+    if (navigator.vibrate) navigator.vibrate([350, 150, 350, 150, 350]);
+  };
+  fireOnce();
+  setTimeout(fireOnce, 2500);
+  setTimeout(fireOnce, 5000);
 }
 
 function timerToggle() {
