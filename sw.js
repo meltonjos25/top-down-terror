@@ -1,8 +1,8 @@
-const CACHE = 'workout-v3';
+const CACHE = 'workout-v4';
 const IMMUTABLE_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'lh3.googleusercontent.com'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./workout.html'])));
+  // Do not pre-cache workout.html — always load it fresh from the network
   self.skipWaiting();
 });
 
@@ -30,18 +30,6 @@ self.addEventListener('fetch', e => {
         return res;
       })
     );
-    return;
   }
-
-  // workout.html: network-first — always load the latest, fall back to cache offline
-  if (url.includes('workout.html')) {
-    e.respondWith(
-      fetch(e.request)
-        .then(res => {
-          if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
-          return res;
-        })
-        .catch(() => caches.match(e.request))
-    );
-  }
+  // workout.html: always network, no caching — ensures every open gets the latest
 });
