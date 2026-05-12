@@ -2557,22 +2557,51 @@ function clearProgress() {
 }
 
 // ---- TIMER ----
-function playAlarm() {
+// AudioContext is created on the user's Start tap (a real gesture) so iOS Safari
+// allows it. We keep one instance alive and reuse it for every alarm.
+let _audioCtx = null;
+
+function ensureAudioCtx() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    [[0, 880], [0.35, 880], [0.7, 1100]].forEach(([delay, freq]) => {
+    if (!_audioCtx) _audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+  } catch(e) {}
+  return _audioCtx;
+}
+
+function playAlarm() {
+  const ctx = _audioCtx;
+  if (!ctx) return;
+
+  // Play 3 two-tone chimes (A5 + E6 = perfect fifth — clear but pleasant)
+  const chime = (startTime) => {
+    [[880, 0.55], [1320, 0.35]].forEach(([freq, vol]) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.type = 'sine';
       osc.frequency.value = freq;
-      gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
-      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3);
-      osc.start(ctx.currentTime + delay);
-      osc.stop(ctx.currentTime + delay + 0.35);
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(vol, startTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.55);
+      osc.start(startTime);
+      osc.stop(startTime + 0.57);
     });
-  } catch(e) {}
+  };
+
+  const doPlay = () => {
+    const t = ctx.currentTime + 0.05;
+    chime(t);
+    chime(t + 0.7);
+    chime(t + 1.4);
+  };
+
+  // Resume first in case iOS suspended the context between tap and alarm
+  if (ctx.state === 'suspended') ctx.resume().then(doPlay); else doPlay();
+
+  // Vibration: 3 pulses — works on Android, silently ignored on iOS
+  if (navigator.vibrate) navigator.vibrate([350, 150, 350, 150, 350]);
 }
 
 function timerToggle() {
@@ -2580,6 +2609,7 @@ function timerToggle() {
     clearInterval(S.timerInterval);
     S.timerRunning = false;
   } else {
+    ensureAudioCtx(); // Must happen on this user gesture so iOS allows audio later
     S.timerRunning = true;
     S.timerInterval = setInterval(() => {
       if (S.countdownTarget !== null) {
