@@ -1622,6 +1622,7 @@ async function submitWorkout() {
     S.togetherRecordsLoaded = false;
     S.togetherRecordsLoading = false;
     S.togetherRecords = null;
+    clearProgress();
     S.screen = 'success';
     render();
     checkAndNotifyNewBadges();
@@ -2258,6 +2259,7 @@ async function selectDay(timestamp) {
     await loadHistory();
     S.progression = calcProgression(S.workout.exercises, S.history);
     S.screen = 'workout';
+    loadProgress();
   } catch(e) {
     S.error = e.message;
     S.screen = 'week';
@@ -2464,12 +2466,13 @@ function renderModal() {
 
 function handleOverlayClick(e) { if (e.target.classList.contains('modal-overlay')) closeModal(); }
 
-function setRep(i, s, v) { S.logs[i].repsPerSet[s] = v; }
-function setNote(i, v) { S.logs[i].notes = v; }
+function setRep(i, s, v) { S.logs[i].repsPerSet[s] = v; saveProgress(); }
+function setNote(i, v) { S.logs[i].notes = v; saveProgress(); }
 
 function toggleSet(i, s) {
   S.logs[i].setsState[s] = !S.logs[i].setsState[s];
   S.logs[i].setsCompleted = S.logs[i].setsState.filter(Boolean).length;
+  saveProgress();
   // re-render just the modal part
   const overlay = document.querySelector('.modal-overlay');
   if (overlay) overlay.outerHTML = renderModal();
@@ -2517,12 +2520,40 @@ function markDone(i) {
   log.setsCompleted = ex.sets;
   log.reps = log.repsPerSet.filter(r => r !== '').join(', ') || log.repsPerSet[0] || '';
   const gotPR = checkPR(i);
+  saveProgress();
   S.modal = null;
   clearInterval(S.timerInterval);
   S.timerRunning = false;
   S.countdownTarget = null;
   render();
   if (gotPR) setTimeout(() => launchConfetti('pr'), 150);
+}
+
+// ---- PROGRESS PERSISTENCE ----
+function progressKey() {
+  return 'wod_progress_' + S.user + '_' + localDateStr(S.selectedDate);
+}
+function saveProgress() {
+  if (!S.selectedDate || !S.user) return;
+  try { localStorage.setItem(progressKey(), JSON.stringify({ logs: S.logs, workoutStartTime: S.workoutStartTime, prs: S.prs })); } catch(e) {}
+}
+function loadProgress() {
+  if (!S.selectedDate || !S.user) return;
+  try {
+    const raw = localStorage.getItem(progressKey());
+    if (!raw) return;
+    const data = JSON.parse(raw);
+    if (data.logs) {
+      S.logs = {};
+      Object.entries(data.logs).forEach(([k, v]) => { S.logs[parseInt(k)] = v; });
+    }
+    if (data.workoutStartTime) S.workoutStartTime = data.workoutStartTime;
+    if (data.prs) S.prs = data.prs;
+  } catch(e) {}
+}
+function clearProgress() {
+  if (!S.selectedDate || !S.user) return;
+  try { localStorage.removeItem(progressKey()); } catch(e) {}
 }
 
 // ---- TIMER ----
