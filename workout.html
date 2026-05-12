@@ -624,6 +624,7 @@ const S = {
   timerInterval: null,
   timerSec: 0,
   timerRunning: false,
+  countdownTarget: null,
   weekJustCompleted: false,
   navTab: 'workout',    // 'workout' | 'calendar' | 'progress' | 'records'
   recordsLoading: false,
@@ -2370,8 +2371,11 @@ function renderWorkout() {
 function openModal(i) {
   S.modal = i;
   clearInterval(S.timerInterval);
-  S.timerSec = 0;
   S.timerRunning = false;
+  const _ex = S.workout.exercises[i];
+  const _parsed = parseTarget(S.progression[_ex.name]?.target || _ex.target);
+  S.countdownTarget = _parsed.unit === 'sec' ? _parsed.value : null;
+  S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
   if (!S.logs[i]) {
     const ex = S.workout.exercises[i];
     const prog = S.progression[ex.name];
@@ -2383,7 +2387,7 @@ function openModal(i) {
   render();
 }
 
-function closeModal() { S.modal = null; clearInterval(S.timerInterval); S.timerRunning = false; render(); }
+function closeModal() { S.modal = null; clearInterval(S.timerInterval); S.timerRunning = false; S.countdownTarget = null; render(); }
 
 function renderModal() {
   const i = S.modal;
@@ -2422,7 +2426,7 @@ function renderModal() {
   const timerSec = S.timerSec;
   const mm = String(Math.floor(timerSec/60)).padStart(2,'0');
   const ss = String(timerSec%60).padStart(2,'0');
-  const timerClass = S.timerRunning ? 'running' : timerSec > 0 ? 'done-time' : '';
+  const timerClass = S.timerRunning ? 'running' : S.countdownTarget !== null ? (timerSec === 0 ? 'done-time' : '') : (timerSec > 0 ? 'done-time' : '');
 
   const timerHTML = isTimed ? `
   <div class="timer-section">
@@ -2431,7 +2435,7 @@ function renderModal() {
     <div class="timer-row">
       <button class="timer-btn" onclick="timerToggle()">${S.timerRunning ? '⏸ Pause' : '▶ Start'}</button>
       <button class="timer-btn" onclick="timerReset()">↺ Reset</button>
-      <button class="timer-btn" onclick="timerUse(${i})">Use Time</button>
+      ${S.countdownTarget === null ? `<button class="timer-btn" onclick="timerUse(${i})">Use Time</button>` : ''}
     </div>
   </div>` : '';
 
@@ -2516,11 +2520,30 @@ function markDone(i) {
   S.modal = null;
   clearInterval(S.timerInterval);
   S.timerRunning = false;
+  S.countdownTarget = null;
   render();
   if (gotPR) setTimeout(() => launchConfetti('pr'), 150);
 }
 
 // ---- TIMER ----
+function playAlarm() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    [[0, 880], [0.35, 880], [0.7, 1100]].forEach(([delay, freq]) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.type = 'sine';
+      osc.frequency.value = freq;
+      gain.gain.setValueAtTime(0.4, ctx.currentTime + delay);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + delay + 0.3);
+      osc.start(ctx.currentTime + delay);
+      osc.stop(ctx.currentTime + delay + 0.35);
+    });
+  } catch(e) {}
+}
+
 function timerToggle() {
   if (S.timerRunning) {
     clearInterval(S.timerInterval);
@@ -2528,13 +2551,32 @@ function timerToggle() {
   } else {
     S.timerRunning = true;
     S.timerInterval = setInterval(() => {
-      S.timerSec++;
-      const d = document.querySelector('.timer-display');
-      if (d) {
-        const mm = String(Math.floor(S.timerSec/60)).padStart(2,'0');
-        const ss = String(S.timerSec%60).padStart(2,'0');
-        d.textContent = `${mm}:${ss}`;
-        d.className = 'timer-display running';
+      if (S.countdownTarget !== null) {
+        S.timerSec--;
+        const d = document.querySelector('.timer-display');
+        if (d) {
+          const rem = Math.max(0, S.timerSec);
+          d.textContent = `${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`;
+          d.className = 'timer-display running';
+        }
+        if (S.timerSec <= 0) {
+          clearInterval(S.timerInterval);
+          S.timerRunning = false;
+          S.timerSec = 0;
+          const d = document.querySelector('.timer-display');
+          if (d) { d.textContent = '00:00'; d.className = 'timer-display done-time'; }
+          const btn = document.querySelector('.timer-btn');
+          if (btn) btn.textContent = '▶ Start';
+          playAlarm();
+          return;
+        }
+      } else {
+        S.timerSec++;
+        const d = document.querySelector('.timer-display');
+        if (d) {
+          d.textContent = `${String(Math.floor(S.timerSec/60)).padStart(2,'0')}:${String(S.timerSec%60).padStart(2,'0')}`;
+          d.className = 'timer-display running';
+        }
       }
       const btn = document.querySelector('.timer-btn');
       if (btn) btn.textContent = '⏸ Pause';
@@ -2545,7 +2587,7 @@ function timerToggle() {
 
 function timerReset() {
   clearInterval(S.timerInterval);
-  S.timerSec = 0;
+  S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
   S.timerRunning = false;
   render();
 }
