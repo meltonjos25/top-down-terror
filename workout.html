@@ -3169,9 +3169,6 @@ window.addEventListener('load', () => {
   applyTheme(localStorage.getItem('theme') || 'dark');
   if (S.gasUrl) S.screen = 'user';
   render();
-  if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
-  }
 });
 </script>
 </body>
