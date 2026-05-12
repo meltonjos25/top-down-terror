@@ -1,10 +1,8 @@
-const CACHE = 'workout-v2';
+const CACHE = 'workout-v3';
+const IMMUTABLE_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com', 'lh3.googleusercontent.com'];
 
-// Cache the app shell on install
 self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(['./workout.html']))
-  );
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(['./workout.html'])));
   self.skipWaiting();
 });
 
@@ -17,31 +15,33 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
-// Runtime caching: serve from cache if available, fetch and cache if not
 self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   const url = e.request.url;
 
-  // Only cache GET requests for Google Fonts and Google Drive (GIFs)
-  if (
-    e.request.method !== 'GET' ||
-    (!url.includes('fonts.googleapis.com') &&
-     !url.includes('fonts.gstatic.com') &&
-     !url.includes('lh3.googleusercontent.com') &&
-     !url.includes('workout.html'))
-  ) return;
+  // Fonts and GIFs: cache-first — these never change
+  if (IMMUTABLE_HOSTS.some(h => url.includes(h))) {
+    e.respondWith(
+      caches.open(CACHE).then(async cache => {
+        const cached = await cache.match(e.request);
+        if (cached) return cached;
+        const res = await fetch(e.request);
+        if (res.ok) cache.put(e.request, res.clone());
+        return res;
+      })
+    );
+    return;
+  }
 
-  e.respondWith(
-    caches.open(CACHE).then(async cache => {
-      const cached = await cache.match(e.request);
-      if (cached) return cached;
-
-      try {
-        const response = await fetch(e.request);
-        if (response.ok) cache.put(e.request, response.clone());
-        return response;
-      } catch {
-        return cached || new Response('Offline', { status: 503 });
-      }
-    })
-  );
+  // workout.html: network-first — always load the latest, fall back to cache offline
+  if (url.includes('workout.html')) {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          if (res.ok) caches.open(CACHE).then(c => c.put(e.request, res.clone()));
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+  }
 });
