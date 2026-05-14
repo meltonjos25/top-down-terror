@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+c<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -89,6 +89,7 @@ input.field::placeholder{color:var(--muted)}
 .badge.core{border-color:#3fb95044;color:var(--accent)}
 .badge.arms{border-color:#58a6ff44;color:var(--blue)}
 .badge.rest{border-color:#d2992244;color:var(--yellow)}
+.badge.bands{border-color:#a371f744;color:#a371f7}
 
 .progress-bar-wrap{padding:0 20px 16px}
 .progress-bar-bg{height:6px;background:var(--surface2);border-radius:3px;overflow:hidden}
@@ -568,6 +569,30 @@ function bodyDiagramSVG(primary, secondary) {
 }
 
 // ═══════════════════════════════════════════════
+// BADGE OVERRIDES
+// Use to correct badge earn dates or revoke badges that were falsely granted.
+// Set a value to null to revoke; set to 'YYYY-MM-DD' to override the earn date.
+// Remove an entry once the badge is legitimately re-earned and no longer needs overriding.
+// ═══════════════════════════════════════════════
+const BADGE_OVERRIDES = {
+  josh: {
+    prs_5:  '2026-05-11',  // corrected — 5th real PR was May 11, not May 4
+    prs_10: null,           // block until legitimately earned — remove this line when ready
+    prs_25: null,           // block until legitimately earned — remove this line when ready
+    prs_50: null,           // block until legitimately earned — remove this line when ready
+  }
+};
+
+function applyBadgeOverrides(user, earned) {
+  const overrides = BADGE_OVERRIDES[user];
+  if (!overrides) return;
+  for (const [id, val] of Object.entries(overrides)) {
+    if (val === null) delete earned[id];
+    else earned[id] = val;
+  }
+}
+
+// ═══════════════════════════════════════════════
 // PLAN SHEET MAPPING  (which sheet + workout name for each user/day)
 // Edit exercises, sets, and reps directly in Google Sheets — the app reads
 // them fresh on each load. Sheet columns must be:
@@ -761,27 +786,34 @@ function computeBadgesFromRows(user, rows, dateSet) {
   const streak200Date = findStreakEarnedDate(user, dateSet, 200);
   const streak365Date = findStreakEarnedDate(user, dateSet, 365);
 
-  // ── PR count (unique exercises ever logged w/ a value) ───────
+  // ── PR count (beat previous best for an exercise) ────────────
+  // First-time logs establish the baseline but do NOT count as a PR.
+  // Only a logged value that strictly exceeds all prior logs for that exercise counts.
   const sortedRows = [...rows].sort((a, b) => {
     const da = normDateStr(a[0]), db = normDateStr(b[0]);
     return da < db ? -1 : da > db ? 1 : 0;
   });
-  const seen = new Set();
+  const bestPerExercise = {}; // exerciseName → highest value ever logged
+  let prCount = 0;
   let pr1Date = null, pr5Date = null, pr10Date = null, pr25Date = null, pr50Date = null;
   for (const row of sortedRows) {
     const name = String(row[3] || '').trim();
-    if (!name || seen.has(name)) continue;
+    if (!name) continue;
     const repsStr = String(row[5] || '').trim();
-    const hasVal = repsStr.split(',').some(v => { const n = parseFloat(v.trim()); return !isNaN(n) && n > 0; });
-    if (hasVal) {
-      seen.add(name);
+    const vals = repsStr.split(',').map(v => parseFloat(v.trim())).filter(n => !isNaN(n) && n > 0);
+    if (!vals.length) continue;
+    const maxVal = Math.max(...vals);
+    const prevBest = bestPerExercise[name];
+    if (prevBest !== undefined && maxVal > prevBest) {
+      prCount++;
       const d = normDateStr(row[0]);
-      if (seen.size === 1)  pr1Date  = d;
-      if (seen.size === 5)  pr5Date  = d;
-      if (seen.size === 10) pr10Date = d;
-      if (seen.size === 25) pr25Date = d;
-      if (seen.size === 50) { pr50Date = d; break; }
+      if (prCount === 1)  pr1Date  = d;
+      if (prCount === 5)  pr5Date  = d;
+      if (prCount === 10) pr10Date = d;
+      if (prCount === 25) pr25Date = d;
+      if (prCount === 50) pr50Date = d;
     }
+    if (prevBest === undefined || maxVal > prevBest) bestPerExercise[name] = maxVal;
   }
 
   // ── Total reps ───────────────────────────────────────────────
@@ -1444,6 +1476,9 @@ async function loadWeekDurations() {
     const pr3Date = computePR3WeeksBadge(prHistRows);
     if (pr3Date) baseBadges.pr_3weeks = pr3Date;
 
+    // Apply manual overrides before merging (corrects dates and revokes false grants)
+    applyBadgeOverrides(S.user, baseBadges);
+
     // Merge with any duo/level badges already computed in loadStreaks
     S.badges[S.user] = Object.assign({}, S.badges[S.user] || {}, baseBadges);
   } catch(e) {}
@@ -2065,7 +2100,7 @@ function renderUserSelect() {
         ${S.champion==='wife' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
       </div>
       <h3>Wife</h3>
-      <p>Core (Mon/Wed/Fri) · Rest other days</p>
+      <p>Core (Mon/Wed/Fri) · Bands (Tue/Thu)</p>
       ${streakHTML('wife')}
       ${xpBarHTML('wife')}
     </div>
