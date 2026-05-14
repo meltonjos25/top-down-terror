@@ -610,15 +610,20 @@ const PLAN_SHEETS = {
   },
   wife: {
     Monday:    { sheet: 'Wife — Core',  name: 'Core Workout A',  type: 'CORE',  duration: '30 min' },
-    Tuesday:   { sheet: 'Wife — Bands', name: 'Bands Workout A', type: 'BANDS', duration: '30 min' },
+    Tuesday:   { sheet: 'Wife — Bands', name: 'Bands Workout A', type: 'BANDS', duration: '30 min', startDate: '2026-05-12' },
     Wednesday: { sheet: 'Wife — Core',  name: 'Core Workout B',  type: 'CORE',  duration: '30 min' },
-    Thursday:  { sheet: 'Wife — Bands', name: 'Bands Workout B', type: 'BANDS', duration: '30 min' },
+    Thursday:  { sheet: 'Wife — Bands', name: 'Bands Workout B', type: 'BANDS', duration: '30 min', startDate: '2026-05-12' },
     Friday:    { sheet: 'Wife — Core',  name: 'Core Workout C',  type: 'CORE',  duration: '30 min' },
     Saturday:  null,
     Sunday:    null,
   }
 };
 
+
+// Returns false if the plan entry doesn't exist or hasn't started yet for the given dateStr
+function isPlanActive(entry, dateStr) {
+  return entry !== null && (!entry.startDate || dateStr >= entry.startDate);
+}
 
 // ═══════════════════════════════════════════════
 // APP STATE
@@ -743,7 +748,7 @@ function calcMaxStreak(user, loggedDates) {
   let max = 0, cur = 0;
   while (d <= end) {
     const dStr = localDateStr(d);
-    if (PLAN_SHEETS[user][dateDay(d)] !== null) {
+    if (isPlanActive(PLAN_SHEETS[user][dateDay(d)], dStr)) {
       if (loggedDates.has(dStr)) { cur++; if (cur > max) max = cur; }
       else if (dStr < todayStr) cur = 0;
     }
@@ -762,7 +767,7 @@ function findStreakEarnedDate(user, loggedDates, target) {
   let cur = 0;
   while (d <= end) {
     const dStr = localDateStr(d);
-    if (PLAN_SHEETS[user][dateDay(d)] !== null) {
+    if (isPlanActive(PLAN_SHEETS[user][dateDay(d)], dStr)) {
       if (loggedDates.has(dStr)) { cur++; if (cur === target) return dStr; }
       else if (dStr < todayStr) cur = 0;
     }
@@ -1284,7 +1289,7 @@ function calcStreak(user, loggedDates) {
   let streak = 0;
   for (let i = 0; i < 365; i++) {
     const dStr = localDateStr(d);
-    const isScheduled = PLAN_SHEETS[user][dateDay(d)] !== null;
+    const isScheduled = isPlanActive(PLAN_SHEETS[user][dateDay(d)], dStr);
     if (!isScheduled) {
       // Rest day — skip without breaking streak
       d.setDate(d.getDate() - 1);
