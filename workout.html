@@ -2292,7 +2292,7 @@ function renderWeek() {
   else bodyContent = renderWeekBody();
   app.innerHTML = `
   <div class="header">
-    <div class="header-title">🏋️ ${userName}</div>
+    <div class="header-title">${S.user === 'wife' ? '🏋️‍♀️' : '🏋️'} ${userName}</div>
     <div class="header-right">${themeBtn()}<button class="header-user" onclick="S.screen='user';render()">Switch</button></div>
   </div>
   <div class="body">${bodyContent}</div>
