@@ -3150,7 +3150,7 @@ function swipeEnd(e, el) {
 }
 
 function msgKey(m) {
-  return `${m.date}|${m.time}|${m.from}`;
+  return `${m.date}|${m.from}|${String(m.text).slice(0, 60)}`;
 }
 function deleteReceivedMsg(key) {
   if (!S.messages) return;
