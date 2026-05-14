@@ -1581,6 +1581,15 @@ async function gasRead(sheetName) {
   return json.rows || [];
 }
 
+// Like gasRead but returns ALL rows (no header skip) — used for sheets with no header row (e.g. Messages)
+async function gasReadAll(sheetName) {
+  const url = `${S.gasUrl}?action=read_all&sheet=${encodeURIComponent(sheetName)}`;
+  const r = await fetch(url);
+  if (!r.ok) throw new Error(`Read failed: ${r.status}`);
+  const json = await r.json();
+  return json.rows || [];
+}
+
 async function gasWrite(sheetName, rows) {
   const data = encodeURIComponent(JSON.stringify({sheet: sheetName, rows}));
   const url = `${S.gasUrl}?action=log&data=${data}`;
@@ -1983,6 +1992,12 @@ function doGet(e) {
   if (action === 'read') {
     var s = ss.getSheetByName(e.parameter.sheet);
     var vals = s ? s.getDataRange().getValues().slice(1) : [];
+    return res({rows: vals});
+  }
+
+  if (action === 'read_all') {
+    var s = ss.getSheetByName(e.parameter.sheet);
+    var vals = s ? s.getDataRange().getValues() : [];
     return res({rows: vals});
   }
 
@@ -2974,7 +2989,7 @@ async function loadMessages() {
   S.messagesLoading = true;
   render();
   try {
-    const rows = await gasRead(MESSAGES_SHEET);
+    const rows = await gasReadAll(MESSAGES_SHEET);
     const user = S.user;
     const sent = [], received = [];
     rows.forEach(row => {
@@ -3086,7 +3101,7 @@ function escapeHtml(str) {
 }
 
 function checkAndShowDedicationPopup(user) {
-  gasRead(MESSAGES_SHEET).then(rows => {
+  gasReadAll(MESSAGES_SHEET).then(rows => {
     const lastRead = localStorage.getItem(`lastRead_${user}`) || '0000-00-00 00:00';
     const unread = [];
     rows.forEach(row => {
