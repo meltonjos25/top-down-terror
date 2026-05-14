@@ -170,6 +170,12 @@ input.field::placeholder{color:var(--muted)}
 .success-screen h2{font-size:26px;font-weight:800}
 .success-screen p{color:var(--muted);font-size:15px;max-width:300px;line-height:1.6}
 
+/* ---- SWIPE-TO-DELETE ---- */
+.swipe-row{position:relative;overflow:hidden;border-radius:12px;margin-bottom:8px}
+.swipe-content{position:relative;border-radius:12px;will-change:transform}
+.swipe-delete-btn{position:absolute;right:0;top:0;bottom:0;width:72px;background:var(--red);display:flex;align-items:center;justify-content:center;border-radius:0 12px 12px 0;cursor:pointer;flex-shrink:0}
+.swipe-delete-btn svg{pointer-events:none}
+
 /* ---- MISC ---- */
 .error-msg{background:#f8514922;border:1px solid #f8514966;border-radius:10px;padding:12px 16px;font-size:14px;color:var(--red);margin-top:4px}
 .divider{height:1px;background:var(--border);margin:0 20px}
@@ -2991,6 +2997,7 @@ async function loadMessages() {
   try {
     const rows = await gasReadAll(MESSAGES_SHEET);
     const user = S.user;
+    const deleted = new Set(JSON.parse(localStorage.getItem('deletedMsgs_' + user) || '[]'));
     const sent = [], received = [];
     rows.forEach(row => {
       const date = String(row[0] || '').trim();
@@ -3001,7 +3008,7 @@ async function loadMessages() {
       if (!date || !text) return;
       const msg = { date, time, from, to, text };
       if (from === user) sent.unshift(msg);
-      else if (to === user) received.unshift(msg);
+      else if (to === user && !deleted.has(msgKey(msg))) received.unshift(msg);
     });
     S.messages = { sent, received };
   } catch(e) {
@@ -3061,12 +3068,25 @@ function renderMessagesBody() {
       ? `To ${S.user === 'josh' ? 'Wife' : 'Josh'}`
       : `From ${S.user === 'josh' ? 'Wife' : 'Josh'}`;
     const labelColor = isSent ? 'var(--blue)' : 'var(--accent)';
-    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:8px">
+    const inner = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
         <div style="font-size:11px;font-weight:700;color:${labelColor};text-transform:uppercase;letter-spacing:.5px">${label}</div>
         <div style="font-size:11px;color:var(--muted)">${m.date}${m.time ? ' · ' + m.time : ''}</div>
       </div>
       <div style="font-size:14px;line-height:1.55;color:var(--text)">${escapeHtml(m.text)}</div>
+    </div>`;
+    if (isSent) return `<div style="margin-bottom:8px">${inner}</div>`;
+    const key = escapeHtml(msgKey(m));
+    return `<div class="swipe-row">
+      <div class="swipe-delete-btn" onclick="deleteReceivedMsg('${key}')">
+        <svg viewBox="0 0 24 24" fill="white" width="22" height="22"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6h14z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+      </div>
+      <div class="swipe-content" style="touch-action:pan-y"
+           ontouchstart="swipeStart(event,this)"
+           ontouchmove="swipeMove(event,this)"
+           ontouchend="swipeEnd(event,this)">
+        ${inner}
+      </div>
     </div>`;
   }
 
@@ -3098,6 +3118,47 @@ function renderMessagesBody() {
 
 function escapeHtml(str) {
   return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ---- SWIPE-TO-DELETE (messages) ----
+let _swEl = null, _swX0 = 0, _swY0 = 0, _swDx = 0, _swLocked = false;
+
+function swipeStart(e, el) {
+  _swEl = el; _swX0 = e.touches[0].clientX; _swY0 = e.touches[0].clientY;
+  _swDx = 0; _swLocked = false;
+  el.style.transition = 'none';
+}
+function swipeMove(e, el) {
+  if (_swEl !== el) return;
+  const dx = e.touches[0].clientX - _swX0;
+  const dy = e.touches[0].clientY - _swY0;
+  if (!_swLocked) {
+    if (Math.abs(dx) < 5 && Math.abs(dy) < 5) return;
+    if (Math.abs(dy) > Math.abs(dx)) { _swEl = null; return; }
+    _swLocked = true;
+  }
+  e.preventDefault();
+  _swDx = Math.min(0, Math.max(dx, -72));
+  el.style.transform = `translateX(${_swDx}px)`;
+}
+function swipeEnd(e, el) {
+  if (_swEl !== el) return;
+  el.style.transition = 'transform 0.2s ease';
+  if (_swDx < -36) { el.style.transform = 'translateX(-72px)'; }
+  else { el.style.transform = 'translateX(0)'; _swDx = 0; }
+  _swEl = null;
+}
+
+function msgKey(m) {
+  return `${m.date}|${m.time}|${m.from}`;
+}
+function deleteReceivedMsg(key) {
+  if (!S.messages) return;
+  S.messages.received = S.messages.received.filter(m => msgKey(m) !== key);
+  const stored = JSON.parse(localStorage.getItem('deletedMsgs_' + S.user) || '[]');
+  if (!stored.includes(key)) stored.push(key);
+  localStorage.setItem('deletedMsgs_' + S.user, JSON.stringify(stored));
+  render();
 }
 
 function checkAndShowDedicationPopup(user) {
