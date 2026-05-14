@@ -458,6 +458,7 @@ const MUSCLE_RULES = [
   // Arms & upper body
   { re: /curl|hammer|zottman/i,                     p: ['biceps'],              s: ['forearms'] },
   { re: /tricep|skull.?crush|pushdown|kickback/i,   p: ['triceps'],             s: [] },
+  { re: /side.?plank/i,                             p: ['obliques'],            s: ['glutes'] },
   { re: /dip/i,                                     p: ['triceps'],             s: ['chest','shoulders'] },
   { re: /overhead.?press|shoulder.?press|military|arnold/i, p: ['shoulders'],   s: ['triceps'] },
   { re: /lateral.?raise|side.?raise/i,              p: ['shoulders'],           s: [] },
@@ -472,7 +473,6 @@ const MUSCLE_RULES = [
   { re: /forearm|wrist.?curl/i,                     p: ['forearms'],            s: [] },
   { re: /reverse.?curl/i,                           p: ['forearms'],            s: ['biceps'] },
   // Core
-  { re: /side.?plank/i,                             p: ['obliques'],            s: ['abs'] },
   { re: /plank/i,                                   p: ['abs'],                 s: ['shoulders','glutes'] },
   { re: /crunch|sit.?up/i,                          p: ['abs'],                 s: ['hip-flexors'] },
   { re: /russian.?twist|rotati/i,                   p: ['obliques'],            s: ['abs'] },
