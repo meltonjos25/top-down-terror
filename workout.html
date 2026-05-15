@@ -1294,6 +1294,16 @@ function normDateStr(v) {
   if (slash) return `${slash[3]}-${slash[1].padStart(2,'0')}-${slash[2].padStart(2,'0')}`;
   return '';
 }
+// Normalize whatever time format GAS returns to HH:MM
+function normTimeStr(v) {
+  if (!v) return '00:00';
+  const s = String(v).trim();
+  if (/^\d{2}:\d{2}/.test(s)) return s.slice(0, 5); // already HH:MM
+  // GAS serializes time-only values as ISO with 1899-12-30 base date
+  const iso = s.match(/T(\d{2}):(\d{2})/);
+  if (iso) return `${iso[1]}:${iso[2]}`;
+  return '00:00';
+}
 function calcStreak(user, loggedDates) {
   const todayStr = localDateStr(new Date());
   const d = new Date();
@@ -3253,12 +3263,12 @@ function checkAndShowDedicationPopup(user) {
     const lastRead = localStorage.getItem(`lastRead_${user}`) || '0000-00-00 00:00';
     const unread = [];
     rows.forEach(row => {
-      const date = String(row[0] || '').trim();
-      const time = String(row[1] || '').trim();
+      const date = normDateStr(String(row[0] || ''));
+      const time = normTimeStr(String(row[1] || ''));
       const to   = String(row[3] || '').trim().toLowerCase();
       const text = String(row[4] || '').trim();
       if (to !== user || !date || !text) return;
-      const sentAt = `${date} ${time || '00:00'}`;
+      const sentAt = `${date} ${time}`;
       if (sentAt > lastRead) unread.push({ date, time, from: String(row[2]||'').trim(), text });
     });
     if (unread.length) {
