@@ -2456,7 +2456,7 @@ function openModal(i) {
   render();
 }
 
-function closeModal() { S.modal = null; clearInterval(S.timerInterval); S.timerRunning = false; S.countdownTarget = null; render(); }
+function closeModal() { S.modal = null; clearInterval(S.timerInterval); stopAudioKeepAlive(); S.timerRunning = false; S.countdownTarget = null; render(); }
 
 function renderModal() {
   const i = S.modal;
@@ -2627,6 +2627,7 @@ function clearProgress() {
 // AudioContext is created on the user's Start tap (a real gesture) so iOS Safari
 // allows it. We keep one instance alive and reuse it for every alarm.
 let _audioCtx = null;
+let _audioKeepAlive = null;
 
 function ensureAudioCtx() {
   try {
@@ -2634,6 +2635,28 @@ function ensureAudioCtx() {
     if (_audioCtx.state === 'suspended') _audioCtx.resume();
   } catch(e) {}
   return _audioCtx;
+}
+
+// Plays a near-silent 10ms tone every 20s to prevent iOS from suspending the AudioContext mid-timer
+function startAudioKeepAlive() {
+  stopAudioKeepAlive();
+  _audioKeepAlive = setInterval(() => {
+    if (!_audioCtx) return;
+    try {
+      if (_audioCtx.state === 'suspended') _audioCtx.resume();
+      const osc = _audioCtx.createOscillator();
+      const gain = _audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(_audioCtx.destination);
+      gain.gain.setValueAtTime(0.0001, _audioCtx.currentTime);
+      osc.start(_audioCtx.currentTime);
+      osc.stop(_audioCtx.currentTime + 0.01);
+    } catch(e) {}
+  }, 20000);
+}
+
+function stopAudioKeepAlive() {
+  if (_audioKeepAlive) { clearInterval(_audioKeepAlive); _audioKeepAlive = null; }
 }
 
 function playAlarm() {
@@ -2678,9 +2701,11 @@ function playAlarm() {
 function timerToggle() {
   if (S.timerRunning) {
     clearInterval(S.timerInterval);
+    stopAudioKeepAlive();
     S.timerRunning = false;
   } else {
     ensureAudioCtx(); // Must happen on this user gesture so iOS allows audio later
+    startAudioKeepAlive();
     S.timerRunning = true;
     S.timerInterval = setInterval(() => {
       if (S.countdownTarget !== null) {
@@ -2693,6 +2718,7 @@ function timerToggle() {
         }
         if (S.timerSec <= 0) {
           clearInterval(S.timerInterval);
+          stopAudioKeepAlive();
           S.timerRunning = false;
           S.timerSec = 0;
           const d = document.querySelector('.timer-display');
@@ -2719,6 +2745,7 @@ function timerToggle() {
 
 function timerReset() {
   clearInterval(S.timerInterval);
+  stopAudioKeepAlive();
   S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
   S.timerRunning = false;
   render();
