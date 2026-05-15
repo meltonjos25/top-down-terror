@@ -1536,6 +1536,18 @@ function computePR3WeeksBadge(prHistRows) {
 // ═══════════════════════════════════════════════
 // PROGRESSION LOGIC
 // ═══════════════════════════════════════════════
+// Extract all distinct time values (in seconds) from a target string (e.g. "45 sec → 30 sec")
+function parseAllTimers(str) {
+  const seen = new Set(), out = [];
+  const re = /(\d+)\s*(min|sec)\b/gi;
+  let m;
+  while ((m = re.exec(str || '')) !== null) {
+    const v = m[2].toLowerCase().startsWith('m') ? parseInt(m[1]) * 60 : parseInt(m[1]);
+    if (!seen.has(v)) { seen.add(v); out.push(v); }
+  }
+  return out;
+}
+
 function parseTarget(str) {
   str = str || '';
   if (/failure|max|burnout|gauntlet|triset|flow/i.test(str)) return {value: null, unit: 'max'};
@@ -2443,7 +2455,14 @@ function openModal(i) {
   S.timerRunning = false;
   const _ex = S.workout.exercises[i];
   const _parsed = parseTarget(S.progression[_ex.name]?.target || _ex.target);
-  S.countdownTarget = _parsed.unit === 'sec' ? _parsed.value : null;
+  const _allTimers = parseAllTimers(S.progression[_ex.name]?.target || _ex.target);
+  if (_parsed.unit === 'sec') {
+    S.countdownTarget = _parsed.value;
+  } else if (_allTimers.length > 0) {
+    S.countdownTarget = _allTimers[0];
+  } else {
+    S.countdownTarget = null;
+  }
   S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
   if (!S.logs[i]) {
     const ex = S.workout.exercises[i];
@@ -2465,8 +2484,9 @@ function renderModal() {
   const prog = S.progression[ex.name];
   const target = prog?.target || ex.target;
   const parsed = parseTarget(target);
+  const allTimers = parseAllTimers(target);
   const isTimedByName = /plank|hold/i.test(ex.name);
-  const isTimed = parsed.unit === 'sec' || (isTimedByName && parsed.unit === 'max');
+  const isTimed = parsed.unit === 'sec' || (isTimedByName && parsed.unit === 'max') || allTimers.length > 0;
   const isMax = !isTimed && (parsed.unit === 'max' || parsed.unit === 'complex');
 
   const muscles = getMuscles(ex.name);
@@ -2497,9 +2517,17 @@ function renderModal() {
   const ss = String(timerSec%60).padStart(2,'0');
   const timerClass = S.timerRunning ? 'running' : S.countdownTarget !== null ? (timerSec === 0 ? 'done-time' : '') : (timerSec > 0 ? 'done-time' : '');
 
+  const fmtSec = v => v >= 60 ? `${Math.floor(v/60)}m${v%60 ? v%60+'s' : ''}` : `${v}s`;
+  const presetsHTML = allTimers.length > 1 ? `
+    <div class="timer-row" style="margin-bottom:4px">
+      ${allTimers.map(v => `<button class="timer-btn" onclick="setTimerPreset(${v})"
+        style="${S.countdownTarget===v?'background:var(--accent);color:#000;font-weight:700;':''}">${fmtSec(v)}</button>`).join('')}
+    </div>` : '';
+
   const timerHTML = isTimed ? `
   <div class="timer-section">
     <div class="timer-target">Target: ${target}</div>
+    ${presetsHTML}
     <div class="timer-display ${timerClass}">${mm}:${ss}</div>
     <div class="timer-row">
       <button class="timer-btn" onclick="timerToggle()">${S.timerRunning ? '⏸ Pause' : '▶ Start'}</button>
@@ -2748,6 +2776,15 @@ function timerReset() {
   stopAudioKeepAlive();
   S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
   S.timerRunning = false;
+  render();
+}
+
+function setTimerPreset(sec) {
+  clearInterval(S.timerInterval);
+  stopAudioKeepAlive();
+  S.timerRunning = false;
+  S.countdownTarget = sec;
+  S.timerSec = sec;
   render();
 }
 
