@@ -277,6 +277,36 @@ input.field::placeholder{color:var(--muted)}
 .badge-notif-icon{font-size:34px;width:46px;text-align:center;flex-shrink:0;line-height:1}
 @keyframes bfadein{from{opacity:0}to{opacity:1}}
 @keyframes bslideup{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
+
+/* ── Transition animations ── */
+@keyframes splashIn    { from{opacity:0;transform:scale(.94) translateY(10px)} to{opacity:1;transform:none} }
+@keyframes splashOut   { to{opacity:0;transform:translateY(-22px)} }
+@keyframes cardUp      { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:none} }
+@keyframes slideInRight{ from{opacity:0;transform:translateX(18px)} to{opacity:1;transform:none} }
+@keyframes sheetUp     { from{opacity:0;transform:translateY(52px)} to{opacity:1;transform:none} }
+@keyframes sheetDown   { to{opacity:0;transform:translateY(52px)} }
+@keyframes scaleIn     { from{opacity:0;transform:scale(.88)} to{opacity:1;transform:none} }
+@keyframes scaleOut    { to{opacity:0;transform:scale(.88)} }
+@keyframes fadeIn      { from{opacity:0} to{opacity:1} }
+@keyframes fadeOut     { from{opacity:1} to{opacity:0} }
+@keyframes checkBounce { 0%{transform:scale(0);opacity:0} 55%{transform:scale(1.3)} 78%{transform:scale(.9)} 92%{transform:scale(1.07)} 100%{transform:scale(1);opacity:1} }
+.splash-enter { animation:splashIn .42s cubic-bezier(.22,1,.36,1) both }
+.splash-exit  { animation:splashOut .28s ease-in forwards }
+.card-enter-1 { animation:cardUp .36s cubic-bezier(.22,1,.36,1) .04s both }
+.card-enter-2 { animation:cardUp .36s cubic-bezier(.22,1,.36,1) .16s both }
+.screen-enter { animation:slideInRight .3s cubic-bezier(.22,1,.36,1) both }
+.modal-overlay.sheet-enter          { animation:fadeIn  .25s ease both }
+.modal-overlay.sheet-enter .modal   { animation:sheetUp .32s cubic-bezier(.22,1,.36,1) both }
+.modal-overlay.sheet-exit           { animation:fadeOut .22s ease forwards }
+.modal-overlay.sheet-exit .modal    { animation:sheetDown .22s ease-in forwards }
+.gif-overlay      { position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(0,0,0,.88) }
+.gif-overlay.gif-in  { animation:fadeIn  .25s ease both }
+.gif-overlay.gif-out { animation:fadeOut .22s ease forwards }
+.gif-card     { background:var(--surface);border-radius:18px;width:100%;max-width:420px;overflow:hidden;max-height:80vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.6) }
+.gif-card.gif-in  { animation:scaleIn  .3s cubic-bezier(.22,1,.36,1) both }
+.gif-card.gif-out { animation:scaleOut .22s ease-in forwards }
+.check-pop    { display:inline-block;animation:checkBounce .45s cubic-bezier(.22,1,.36,1) .08s both }
+.modal-demo   { background:none;border:none;padding:0;cursor:pointer }
 </style>
 </head>
 <body>
@@ -2048,7 +2078,7 @@ function renderSetup() {
   stopMessagePolling();
   app.innerHTML = `
   <div class="header" style="border-bottom:none"><div></div>${themeBtn()}</div>
-  <div class="setup">
+  <div class="setup splash-enter">
     <div style="font-size:48px;margin-bottom:-8px">🏋️</div>
     <h1>Morning Workout<br>Josh & Wife</h1>
     <p>One-time setup: deploy a tiny Google Apps Script so the app can write to your sheet — no sign-in needed on your phone.</p>
@@ -2081,14 +2111,21 @@ function saveGasUrl() {
   S.gasUrl = v;
   localStorage.setItem('gasUrl', v);
   S.error = '';
-  S.screen = 'user';
-  render();
+  _exitSplash(() => { S.screen = 'user'; render(); });
 }
 
 function trySkip() {
   if (!S.gasUrl) { S.error = 'No URL saved yet. Complete the steps above.'; render(); return; }
-  S.screen = 'user';
-  render();
+  _exitSplash(() => { S.screen = 'user'; render(); });
+}
+
+function _exitSplash(cb) {
+  const setup = document.querySelector('.setup');
+  if (setup) {
+    setup.classList.remove('splash-enter');
+    setup.classList.add('splash-exit');
+    setTimeout(cb, 260);
+  } else { cb(); }
 }
 
 // ---- USER SELECT ----
@@ -2140,7 +2177,7 @@ function renderUserSelect() {
       <div class="quote-text">"${q.text}"</div>
       <div class="quote-author">— ${q.author}</div>
     </div>
-    <div class="user-card" onclick="selectUser('josh')">
+    <div class="user-card card-enter-1" onclick="selectUser('josh')">
       <div style="display:flex;align-items:center;justify-content:center;gap:8px">
         <div class="icon" style="margin:0">💪</div>
         ${S.champion==='josh' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
@@ -2150,7 +2187,7 @@ function renderUserSelect() {
       ${streakHTML('josh')}
       ${xpBarHTML('josh')}
     </div>
-    <div class="user-card" onclick="selectUser('wife')">
+    <div class="user-card card-enter-2" onclick="selectUser('wife')">
       <div style="display:flex;align-items:center;justify-content:center;gap:8px">
         <div class="icon" style="margin:0">🌟</div>
         ${S.champion==='wife' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
@@ -2437,7 +2474,7 @@ function renderWorkout() {
     <div class="header-title">${dateLabel}</div>
     <div class="header-right">${themeBtn()}<button class="header-user" onclick="S.screen='week';render()">← Week</button></div>
   </div>
-  <div class="body">
+  <div class="body screen-enter">
     <div class="day-header">
       <div class="day-label">${dateLabel}</div>
       <div class="day-workout">${w.name}</div>
@@ -2488,7 +2525,15 @@ function openModal(i) {
   render();
 }
 
-function closeModal() { S.modal = null; clearInterval(S.timerInterval); stopAudioKeepAlive(); S.timerRunning = false; S.countdownTarget = null; render(); }
+function closeModal() {
+  const overlay = document.querySelector('.modal-overlay');
+  function _doClose() { S.modal = null; clearInterval(S.timerInterval); stopAudioKeepAlive(); S.timerRunning = false; S.countdownTarget = null; render(); }
+  if (overlay) {
+    overlay.classList.remove('sheet-enter');
+    overlay.classList.add('sheet-exit');
+    setTimeout(_doClose, 230);
+  } else { _doClose(); }
+}
 
 function renderModal() {
   const i = S.modal;
@@ -2550,7 +2595,7 @@ function renderModal() {
   </div>` : '';
 
   return `
-  <div class="modal-overlay" onclick="handleOverlayClick(event)">
+  <div class="modal-overlay sheet-enter" onclick="handleOverlayClick(event)">
     <div class="modal" onclick="event.stopPropagation()">
       <div class="modal-handle"></div>
       <div class="modal-header">
@@ -2559,7 +2604,7 @@ function renderModal() {
       </div>
       <div class="modal-body">
         ${ex.note ? `<div class="modal-note">${ex.note}</div>` : ''}
-        ${ex.demo ? `<a class="modal-demo" href="${ex.demo}" target="_blank">▶ Watch Demo</a>` : ''}
+        ${ex.demo ? `<button class="modal-demo" onclick="openGifModal('${ex.demo.replace(/'/g,"\\'")}','${ex.name.replace(/'/g,"\\'")}')">▶ Watch Demo</button>` : ''}
         <div class="target-hint">Target: <strong>${ex.sets} × ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">↑ PROGRESSED</span>' : ''}</div>
         ${diagramHTML}
         ${timerHTML}
@@ -2573,6 +2618,37 @@ function renderModal() {
 }
 
 function handleOverlayClick(e) { if (e.target.classList.contains('modal-overlay')) closeModal(); }
+
+function openGifModal(url, title) {
+  const isImage = /\.(gif|jpe?g|png|webp|svg)(\?|$)/i.test(url);
+  if (!isImage) { window.open(url, '_blank'); return; }
+  const existing = document.getElementById('gif-modal-overlay');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.id = 'gif-modal-overlay';
+  el.className = 'gif-overlay gif-in';
+  el.innerHTML = `
+    <div class="gif-card gif-in" onclick="event.stopPropagation()">
+      <div class="modal-header">
+        <div class="modal-title">${title || 'Demo'}</div>
+        <button class="modal-close" onclick="closeGifModal()">×</button>
+      </div>
+      <div style="padding:16px;text-align:center">
+        <img src="${url}" style="max-width:100%;border-radius:10px;display:block" alt="Exercise demo">
+      </div>
+    </div>`;
+  el.addEventListener('click', closeGifModal);
+  document.body.appendChild(el);
+}
+
+function closeGifModal() {
+  const el = document.getElementById('gif-modal-overlay');
+  if (!el) return;
+  el.classList.remove('gif-in');
+  el.classList.add('gif-out');
+  el.querySelector('.gif-card')?.classList.replace('gif-in', 'gif-out');
+  setTimeout(() => el.remove(), 230);
+}
 
 function setRep(i, s, v) { S.logs[i].repsPerSet[s] = v; saveProgress(); }
 function setNote(i, v) { S.logs[i].notes = v; saveProgress(); }
@@ -2917,7 +2993,7 @@ function renderSuccess() {
 
   app.innerHTML = `
   <div class="success-screen">
-    <div class="check">${prEntries.length ? '🏆' : '🎉'}</div>
+    <div class="check check-pop">${prEntries.length ? '🏆' : '🎉'}</div>
     <h2>${prEntries.length ? `${prEntries.length} New PR${prEntries.length > 1 ? 's' : ''}!` : 'Workout Logged!'}</h2>
     <p>Your ${S.workout.name} has been saved to Google Sheets. Great work${S.user === 'josh' ? ', Josh' : ''}!</p>
     ${renderXPCard()}
