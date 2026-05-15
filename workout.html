@@ -3260,7 +3260,8 @@ function deleteReceivedMsg(key) {
 
 function checkAndShowDedicationPopup(user) {
   gasReadAll(MESSAGES_SHEET).then(rows => {
-    const lastRead = localStorage.getItem(`lastRead_${user}`) || '0000-00-00 00:00';
+    const storageKey = `shownPopups_${user}`;
+    const shown = new Set(JSON.parse(localStorage.getItem(storageKey) || '[]'));
     const unread = [];
     rows.forEach(row => {
       const date = normDateStr(String(row[0] || ''));
@@ -3268,12 +3269,13 @@ function checkAndShowDedicationPopup(user) {
       const to   = String(row[3] || '').trim().toLowerCase();
       const text = String(row[4] || '').trim();
       if (to !== user || !date || !text) return;
-      const sentAt = `${date} ${time}`;
-      if (sentAt > lastRead) unread.push({ date, time, from: String(row[2]||'').trim(), text });
+      const from = String(row[2] || '').trim();
+      const key  = `${date}|${time}|${from}|${text.slice(0, 60)}`;
+      if (!shown.has(key)) unread.push({ date, time, from, text, key });
     });
     if (unread.length) {
-      const nowStamp = `${localDateStr(new Date())} ${new Date().toTimeString().slice(0,5)}`;
-      localStorage.setItem(`lastRead_${user}`, nowStamp);
+      unread.forEach(m => shown.add(m.key));
+      localStorage.setItem(storageKey, JSON.stringify([...shown]));
       setTimeout(() => showDedicationPopup(unread, user), 400);
     }
   }).catch(() => {});
