@@ -2035,6 +2035,7 @@ function res(data) {
 }`;
 
 function renderSetup() {
+  stopMessagePolling();
   app.innerHTML = `
   <div class="header" style="border-bottom:none"><div></div>${themeBtn()}</div>
   <div class="setup">
@@ -2082,6 +2083,7 @@ function trySkip() {
 
 // ---- USER SELECT ----
 function renderUserSelect() {
+  stopMessagePolling();
   if (S.streaks.josh === null && !S.streaksLoading) loadStreaks();
 
   function streakHTML(user) {
@@ -2183,6 +2185,7 @@ function selectUser(who) {
   S.screen = 'week';
   render();
   checkAndShowDedicationPopup(who);
+  startMessagePolling(who);
 }
 
 // ---- WEEK VIEW ----
@@ -2656,6 +2659,20 @@ function clearProgress() {
 // allows it. We keep one instance alive and reuse it for every alarm.
 let _audioCtx = null;
 let _audioKeepAlive = null;
+let _msgPollInterval = null;
+
+function startMessagePolling(user) {
+  stopMessagePolling();
+  _msgPollInterval = setInterval(() => {
+    if (S.user === user && S.screen !== 'setup' && S.screen !== 'user') {
+      checkAndShowDedicationPopup(user);
+    }
+  }, 30000);
+}
+
+function stopMessagePolling() {
+  if (_msgPollInterval) { clearInterval(_msgPollInterval); _msgPollInterval = null; }
+}
 
 function ensureAudioCtx() {
   try {
@@ -3253,9 +3270,10 @@ function checkAndShowDedicationPopup(user) {
 }
 
 function showDedicationPopup(messages, user) {
+  if (document.querySelector('.dedication-popup')) return;
   const fromName = user === 'josh' ? 'Wife' : 'Josh';
   const el = document.createElement('div');
-  el.className = 'badge-notif-overlay';
+  el.className = 'badge-notif-overlay dedication-popup';
   const msgsHTML = messages.map(m => `
     <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:8px;text-align:left">
       <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${m.date}${m.time ? ' · ' + m.time : ''}</div>
