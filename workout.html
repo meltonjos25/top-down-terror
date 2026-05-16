@@ -2111,12 +2111,12 @@ function saveGasUrl() {
   S.gasUrl = v;
   localStorage.setItem('gasUrl', v);
   S.error = '';
-  _exitSplash(() => { S.screen = 'user'; render(); });
+  _exitSplash(() => goUserSelect());
 }
 
 function trySkip() {
   if (!S.gasUrl) { S.error = 'No URL saved yet. Complete the steps above.'; render(); return; }
-  _exitSplash(() => { S.screen = 'user'; render(); });
+  _exitSplash(() => goUserSelect());
 }
 
 function _exitSplash(cb) {
@@ -2128,10 +2128,15 @@ function _exitSplash(cb) {
   } else { cb(); }
 }
 
+function goUserSelect() { _userCardAnim = true; S.screen = 'user'; render(); }
+
 // ---- USER SELECT ----
 function renderUserSelect() {
   stopMessagePolling();
   if (S.streaks.josh === null && !S.streaksLoading) loadStreaks();
+  const _anim1 = _userCardAnim ? 'card-enter-1' : '';
+  const _anim2 = _userCardAnim ? 'card-enter-2' : '';
+  _userCardAnim = false;
 
   function streakHTML(user) {
     const n = S.streaks[user];
@@ -2177,7 +2182,7 @@ function renderUserSelect() {
       <div class="quote-text">"${q.text}"</div>
       <div class="quote-author">— ${q.author}</div>
     </div>
-    <div class="user-card card-enter-1" onclick="selectUser('josh')">
+    <div class="user-card ${_anim1}" onclick="selectUser('josh')">
       <div style="display:flex;align-items:center;justify-content:center;gap:8px">
         <div class="icon" style="margin:0">💪</div>
         ${S.champion==='josh' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
@@ -2187,7 +2192,7 @@ function renderUserSelect() {
       ${streakHTML('josh')}
       ${xpBarHTML('josh')}
     </div>
-    <div class="user-card card-enter-2" onclick="selectUser('wife')">
+    <div class="user-card ${_anim2}" onclick="selectUser('wife')">
       <div style="display:flex;align-items:center;justify-content:center;gap:8px">
         <div class="icon" style="margin:0">🌟</div>
         ${S.champion==='wife' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
@@ -2361,7 +2366,7 @@ function renderWeek() {
   app.innerHTML = `
   <div class="header">
     <div class="header-title">${S.user === 'wife' ? '🏋️‍♀️' : '🏋️'} ${userName}</div>
-    <div class="header-right">${themeBtn()}<button class="header-user" onclick="S.screen='user';render()">Switch</button></div>
+    <div class="header-right">${themeBtn()}<button class="header-user" onclick="goUserSelect()">Switch</button></div>
   </div>
   <div class="body">${bodyContent}</div>
   ${renderNavBar()}`;
@@ -2745,6 +2750,7 @@ function clearProgress() {
 // allows it. We keep one instance alive and reuse it for every alarm.
 let _audioCtx = null;
 let _audioKeepAlive = null;
+let _userCardAnim = false; // true only on the first render after navigating to the user screen
 let _silenceSource = null;   // looping silent buffer — holds iOS from suspending AudioContext
 let _msgPollInterval = null;
 
@@ -3542,7 +3548,7 @@ function renderRecordsBody() {
 // ═══════════════════════════════════════════════
 window.addEventListener('load', () => {
   applyTheme(localStorage.getItem('theme') || 'dark');
-  if (S.gasUrl) S.screen = 'user';
+  if (S.gasUrl) { _userCardAnim = true; S.screen = 'user'; }
   render();
 });
 </script>
