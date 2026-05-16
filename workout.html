@@ -2745,6 +2745,7 @@ function clearProgress() {
 // allows it. We keep one instance alive and reuse it for every alarm.
 let _audioCtx = null;
 let _audioKeepAlive = null;
+let _silenceSource = null;   // looping silent buffer — holds iOS from suspending AudioContext
 let _msgPollInterval = null;
 
 function startMessagePolling(user) {
@@ -2768,9 +2769,21 @@ function ensureAudioCtx() {
   return _audioCtx;
 }
 
-// Plays a near-silent 10ms tone every 20s to prevent iOS from suspending the AudioContext mid-timer
+// Keeps iOS from suspending AudioContext during a timer:
+// 1. A continuously looping silent buffer (primary — holds the graph active with no gaps)
+// 2. A periodic inaudible oscillator every 20s (belt-and-suspenders)
 function startAudioKeepAlive() {
   stopAudioKeepAlive();
+  if (_audioCtx) {
+    try {
+      const buf = _audioCtx.createBuffer(1, 512, _audioCtx.sampleRate);
+      _silenceSource = _audioCtx.createBufferSource();
+      _silenceSource.buffer = buf;
+      _silenceSource.loop = true;
+      _silenceSource.connect(_audioCtx.destination);
+      _silenceSource.start();
+    } catch(e) { _silenceSource = null; }
+  }
   _audioKeepAlive = setInterval(() => {
     if (!_audioCtx) return;
     try {
@@ -2788,6 +2801,10 @@ function startAudioKeepAlive() {
 
 function stopAudioKeepAlive() {
   if (_audioKeepAlive) { clearInterval(_audioKeepAlive); _audioKeepAlive = null; }
+  if (_silenceSource) {
+    try { _silenceSource.stop(); _silenceSource.disconnect(); } catch(e) {}
+    _silenceSource = null;
+  }
 }
 
 function playAlarm() {
@@ -2849,7 +2866,6 @@ function timerToggle() {
         }
         if (S.timerSec <= 0) {
           clearInterval(S.timerInterval);
-          stopAudioKeepAlive();
           S.timerRunning = false;
           S.timerSec = 0;
           const d = document.querySelector('.timer-display');
@@ -2857,6 +2873,8 @@ function timerToggle() {
           const btn = document.querySelector('.timer-btn');
           if (btn) btn.textContent = '▶ Start';
           playAlarm();
+          // Stop keep-alive AFTER alarm so the silent buffer stays connected while the alarm plays
+          setTimeout(stopAudioKeepAlive, 6000);
           return;
         }
       } else {
