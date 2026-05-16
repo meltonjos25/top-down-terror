@@ -281,7 +281,7 @@ input.field::placeholder{color:var(--muted)}
 /* ── Transition animations ── */
 @keyframes splashIn    { from{opacity:0;transform:scale(.94) translateY(10px)} to{opacity:1;transform:none} }
 @keyframes splashOut   { to{opacity:0;transform:translateY(-22px)} }
-@keyframes cardUp      { from{opacity:0;transform:translateY(22px)} to{opacity:1;transform:none} }
+@keyframes cardUp      { from{opacity:0;transform:translateY(40px)} to{opacity:1;transform:none} }
 @keyframes slideInRight{ from{opacity:0;transform:translateX(18px)} to{opacity:1;transform:none} }
 @keyframes sheetUp     { from{opacity:0;transform:translateY(52px)} to{opacity:1;transform:none} }
 @keyframes sheetDown   { to{opacity:0;transform:translateY(52px)} }
@@ -292,8 +292,8 @@ input.field::placeholder{color:var(--muted)}
 @keyframes checkBounce { 0%{transform:scale(0);opacity:0} 55%{transform:scale(1.3)} 78%{transform:scale(.9)} 92%{transform:scale(1.07)} 100%{transform:scale(1);opacity:1} }
 .splash-enter { animation:splashIn .42s cubic-bezier(.22,1,.36,1) both }
 .splash-exit  { animation:splashOut .28s ease-in forwards }
-.card-enter-1 { animation:cardUp .36s cubic-bezier(.22,1,.36,1) .04s both }
-.card-enter-2 { animation:cardUp .36s cubic-bezier(.22,1,.36,1) .16s both }
+.card-enter-1 { animation:cardUp .75s cubic-bezier(.25,.46,.45,.94) .08s both }
+.card-enter-2 { animation:cardUp .75s cubic-bezier(.25,.46,.45,.94) .28s both }
 .screen-enter { animation:slideInRight .3s cubic-bezier(.22,1,.36,1) both }
 .modal-overlay.sheet-enter          { animation:fadeIn  .25s ease both }
 .modal-overlay.sheet-enter .modal   { animation:sheetUp .32s cubic-bezier(.22,1,.36,1) both }
