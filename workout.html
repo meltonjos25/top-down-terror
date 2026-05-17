@@ -279,8 +279,8 @@ input.field::placeholder{color:var(--muted)}
 @keyframes bslideup{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
 
 /* ── Intro video screen ── */
-.intro-screen{position:fixed;inset:0;background:#000;z-index:9999;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.intro-screen video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.intro-screen{position:fixed;inset:0;background:#fff;z-index:9999;cursor:pointer;-webkit-tap-highlight-color:transparent;overflow:hidden}
+.intro-screen video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;transform:scale(1.1)}
 @keyframes introFadeOut{to{opacity:0}}
 .intro-screen.fading{animation:introFadeOut .4s ease forwards;pointer-events:none}
 
