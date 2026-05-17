@@ -1907,18 +1907,37 @@ async function fetchPlan(user, day) {
   const meta = PLAN_SHEETS[user][day];
   if (!meta) return null; // rest day
 
-  // Use local conjugate data for CORE (both users) and ARMS (Josh only)
+  // Conjugate workouts: warm-up and cool-down come from GAS; working blocks from local data
   const conjType = CONJUGATE_EXERCISES[user]?.[meta.type] ? meta.type : null;
   if (conjType) {
     const dateStr = S.selectedDate ? localDateStr(S.selectedDate) : localDateStr(new Date());
     const blockInfo = getConjugateBlock(dateStr);
     if (blockInfo) {
-      const exercises = CONJUGATE_EXERCISES[user][conjType][blockInfo.num] || [];
-      return { ...meta, exercises, blockInfo };
+      const conjExercises = CONJUGATE_EXERCISES[user][conjType][blockInfo.num] || [];
+      const conjWorking = conjExercises.filter(ex => ex.block !== 'Warm-Up' && ex.block !== 'Cool-Down');
+
+      // Fetch GAS for warm-up and cool-down; silently fall back if unavailable
+      let gasWarmUp = [], gasCoolDown = [];
+      try {
+        const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
+        const r = await fetch(url);
+        if (r.ok) {
+          const json = await r.json();
+          if (!json.error && Array.isArray(json.exercises)) {
+            gasWarmUp   = json.exercises.filter(ex => ex.block === 'Warm-Up');
+            gasCoolDown = json.exercises.filter(ex => ex.block === 'Cool-Down');
+          }
+        }
+      } catch(e) {}
+
+      // Fall back to conjugate warm-up if GAS returned nothing
+      const warmUp  = gasWarmUp.length  ? gasWarmUp  : conjExercises.filter(ex => ex.block === 'Warm-Up');
+      const coolDown = gasCoolDown.length ? gasCoolDown : [];
+      return { ...meta, exercises: [...warmUp, ...conjWorking, ...coolDown], blockInfo };
     }
   }
 
-  // Fall back to GAS (wife's BANDS workouts)
+  // GAS-only workouts (wife's BANDS)
   const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
   const r = await fetch(url);
   if (!r.ok) throw new Error(`Could not load workout plan (${r.status})`);
