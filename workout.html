@@ -1912,6 +1912,15 @@ async function fetchPlan(user, day) {
   if (conjType) {
     const dateStr = S.selectedDate ? localDateStr(S.selectedDate) : localDateStr(new Date());
     const blockInfo = getConjugateBlock(dateStr);
+    // Block 1: use sheets as-is so current exercises stay unchanged through the end of the phase
+    if (blockInfo && blockInfo.num === 1) {
+      const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
+      const r = await fetch(url);
+      if (!r.ok) throw new Error(`Could not load workout plan (${r.status})`);
+      const json = await r.json();
+      if (json.error) throw new Error(json.error);
+      return { ...meta, exercises: json.exercises, blockInfo };
+    }
     if (blockInfo) {
       const conjExercises = CONJUGATE_EXERCISES[user][conjType][blockInfo.num] || [];
       const conjWorking = conjExercises.filter(ex => ex.block !== 'Warm-Up' && ex.block !== 'Cool-Down');
