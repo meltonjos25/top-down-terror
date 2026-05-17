@@ -319,7 +319,7 @@ input.field::placeholder{color:var(--muted)}
 .bt-track{display:flex;gap:5px}
 .bt-block{flex:1;background:var(--card);border-radius:8px;padding:7px 4px;text-align:center;border:1.5px solid transparent;transition:border-color .2s,background .2s}
 .bt-block.bt-active{border-color:var(--bc);background:rgba(128,128,128,.12)}
-.bt-num{font-size:11px;font-weight:700;color:var(--muted)}
+.bt-num{font-size:10px;font-weight:700;color:var(--muted)}
 .bt-sub{font-size:9px;color:var(--muted);margin-top:2px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bt-block.bt-active .bt-num,.bt-block.bt-active .bt-sub{color:var(--bc)}
 .bt-info{font-size:12px;color:var(--muted);margin-top:8px;text-align:center}
@@ -893,7 +893,7 @@ function blockTimelineHTML() {
     var a = tb.num === b.num;
     return '<div class="bt-block' + (a ? ' bt-active' : '') +
       '" style="--bc:' + b.color + '"><div class="bt-num" style="color:' +
-      (a ? b.color : 'var(--muted)') + '">B' + b.num +
+      (a ? b.color : 'var(--muted)') + '">Phase ' + b.num +
       '</div><div class="bt-sub" style="color:' +
       (a ? b.color : 'var(--muted)') + '">' + b.tag + '</div></div>';
   }).join('');
