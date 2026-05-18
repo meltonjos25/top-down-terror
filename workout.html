@@ -3366,7 +3366,7 @@ function renderWeekBody() {
       </div>
     </div>`;
   });
-  var _wkBanner = blockBannerHTML(todayStr);
+  var _wkBanner = blockBannerHTML(localDateStr(first));
   return `
   <div class="week-nav">
     <button class="week-nav-btn" onclick="S.weekOffset--;render()">‹</button>
