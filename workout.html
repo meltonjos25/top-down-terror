@@ -637,7 +637,7 @@ function bodyDiagramSVG(primary, secondary) {
 // Remove an entry once the badge is legitimately re-earned and no longer needs overriding.
 // ═══════════════════════════════════════════════
 const BADGE_OVERRIDES = {
-  josh: {
+  husband: {
     prs_5:  '2026-05-11',  // corrected — 5th real PR was May 11, not May 4
     prs_10: null,           // block until legitimately earned — remove this line when ready
     prs_25: null,           // block until legitimately earned — remove this line when ready
@@ -667,7 +667,7 @@ function applyBadgeOverrides(user, earned) {
 //   Day | Block | Exercise | Sets | Target Reps/Time | Demo Link | Coaching Note
 // ═══════════════════════════════════════════════
 const PLAN_SHEETS = {
-  josh: {
+  husband: {
     Monday:    { sheet: 'Husband — Core', name: 'Core Workout A',  type: 'CORE', duration: '30 min' },
     Tuesday:   { sheet: 'Husband — Arms', name: 'Arms Workout A',  type: 'ARMS', duration: '30 min' },
     Wednesday: { sheet: 'Husband — Core', name: 'Core Workout B',  type: 'CORE', duration: '30 min' },
@@ -728,7 +728,7 @@ const _cex = (name, sets, target, wblock, note = '') =>
   ({ block: wblock, name, sets, target, demo: '', note });
 
 const CONJUGATE_EXERCISES = {
-  josh: {
+  husband: {
     CORE: {
       1: {
         Monday: [
@@ -1684,7 +1684,7 @@ function isPlanActive(entry, dateStr) {
 const S = {
   screen: 'setup',    // setup | user | week | loading | workout | summary | uploading | success
   gasUrl: localStorage.getItem('gasUrl') || '',
-  user: null,          // 'josh' | 'wife'
+  user: null,          // 'husband' | 'wife'
   day: null,
   selectedDate: null,  // Date object for the workout being logged
   weekOffset: 0,       // weeks relative to current week (0 = this week)
@@ -1694,7 +1694,7 @@ const S = {
   history: [],
   modal: null,
   prs: {},         // exerciseName → { value, prevBest, unit } for PRs hit this session
-  streaks: { josh: null, wife: null },
+  streaks: { husband: null, wife: null },
   streaksLoading: false,
   weekDurations: {},        // dateStr → formatted duration for completed workouts
   weekDurationsLoaded: false,
@@ -1713,19 +1713,19 @@ const S = {
   recordsLoading: false,
   recordsLoaded: false,
   allTimeRecords: {},
-  togetherRecords: null,       // { combinedTotal, joshTotal, wifeTotal, currentStreak, bestStreak }
+  togetherRecords: null,       // { combinedTotal, husbandTotal, wifeTotal, currentStreak, bestStreak }
   togetherRecordsLoading: false,
   togetherRecordsLoaded: false,
   badges: {},           // user → { badgeId: 'YYYY-MM-DD' }
   badgesLoaded: false,
-  champion: null,       // 'josh' | 'wife' | 'tie' | null (last month winner)
+  champion: null,       // 'husband' | 'wife' | 'tie' | null (last month winner)
   messages: null,       // { sent: [], received: [] } once loaded
   messagesLoading: false,
   messagesLoaded: false,
   messageDraft: '',
   messageSending: false,
   messageSendError: '',
-  xp: { josh: null, wife: null },
+  xp: { husband: null, wife: null },
   lastXPEarned: 0,
   levelUpInfo: null,    // { level, title } while on success screen
   error: '',
@@ -2113,9 +2113,9 @@ function computeBadgesFromRows(user, rows, dateSet) {
 }
 
 // ── Duo badge computation (runs with both users' data) ──────────────────
-function computeDuoBadges(joshDates, wifeDates, joshRows, wifeRows) {
+function computeDuoBadges(husbandDates, wifeDates, husbandRows, wifeRows) {
   const todayStr = localDateStr(new Date());
-  const jSorted  = [...joshDates].sort();
+  const jSorted  = [...husbandDates].sort();
   const wSorted  = [...wifeDates].sort();
   const earned   = {};
 
@@ -2135,9 +2135,9 @@ function computeDuoBadges(joshDates, wifeDates, joshRows, wifeRows) {
   if (jNY && wNY) earned.duo_new_year = [jNY, wNY].sort().pop();
 
   // Both 7-day and 30-day streaks simultaneously
-  const j7  = findStreakEarnedDate('josh', joshDates, 7);
+  const j7  = findStreakEarnedDate('husband', husbandDates, 7);
   const w7  = findStreakEarnedDate('wife', wifeDates, 7);
-  const j30 = findStreakEarnedDate('josh', joshDates, 30);
+  const j30 = findStreakEarnedDate('husband', husbandDates, 30);
   const w30 = findStreakEarnedDate('wife', wifeDates, 30);
   if (j7  && w7)  earned.duo_streak_7_sync = [j7,  w7].sort().pop();
   if (j30 && w30) earned.duo_streak_30     = [j30, w30].sort().pop();
@@ -2186,7 +2186,7 @@ function computeDuoBadges(joshDates, wifeDates, joshRows, wifeRows) {
   iterateWeeks(wm => {
     if (earned.duo_perfect_week && earned.duo_no_miss_2wks) return;
     const lastDay = localDateStr(new Date(wm.getTime() + 6 * 86400000));
-    if (weekOkFor('josh', wm, joshDates) && weekOkFor('wife', wm, wifeDates)) {
+    if (weekOkFor('husband', wm, husbandDates) && weekOkFor('wife', wm, wifeDates)) {
       if (!earned.duo_perfect_week) earned.duo_perfect_week = lastDay;
       consecGood++;
       if (consecGood >= 2 && !earned.duo_no_miss_2wks) earned.duo_no_miss_2wks = lastDay;
@@ -2210,13 +2210,13 @@ function computeDuoBadges(joshDates, wifeDates, joshRows, wifeRows) {
     for (let d = 1; d <= totalDays; d++) {
       const date = new Date(year, month, d);
       const dStr = localDateStr(date);
-      const jSched = PLAN_SHEETS['josh'][dateDay(date)] !== null;
+      const jSched = PLAN_SHEETS['husband'][dateDay(date)] !== null;
       const wSched = PLAN_SHEETS['wife'][dateDay(date)] !== null;
-      if (jSched) { jHas = true; if (!joshDates.has(dStr)) jAllOk = false; else jLast = dStr; }
+      if (jSched) { jHas = true; if (!husbandDates.has(dStr)) jAllOk = false; else jLast = dStr; }
       if (wSched) { wHas = true; if (!wifeDates.has(dStr)) wAllOk = false; else wLast = dStr; }
       if (jSched && wSched) {
         hasShared = true;
-        if (!joshDates.has(dStr) || !wifeDates.has(dStr)) sharedOk = false;
+        if (!husbandDates.has(dStr) || !wifeDates.has(dStr)) sharedOk = false;
         else sharedLast = dStr;
       }
     }
@@ -2236,7 +2236,7 @@ function computeDuoBadges(joshDates, wifeDates, joshRows, wifeRows) {
     });
     return map;
   }
-  const jTimes = buildTimeMap(joshRows);
+  const jTimes = buildTimeMap(husbandRows);
   const wTimes = buildTimeMap(wifeRows);
 
   for (const d of allBothDates.sort()) {
@@ -2375,10 +2375,10 @@ function calcStreak(user, loggedDates) {
 
 function isBothScheduled(d) {
   const day = dateDay(d);
-  return PLAN_SHEETS.josh[day] !== null && PLAN_SHEETS.wife[day] !== null;
+  return PLAN_SHEETS.husband[day] !== null && PLAN_SHEETS.wife[day] !== null;
 }
 
-function calcCurrentCombinedStreak(joshDates, wifeDates) {
+function calcCurrentCombinedStreak(husbandDates, wifeDates) {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   const todayStr = localDateStr(d);
@@ -2390,7 +2390,7 @@ function calcCurrentCombinedStreak(joshDates, wifeDates) {
       d.setDate(d.getDate() - 1);
       continue;
     }
-    const jLogged = joshDates.has(dStr);
+    const jLogged = husbandDates.has(dStr);
     const wLogged = wifeDates.has(dStr);
     if (jLogged && wLogged) {
       streak++;
@@ -2404,8 +2404,8 @@ function calcCurrentCombinedStreak(joshDates, wifeDates) {
   return streak;
 }
 
-function calcBestCombinedStreak(joshDates, wifeDates) {
-  const allDates = [...new Set([...joshDates, ...wifeDates])].sort();
+function calcBestCombinedStreak(husbandDates, wifeDates) {
+  const allDates = [...new Set([...husbandDates, ...wifeDates])].sort();
   if (!allDates.length) return 0;
   const start = new Date(allDates[0] + 'T00:00:00');
   const end = new Date();
@@ -2415,7 +2415,7 @@ function calcBestCombinedStreak(joshDates, wifeDates) {
   while (d <= end) {
     if (isBothScheduled(d)) {
       const dStr = localDateStr(d);
-      const bothLogged = joshDates.has(dStr) && wifeDates.has(dStr);
+      const bothLogged = husbandDates.has(dStr) && wifeDates.has(dStr);
       if (bothLogged) {
         current++;
         if (current > best) best = current;
@@ -2432,20 +2432,20 @@ async function loadStreaks() {
   if (S.streaksLoading) return;
   S.streaksLoading = true;
   try {
-    const [joshRows, wifeRows, joshXPRows, wifeXPRows] = await Promise.all([
+    const [husbandRows, wifeRows, husbandXPRows, wifeXPRows] = await Promise.all([
       gasRead(HUSBAND_LOG_SHEET),
       gasRead(WIFE_LOG_SHEET),
       gasRead(HUSBAND_XP_SHEET),
       gasRead(WIFE_XP_SHEET)
     ]);
-    const joshDates = new Set(joshRows.map(r => normDateStr(r[0])).filter(Boolean));
+    const husbandDates = new Set(husbandRows.map(r => normDateStr(r[0])).filter(Boolean));
     const wifeDates = new Set(wifeRows.map(r => normDateStr(r[0])).filter(Boolean));
-    S.streaks.josh = calcStreak('josh', joshDates);
+    S.streaks.husband = calcStreak('husband', husbandDates);
     S.streaks.wife = calcStreak('wife', wifeDates);
 
     // Compute XP totals; retroactively initialize if XP sheet is empty
     const todayStr = localDateStr(new Date());
-    [['josh', joshXPRows, joshDates, HUSBAND_XP_SHEET],
+    [['husband', husbandXPRows, husbandDates, HUSBAND_XP_SHEET],
      ['wife', wifeXPRows, wifeDates, WIFE_XP_SHEET]].forEach(([user, xpRows, dates, sheet]) => {
       if (xpRows.length > 0) {
         S.xp[user] = xpRows.reduce((sum, r) => sum + (parseFloat(r[2]) || 0), 0);
@@ -2459,8 +2459,8 @@ async function loadStreaks() {
     });
 
     // Compute duo badges (shown for both users)
-    const duoBadges = computeDuoBadges(joshDates, wifeDates, joshRows, wifeRows);
-    ['josh', 'wife'].forEach(user => {
+    const duoBadges = computeDuoBadges(husbandDates, wifeDates, husbandRows, wifeRows);
+    ['husband', 'wife'].forEach(user => {
       if (!S.badges[user]) S.badges[user] = {};
       Object.assign(S.badges[user], duoBadges);
     });
@@ -2468,7 +2468,7 @@ async function loadStreaks() {
     // Level badges — award based on current XP total
     function levelBadgeDate(user) {
       // Find the XP row where cumulative XP crossed each level threshold
-      const xpRows = user === 'josh' ? joshXPRows : wifeXPRows;
+      const xpRows = user === 'husband' ? husbandXPRows : wifeXPRows;
       const levels = [10, 25, 50, 75, 100];
       const result = {};
       let cumXP = 0;
@@ -2485,7 +2485,7 @@ async function loadStreaks() {
       }
       return result;
     }
-    ['josh','wife'].forEach(user => {
+    ['husband','wife'].forEach(user => {
       const lvBadges = levelBadgeDate(user);
       if (!S.badges[user]) S.badges[user] = {};
       Object.assign(S.badges[user], lvBadges);
@@ -2495,11 +2495,11 @@ async function loadStreaks() {
     const now = new Date();
     const lastMonthYM = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const lastYM = `${lastMonthYM.getFullYear()}-${String(lastMonthYM.getMonth()+1).padStart(2,'0')}`;
-    const jCount = [...joshDates].filter(d => d.startsWith(lastYM)).length;
+    const husbandCount = [...husbandDates].filter(d => d.startsWith(lastYM)).length;
     const wCount = [...wifeDates].filter(d => d.startsWith(lastYM)).length;
-    if (jCount > 0 || wCount > 0) {
-      if (jCount > wCount) S.champion = 'josh';
-      else if (wCount > jCount) S.champion = 'wife';
+    if (husbandCount > 0 || wCount > 0) {
+      if (husbandCount > wCount) S.champion = 'husband';
+      else if (wCount > husbandCount) S.champion = 'wife';
       else S.champion = 'tie';
     } else {
       S.champion = null;
@@ -2512,9 +2512,9 @@ async function loadStreaks() {
     }
 
   } catch(e) {
-    S.streaks.josh = 0;
+    S.streaks.husband = 0;
     S.streaks.wife = 0;
-    S.xp.josh = 0;
+    S.xp.husband = 0;
     S.xp.wife = 0;
   }
   S.streaksLoading = false;
@@ -2525,8 +2525,8 @@ async function loadWeekDurations() {
   if (S.weekDurationsLoaded) return;
   S.weekDurationsLoaded = true;
   try {
-    const logSheet = S.user === 'josh' ? HUSBAND_LOG_SHEET : WIFE_LOG_SHEET;
-    const prSheet  = S.user === 'josh' ? HUSBAND_PR_HISTORY_SHEET : WIFE_PR_HISTORY_SHEET;
+    const logSheet = S.user === 'husband' ? HUSBAND_LOG_SHEET : WIFE_LOG_SHEET;
+    const prSheet  = S.user === 'husband' ? HUSBAND_PR_HISTORY_SHEET : WIFE_PR_HISTORY_SHEET;
     const [rows, prHistRows] = await Promise.all([gasRead(logSheet), gasRead(prSheet).catch(() => [])]);
     const map = {};
     const dateSet = new Set();
@@ -2726,7 +2726,7 @@ async function fetchPlan(user, day) {
 
 async function loadHistory() {
   try {
-    const sheet = S.user === 'josh' ? HUSBAND_LOG_SHEET : WIFE_LOG_SHEET;
+    const sheet = S.user === 'husband' ? HUSBAND_LOG_SHEET : WIFE_LOG_SHEET;
     S.history = await gasRead(sheet);
   } catch(e) { S.history = []; }
 }
@@ -2736,7 +2736,7 @@ async function submitWorkout() {
   S.screen = 'uploading';
   render();
   try {
-    const sheet = S.user === 'josh' ? HUSBAND_LOG_SHEET : WIFE_LOG_SHEET;
+    const sheet = S.user === 'husband' ? HUSBAND_LOG_SHEET : WIFE_LOG_SHEET;
     const dateStr = localDateStr(S.selectedDate || new Date());
     const durationStr = fmtDuration(S.workoutDuration);
     const timeStr = new Date().toTimeString().slice(0,5); // "HH:MM"
@@ -2761,7 +2761,7 @@ async function submitWorkout() {
 
     // Write PR history (for "PR 3 weeks in a row" badge tracking)
     if (Object.keys(S.prs).length > 0) {
-      const prSheet = S.user === 'josh' ? HUSBAND_PR_HISTORY_SHEET : WIFE_PR_HISTORY_SHEET;
+      const prSheet = S.user === 'husband' ? HUSBAND_PR_HISTORY_SHEET : WIFE_PR_HISTORY_SHEET;
       const prRows = Object.keys(S.prs).map(name => [dateStr, name, S.prs[name].value || '']);
       gasWrite(prSheet, prRows).catch(() => {});
     }
@@ -2780,7 +2780,7 @@ async function submitWorkout() {
     const newLevel  = levelFromXP(S.xp[S.user]);
     S.levelUpInfo   = newLevel > prevLevel ? { level: newLevel, title: getLevelTitle(newLevel) } : null;
     const xpNote = `${exercisesDone} ex${prCount > 0 ? `, ${prCount} PR` : ''}${(S.streaks[S.user]||0) >= 7 ? ', streak' : ''}`;
-    gasWrite(S.user === 'josh' ? HUSBAND_XP_SHEET : WIFE_XP_SHEET,
+    gasWrite(S.user === 'husband' ? HUSBAND_XP_SHEET : WIFE_XP_SHEET,
       [[dateStr, S.workout.name, xpEarned, xpNote]]).catch(() => {});
 
     S.togetherRecordsLoaded = false;
@@ -3185,7 +3185,7 @@ function goUserSelect() { _userCardAnim = true; S.screen = 'user'; render(); }
 // ---- USER SELECT ----
 function renderUserSelect() {
   stopMessagePolling();
-  if (S.streaks.josh === null && !S.streaksLoading) loadStreaks();
+  if (S.streaks.husband === null && !S.streaksLoading) loadStreaks();
   const _anim1 = _userCardAnim ? 'card-enter-1' : '';
   const _anim2 = _userCardAnim ? 'card-enter-2' : '';
   _userCardAnim = false;
@@ -3231,15 +3231,15 @@ function renderUserSelect() {
       <div class="quote-author">— ${q.author}</div>
     </div>
     ${_tlHTML}
-    <div class="user-card ${_anim1}" onclick="selectUser('josh')">
+    <div class="user-card ${_anim1}" onclick="selectUser('husband')">
       <div style="display:flex;align-items:center;justify-content:center;gap:8px">
         <div class="icon" style="margin:0">💪</div>
-        ${S.champion==='josh' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
+        ${S.champion==='husband' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
       </div>
       <h3>Husband</h3>
       <p>Core (Mon/Wed/Fri) · Arms (Tue/Thu/Sat)</p>
-      ${streakHTML('josh')}
-      ${xpBarHTML('josh')}
+      ${streakHTML('husband')}
+      ${xpBarHTML('husband')}
     </div>
     <div class="user-card ${_anim2}" onclick="selectUser('wife')">
       <div style="display:flex;align-items:center;justify-content:center;gap:8px">
@@ -3253,7 +3253,7 @@ function renderUserSelect() {
     </div>
   </div>`;
   setTimeout(function() {
-    ['josh','wife'].forEach(function(user) {
+    ['husband','wife'].forEach(function(user) {
       var el = document.getElementById('xp-bar-' + user);
       if (el) el.style.width = el.getAttribute('data-pct') + '%';
     });
@@ -3449,7 +3449,7 @@ function nextMonth() {
 
 function renderWeek() {
   if (!S.weekDurationsLoaded) loadWeekDurations();
-  const userName = S.user === 'josh' ? 'Husband' : 'Wife';
+  const userName = S.user === 'husband' ? 'Husband' : 'Wife';
   let bodyContent;
   if (S.navTab === 'calendar')  bodyContent = renderCalendarBody();
   else if (S.navTab === 'progress')  bodyContent = renderProgressBody();
@@ -4122,7 +4122,7 @@ function renderSuccess() {
   <div class="success-screen">
     <div class="check check-pop">${prEntries.length ? '🏆' : '🎉'}</div>
     <h2>${prEntries.length ? `${prEntries.length} New PR${prEntries.length > 1 ? 's' : ''}!` : 'Workout Logged!'}</h2>
-    <p>Your ${S.workout.name} has been saved to Google Sheets. Great work${S.user === 'josh' ? ', Husband' : ''}!</p>
+    <p>Your ${S.workout.name} has been saved to Google Sheets. Great work${S.user === 'husband' ? ', Husband' : ''}!</p>
     ${renderXPCard()}
     ${durHTML}
     ${prHTML}
@@ -4131,7 +4131,7 @@ function renderSuccess() {
 }
 
 function goHome() {
-  S.streaks = { josh: null, wife: null };
+  S.streaks = { husband: null, wife: null };
   S.streaksLoading = false;
   S.navTab = 'workout';
   S.recordsLoaded = false;
@@ -4139,7 +4139,7 @@ function goHome() {
   S.allTimeRecords = {};
   S.lastXPEarned = 0;
   S.levelUpInfo = null;
-  S.xp = { josh: null, wife: null };
+  S.xp = { husband: null, wife: null };
   S.screen = 'week';
   render();
 }
@@ -4256,7 +4256,7 @@ function renderBadgeGrid() {
   }).join('');
 
   // Birthday config section
-  const jBday = getBirthday('josh');
+  const jBday = getBirthday('husband');
   const wBday = getBirthday('wife');
   const bdaySection = `
   <div style="margin-top:28px;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px">
@@ -4264,9 +4264,9 @@ function renderBadgeGrid() {
     <div style="display:flex;flex-direction:column;gap:10px">
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:13px;width:48px;font-weight:600">Husband</span>
-        <input type="date" id="bday-josh" value="${jBday ? new Date().getFullYear() + '-' + jBday : ''}"
+        <input type="date" id="bday-husband" value="${jBday ? new Date().getFullYear() + '-' + jBday : ''}"
           style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;outline:none"
-          oninput="saveBday('josh',this.value)">
+          oninput="saveBday('husband',this.value)">
       </div>
       <div style="display:flex;align-items:center;gap:10px">
         <span style="font-size:13px;width:48px;font-weight:600">Wife</span>
@@ -4326,7 +4326,7 @@ async function sendDedicationMessage() {
   S.messageSendError = '';
   render();
   try {
-    const to      = S.user === 'josh' ? 'wife' : 'josh';
+    const to      = S.user === 'husband' ? 'wife' : 'husband';
     const dateStr = localDateStr(new Date());
     const timeStr = new Date().toTimeString().slice(0, 5);
     await gasWrite(MESSAGES_SHEET, [[dateStr, timeStr, S.user, to, text]]);
@@ -4344,7 +4344,7 @@ async function sendDedicationMessage() {
 function renderMessagesBody() {
   if (!S.messagesLoaded && !S.messagesLoading) loadMessages();
 
-  const otherName = S.user === 'josh' ? 'Wife' : 'Husband';
+  const otherName = S.user === 'husband' ? 'Wife' : 'Husband';
   const msgs = S.messages || { sent: [], received: [] };
 
   const composerHTML = `
@@ -4365,8 +4365,8 @@ function renderMessagesBody() {
 
   function msgCard(m, isSent) {
     const label = isSent
-      ? `To ${S.user === 'josh' ? 'Wife' : 'Husband'}`
-      : `From ${S.user === 'josh' ? 'Wife' : 'Husband'}`;
+      ? `To ${S.user === 'husband' ? 'Wife' : 'Husband'}`
+      : `From ${S.user === 'husband' ? 'Wife' : 'Husband'}`;
     const labelColor = isSent ? 'var(--blue)' : 'var(--accent)';
     const inner = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
@@ -4486,7 +4486,7 @@ function checkAndShowDedicationPopup(user) {
 
 function showDedicationPopup(messages, user) {
   if (document.querySelector('.dedication-popup')) return;
-  const fromName = user === 'josh' ? 'Wife' : 'Husband';
+  const fromName = user === 'husband' ? 'Wife' : 'Husband';
   const el = document.createElement('div');
   el.className = 'badge-notif-overlay dedication-popup';
   const msgsHTML = messages.map(m => `
@@ -4514,21 +4514,21 @@ async function loadTogetherRecords() {
   S.togetherRecordsLoading = true;
   render();
   try {
-    const [joshRows, wifeRows] = await Promise.all([
+    const [husbandRows, wifeRows] = await Promise.all([
       gasRead(HUSBAND_LOG_SHEET),
       gasRead(WIFE_LOG_SHEET)
     ]);
-    const joshDates = new Set(joshRows.map(r => normDateStr(r[0])).filter(Boolean));
+    const husbandDates = new Set(husbandRows.map(r => normDateStr(r[0])).filter(Boolean));
     const wifeDates = new Set(wifeRows.map(r => normDateStr(r[0])).filter(Boolean));
-    const joshTotal = joshDates.size;
+    const husbandTotal = husbandDates.size;
     const wifeTotal = wifeDates.size;
-    const combinedTotal = [...joshDates].filter(d => wifeDates.has(d)).length;
-    const currentStreak = calcCurrentCombinedStreak(joshDates, wifeDates);
-    const bestStreak = calcBestCombinedStreak(joshDates, wifeDates);
-    S.togetherRecords = { combinedTotal, joshTotal, wifeTotal, currentStreak, bestStreak };
+    const combinedTotal = [...husbandDates].filter(d => wifeDates.has(d)).length;
+    const currentStreak = calcCurrentCombinedStreak(husbandDates, wifeDates);
+    const bestStreak = calcBestCombinedStreak(husbandDates, wifeDates);
+    S.togetherRecords = { combinedTotal, husbandTotal, wifeTotal, currentStreak, bestStreak };
     S.togetherRecordsLoaded = true;
     const dateStr = localDateStr(new Date());
-    gasWrite(TOGETHER_RECORDS_SHEET, [[dateStr, joshTotal, wifeTotal, combinedTotal, currentStreak, bestStreak]]).catch(() => {});
+    gasWrite(TOGETHER_RECORDS_SHEET, [[dateStr, husbandTotal, wifeTotal, combinedTotal, currentStreak, bestStreak]]).catch(() => {});
   } catch(e) {}
   S.togetherRecordsLoading = false;
   render();
@@ -4540,7 +4540,7 @@ async function loadRecordsData() {
   S.recordsLoading = true;
   render();
   try {
-    const logSheet = S.user === 'josh' ? HUSBAND_LOG_SHEET : WIFE_LOG_SHEET;
+    const logSheet = S.user === 'husband' ? HUSBAND_LOG_SHEET : WIFE_LOG_SHEET;
     const logRows = await gasRead(logSheet);
 
     const TRACKED = new Set(['Max Plank Hold', 'Push-Up Burnout', 'Pike Push-Up Burnout']);
