@@ -690,18 +690,19 @@ const PLAN_SHEETS = {
 
 // ═══════════════════════════════════════════════
 // CONJUGATE TRAINING SYSTEM
-// 5 phases: 21/21/21/21/14 days = 98-day cycle, starting 2026-05-05
+// 5 phases: 21/21/21/21/21 days = 105-day cycle, starting 2026-05-04
+// Cycle order: Phase 5 (Culmination) → 1 → 2 → 3 → 4
 // ═══════════════════════════════════════════════
-const CONJUGATE_START = '2026-05-05';
+const CONJUGATE_START = '2026-05-04';
 
 const CONJUGATE_PHASE_META = [
+  { num: 5, name: 'Culmination', color: '#d4af37', tag: 'Culmination', weeks: 3, days: 21 },
   { num: 1, name: 'Stability',   color: '#58a6ff', tag: 'Stability',   weeks: 3, days: 21 },
   { num: 2, name: 'Strength',    color: '#f97316', tag: 'Strength',    weeks: 3, days: 21 },
   { num: 3, name: 'Power',       color: '#f85149', tag: 'Power',       weeks: 3, days: 21 },
   { num: 4, name: 'Unilateral',  color: '#a371f7', tag: 'Unilateral',  weeks: 3, days: 21 },
-  { num: 5, name: 'Culmination', color: '#d4af37', tag: 'Culmination', weeks: 2, days: 14 },
 ];
-const CONJUGATE_CYCLE_DAYS = 98;
+const CONJUGATE_CYCLE_DAYS = 105;
 
 function getConjugateBlock(dateStr) {
   const start  = new Date(CONJUGATE_START + 'T00:00:00');
@@ -710,7 +711,7 @@ function getConjugateBlock(dateStr) {
   if (diff < 0) return null;
   const cycle      = Math.floor(diff / CONJUGATE_CYCLE_DAYS) + 1;
   const dayInCycle = diff % CONJUGATE_CYCLE_DAYS;
-  const bounds     = [0, 21, 42, 63, 84, 98];
+  const bounds     = [0, 21, 42, 63, 84, 105];
   let phaseIdx = CONJUGATE_PHASE_META.length - 1;
   for (let i = 0; i < CONJUGATE_PHASE_META.length; i++) {
     if (dayInCycle < bounds[i + 1]) { phaseIdx = i; break; }
@@ -729,7 +730,56 @@ const _cex = (name, sets, target, wblock, note = '') =>
 const CONJUGATE_EXERCISES = {
   josh: {
     CORE: {
-      1: { Monday: [], Wednesday: [], Friday: [] },
+      1: {
+        Monday: [
+          _cex('Cat-Camel Stretch',              1, '10 reps',        'Warm-Up', ''),
+          _cex('Dead Bug Arms Only',             1, '10/side',        'Warm-Up', ''),
+          _cex('Glute Bridge',                   1, '15 reps',        'Warm-Up', ''),
+          _cex('Hip Flexor Lunge Stretch',       1, '30 sec/side',    'Warm-Up', ''),
+          _cex('RKC Plank',                      3, '45 sec',         'Block 1', ''),
+          _cex('Plank to Push-Up',               3, '10 reps',        'Block 1', ''),
+          _cex('Plank Shoulder Taps',            3, '12/side',        'Block 1', ''),
+          _cex('Dead Bug Full',                  3, '8/side',         'Block 2', ''),
+          _cex('Hollow Body Hold',               3, '35 sec',         'Block 2', ''),
+          _cex('Superman Hold',                  3, '30 sec',         'Block 2', ''),
+          _cex('Max Plank Hold',                 1, 'to failure',     'Finisher', ''),
+          _cex('Child\'s Pose',                  1, '45 sec',         'Cool-Down', ''),
+          _cex('Cobra Stretch',                  1, '30 sec',         'Cool-Down', ''),
+          _cex('Seated Spinal Twist',            1, '30 sec/side',    'Cool-Down', ''),
+        ],
+        Wednesday: [
+          _cex('Hip Circles',                    1, '10/direction',   'Warm-Up', ''),
+          _cex('Lying Knee Rocks',               1, '12 reps',        'Warm-Up', ''),
+          _cex('Glute Bridge March',             1, '10/side',        'Warm-Up', ''),
+          _cex('Inchworm Walk-Out',              1, '6 reps',         'Warm-Up', ''),
+          _cex('Russian Twists Feet Elevated',   3, '20 total',       'Block 1', ''),
+          _cex('Slow Bicycle Crunches',          3, '15/side',        'Block 1', ''),
+          _cex('V-Ups',                          3, '12 reps',        'Block 1', ''),
+          _cex('Side Plank with Hip Dip',        3, '12 dips/side',   'Block 2', ''),
+          _cex('Side Plank Reach-Through',       3, '10/side',        'Block 2', ''),
+          _cex('Standing Oblique Crunches',      3, '15/side',        'Block 2', ''),
+          _cex('Tabata Mountain Climbers',       1, '4 rounds 20s/10s', 'Finisher', ''),
+          _cex('Lying Spinal Twist',             1, '45 sec/side',    'Cool-Down', ''),
+          _cex('Figure-4 Stretch',               1, '30 sec/side',    'Cool-Down', ''),
+          _cex('Child\'s Pose',                  1, '30 sec',         'Cool-Down', ''),
+        ],
+        Friday: [
+          _cex('Cat-Camel Stretch',              1, '10 reps',        'Warm-Up', ''),
+          _cex('Hip Flexor Lunge Stretch',       1, '30 sec/side',    'Warm-Up', ''),
+          _cex('Bear Crawl In Place',            1, '30 sec',         'Warm-Up', ''),
+          _cex('Arm Circles',                    1, '10 each direction', 'Warm-Up', ''),
+          _cex('Dead Bug Full',                  3, '8/side',         'Block 1', ''),
+          _cex('Plank to Downward Dog',          3, '10 reps',        'Block 1', ''),
+          _cex('Single-Leg Glute Bridge',        3, '12/side',        'Block 1', ''),
+          _cex('Hollow Body Rock',               3, '30 sec',         'Block 2', ''),
+          _cex('Superman to Banana Roll',        3, '8 reps',         'Block 2', ''),
+          _cex('Long-Lever Plank',               3, '30 sec',         'Block 2', ''),
+          _cex('Core Gauntlet',                  1, '1 round',        'Finisher', 'Plank 45s → Side Plank L 30s → Side Plank R 30s → Hollow Body 30s, no rest'),
+          _cex('Child\'s Pose',                  1, '45 sec',         'Cool-Down', ''),
+          _cex('Supine Hamstring Stretch',       1, '30 sec/side',    'Cool-Down', ''),
+          _cex('Cobra to Upward Dog',            1, '30 sec',         'Cool-Down', ''),
+        ],
+      },
       2: {
         Monday: [
           _cex('Cat-Camel Stretch',                  1, '10 reps',              'Warm-Up',  ''),
@@ -932,7 +982,54 @@ const CONJUGATE_EXERCISES = {
       },
     },
     ARMS: {
-      1: { Tuesday: [], Thursday: [], Saturday: [] },
+      1: {
+        Tuesday: [
+          _cex('Arm Circles',                    1, '15 each direction', 'Warm-Up', ''),
+          _cex('Shoulder Cross-Body Stretch',    1, '20 sec/side',       'Warm-Up', ''),
+          _cex('Wrist Circles',                  1, '10 each direction', 'Warm-Up', ''),
+          _cex('Band Pull-Apart Tan',            1, '15 reps',           'Warm-Up', ''),
+          _cex('Diamond Push-Up',                3, '12 reps',           'Block 1', ''),
+          _cex('Table Inverted Row',             3, '10 reps',           'Block 1', ''),
+          _cex('Isometric Bicep Hold',           3, '30 sec',            'Block 1', ''),
+          _cex('Close-Grip Push-Up',             3, '15 reps',           'Block 2', ''),
+          _cex('Tricep Dips on Chair',           3, '12 reps',           'Block 2', ''),
+          _cex('Tricep Push-Up Negatives',       3, '8 reps',            'Block 2', ''),
+          _cex('Push-Up Burnout',                1, 'to failure',        'Finisher', ''),
+          _cex('Overhead Tricep Stretch',        1, '30 sec/side',       'Cool-Down', ''),
+          _cex('Cross-Body Bicep Stretch',       1, '30 sec/side',       'Cool-Down', ''),
+        ],
+        Thursday: [
+          _cex('Arm Circles',                    1, '15 each direction', 'Warm-Up', ''),
+          _cex('Band Pull-Apart Tan',            1, '15 reps',           'Warm-Up', ''),
+          _cex('Cat-Camel',                      1, '10 reps',           'Warm-Up', ''),
+          _cex('Wrist Circles',                  1, '10 each direction', 'Warm-Up', ''),
+          _cex('Pike Push-Up',                   3, '10 reps',           'Block 1', ''),
+          _cex('Elevated Pike Push-Up',          3, '8 reps',            'Block 1', ''),
+          _cex('Wall Handstand Hold',            3, '20 sec',            'Block 1', ''),
+          _cex('Wide Push-Up',                   3, '12 reps',           'Block 2', ''),
+          _cex('Superman Pulls',                 3, '12 reps',           'Block 2', ''),
+          _cex('Prone Y-T-W Raises',             3, '8 each',            'Block 2', ''),
+          _cex('Pike Push-Up Burnout',           1, 'to failure',        'Finisher', ''),
+          _cex('Doorway Chest Stretch',          1, '30 sec',            'Cool-Down', ''),
+          _cex('Child\'s Pose Wide Arms',        1, '45 sec',            'Cool-Down', ''),
+        ],
+        Saturday: [
+          _cex('Jumping Jacks',                  1, '30 sec',            'Warm-Up', ''),
+          _cex('Wrist and Shoulder Circles',     1, '10 each',           'Warm-Up', ''),
+          _cex('Inchworm Walk-Out',              1, '6 reps',            'Warm-Up', ''),
+          _cex('Band Pull-Apart Tan',            1, '15 reps',           'Warm-Up', ''),
+          _cex('Explosive Push-Up',              3, '8 reps',            'Block 1', ''),
+          _cex('Table Inverted Row',             3, '10 reps',           'Block 1', ''),
+          _cex('Archer Push-Up',                 3, '6/side',            'Block 1', ''),
+          _cex('Standard Push-Up',               3, '20 reps',           'Block 2', ''),
+          _cex('Diamond Push-Up',                3, '12 reps',           'Block 2', ''),
+          _cex('Pike Push-Up',                   3, '10 reps',           'Block 2', ''),
+          _cex('Arm Triset Burnout',             1, '1 round',           'Finisher', ''),
+          _cex('Overhead Tricep Stretch',        1, '30 sec/side',       'Cool-Down', ''),
+          _cex('Doorway Chest Opener',           1, '30 sec',            'Cool-Down', ''),
+          _cex('Wrist Flexor Stretch',           1, '20 sec/side',       'Cool-Down', ''),
+        ],
+      },
       2: {
         Tuesday: [
           _cex('Arm Circles',                        1, '15 each direction',    'Warm-Up',  ''),
@@ -1129,7 +1226,56 @@ const CONJUGATE_EXERCISES = {
   },
   wife: {
     CORE: {
-      1: { Monday: [], Wednesday: [], Friday: [] },
+      1: {
+        Monday: [
+          _cex('Diaphragmatic Breathing',        1, '8 breaths',        'Warm-Up', ''),
+          _cex('Pelvic Tilts',                   1, '12 reps',          'Warm-Up', ''),
+          _cex('Cat-Camel',                      1, '10 reps',          'Warm-Up', ''),
+          _cex('Glute Bridge',                   1, '12 reps',          'Warm-Up', ''),
+          _cex('Modified Dead Bug Arms Only',    3, '8/side',           'Block 1', ''),
+          _cex('Bird Dog',                       3, '10/side',          'Block 1', ''),
+          _cex('Glute Bridge Hold',              3, '30 sec',           'Block 1', ''),
+          _cex('Heel Slides',                    3, '10/side',          'Block 2', ''),
+          _cex('Forearm Plank',                  3, '20 sec',           'Block 2', ''),
+          _cex('Seated Ab Squeeze',              3, '15 reps',          'Block 2', ''),
+          _cex('Breathing Plank',                1, '40 sec',           'Finisher', ''),
+          _cex('Child\'s Pose',                  1, '45 sec',           'Cool-Down', ''),
+          _cex('Seated Spinal Twist',            1, '30 sec/side',      'Cool-Down', ''),
+          _cex('Knees-to-Chest Hug',             1, '30 sec',           'Cool-Down', ''),
+        ],
+        Wednesday: [
+          _cex('Diaphragmatic Breathing',        1, '6 breaths',        'Warm-Up', ''),
+          _cex('Hip Circles Standing',           1, '10/direction',     'Warm-Up', ''),
+          _cex('Lying Knee Rocks',               1, '12 reps',          'Warm-Up', ''),
+          _cex('Glute Bridge',                   1, '12 reps',          'Warm-Up', ''),
+          _cex('Modified Side Plank Knees Down', 3, '25 sec/side',      'Block 1', ''),
+          _cex('Standing Side Crunches',         3, '12/side',          'Block 1', ''),
+          _cex('Side-Lying Leg Raises',          3, '12/side',          'Block 1', ''),
+          _cex('Bird Dog Slow',                  3, '10/side',          'Block 2', ''),
+          _cex('Slow Mountain Climbers',         3, '8/side',           'Block 2', ''),
+          _cex('Glute Bridge March',             3, '10/side',          'Block 2', ''),
+          _cex('Reverse Marches Standing',       1, '2×40 sec',         'Finisher', ''),
+          _cex('Lying Spinal Twist',             1, '40 sec/side',      'Cool-Down', ''),
+          _cex('Figure-4 Glute Stretch',         1, '30 sec/side',      'Cool-Down', ''),
+          _cex('Child\'s Pose',                  1, '30 sec',           'Cool-Down', ''),
+        ],
+        Friday: [
+          _cex('Diaphragmatic Breathing',        1, '8 breaths',        'Warm-Up', ''),
+          _cex('Pelvic Tilts',                   1, '12 reps',          'Warm-Up', ''),
+          _cex('Cat-Camel',                      1, '10 reps',          'Warm-Up', ''),
+          _cex('Standing Hip Flexor Stretch',    1, '30 sec/side',      'Warm-Up', ''),
+          _cex('Dead Bug Full',                  3, '8/side',           'Block 1', ''),
+          _cex('Plank to Downward Dog',          3, '8 reps',           'Block 1', ''),
+          _cex('Single-Leg Glute Bridge',        3, '10/side',          'Block 1', ''),
+          _cex('Forearm Plank',                  3, '30 sec',           'Block 2', ''),
+          _cex('Modified Side Plank Hold Knees Down', 3, '30 sec/side', 'Block 2', ''),
+          _cex('Seated Torso Rotations',         3, '12/side',          'Block 2', ''),
+          _cex('Core Breathing Flow',            1, '3 rounds',         'Finisher', ''),
+          _cex('Child\'s Pose',                  1, '1 min',            'Cool-Down', ''),
+          _cex('Supine Spinal Twist',            1, '40 sec/side',      'Cool-Down', ''),
+          _cex('Happy Baby Pose',                1, '30 sec',           'Cool-Down', ''),
+        ],
+      },
       2: {
         Monday: [
           _cex('Diaphragmatic Breathing',            1, '8 breaths',            'Warm-Up',  ''),
@@ -1332,7 +1478,38 @@ const CONJUGATE_EXERCISES = {
       },
     },
     BANDS: {
-      1: { Tuesday: [], Thursday: [] },
+      1: {
+        Tuesday: [
+          _cex('Diaphragmatic Breathing',        1, '6 breaths',        'Warm-Up', ''),
+          _cex('Band Pull-Apart Tan',            1, '12 reps',          'Warm-Up', ''),
+          _cex('Hip Circles Standing',           1, '10/direction',     'Warm-Up', ''),
+          _cex('Shoulder Rolls',                 1, '10 each direction', 'Warm-Up', ''),
+          _cex('Band Bicep Curl Tan',            3, '15 reps',          'Block 1', ''),
+          _cex('Band Overhead Press Tan',        3, '12 reps',          'Block 1', ''),
+          _cex('Band Front Raise Tan',           3, '12 reps',          'Block 1', ''),
+          _cex('Band Glute Bridge Green',        3, '15 reps',          'Block 2', ''),
+          _cex('Band Clamshell Tan',             3, '15/side',          'Block 2', ''),
+          _cex('Band Standing Kickback Tan',     3, '15/side',          'Block 2', ''),
+          _cex('Band Glute Bridge Burnout Green', 1, 'to failure',      'Finisher', ''),
+          _cex('Child\'s Pose',                  1, '45 sec',           'Cool-Down', ''),
+          _cex('Seated Spinal Twist',            1, '30 sec/side',      'Cool-Down', ''),
+        ],
+        Thursday: [
+          _cex('Diaphragmatic Breathing',        1, '6 breaths',        'Warm-Up', ''),
+          _cex('Band Pull-Apart Tan',            1, '12 reps',          'Warm-Up', ''),
+          _cex('Glute Bridge',                   1, '12 reps',          'Warm-Up', ''),
+          _cex('Shoulder Rolls',                 1, '10 each direction', 'Warm-Up', ''),
+          _cex('Band Row Tan',                   3, '15 reps',          'Block 1', ''),
+          _cex('Band Lateral Raise Tan',         3, '12 reps',          'Block 1', ''),
+          _cex('Band Face Pull Tan',             3, '15 reps',          'Block 1', ''),
+          _cex('Band Squat Green',               3, '15 reps',          'Block 2', ''),
+          _cex('Band Side Step Tan',             3, '15/side',          'Block 2', ''),
+          _cex('Band Donkey Kick Tan',           3, '15/side',          'Block 2', ''),
+          _cex('Band Squat Burnout Green',       1, 'to failure',       'Finisher', ''),
+          _cex('Figure-4 Glute Stretch',         1, '30 sec/side',      'Cool-Down', ''),
+          _cex('Child\'s Pose',                  1, '30 sec',           'Cool-Down', ''),
+        ],
+      },
       2: {
         Tuesday: [
           _cex('Diaphragmatic Breathing',            1, '6 breaths',            'Warm-Up',  ''),
@@ -2505,8 +2682,8 @@ async function fetchPlan(user, day) {
   if (conjType) {
     const dateStr = S.selectedDate ? localDateStr(S.selectedDate) : localDateStr(new Date());
     const blockInfo = getConjugateBlock(dateStr);
-    // Block 1: use sheets as-is so current exercises stay unchanged through the end of the phase
-    if (blockInfo && blockInfo.num === 1) {
+    // Phase 5 (current): use sheets as-is so existing exercises stay unchanged
+    if (blockInfo && blockInfo.num === 5) {
       const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
       const r = await fetch(url);
       if (!r.ok) throw new Error(`Could not load workout plan (${r.status})`);
