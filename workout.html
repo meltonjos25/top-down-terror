@@ -2708,12 +2708,12 @@ async function fetchPlan(user, day) {
   const meta = PLAN_SHEETS[user][day];
   if (!meta) return null; // rest day
 
-  // Conjugate workouts: warm-up and cool-down come from GAS; working blocks from local data
   const conjType = CONJUGATE_EXERCISES[user]?.[meta.type] ? meta.type : null;
   if (conjType) {
     const dateStr = S.selectedDate ? localDateStr(S.selectedDate) : localDateStr(new Date());
     const blockInfo = getConjugateBlock(dateStr);
-    // Phase 5 (current): use sheets as-is so existing exercises stay unchanged
+
+    // Phase 5: use the regular named sheets (Husband — Core, etc.) unchanged
     if (blockInfo && blockInfo.num === 5) {
       const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
       const r = await fetch(url);
@@ -2722,28 +2722,31 @@ async function fetchPlan(user, day) {
       if (json.error) throw new Error(json.error);
       return { ...meta, exercises: json.exercises, blockInfo };
     }
-    if (blockInfo) {
-      const conjExercises = (CONJUGATE_EXERCISES[user]?.[conjType]?.[blockInfo.num]?.[day]) || [];
-      const conjWorking = conjExercises.filter(ex => ex.block !== 'Warm-Up' && ex.block !== 'Cool-Down');
 
-      // Fetch GAS for warm-up and cool-down; silently fall back to local data
-      // Phase 1 has full local data — skip GAS fetch entirely
-      let gasWarmUp = [], gasCoolDown = [];
-      try { if (blockInfo.num === 1) throw 0;
-        const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
+    if (blockInfo) {
+      // Phases 1–4: primary source = dedicated phase/cycle sheet (e.g. "Husband Core P1C1"),
+      // with local CONJUGATE_EXERCISES as silent fallback for any missing sheet.
+      const userLabel = user.charAt(0).toUpperCase() + user.slice(1);
+      const typeLabel = conjType.charAt(0) + conjType.slice(1).toLowerCase();
+      const phaseSheet = `${userLabel} ${typeLabel} P${blockInfo.num}C${blockInfo.cycle}`;
+
+      let exercises = null;
+      try {
+        const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(phaseSheet)}&day=${encodeURIComponent(day)}`;
         const r = await fetch(url);
         if (r.ok) {
           const json = await r.json();
-          if (!json.error && Array.isArray(json.exercises)) {
-            gasWarmUp   = json.exercises.filter(ex => ex.block === 'Warm-Up');
-            gasCoolDown = json.exercises.filter(ex => ex.block === 'Cool-Down');
+          if (!json.error && Array.isArray(json.exercises) && json.exercises.length > 0) {
+            exercises = json.exercises;
           }
         }
       } catch(e) {}
 
-      const warmUp   = gasWarmUp.length   ? gasWarmUp   : conjExercises.filter(ex => ex.block === 'Warm-Up');
-      const coolDown = gasCoolDown.length ? gasCoolDown : conjExercises.filter(ex => ex.block === 'Cool-Down');
-      return { ...meta, exercises: [...warmUp, ...conjWorking, ...coolDown], blockInfo };
+      if (!exercises) {
+        exercises = (CONJUGATE_EXERCISES[user]?.[conjType]?.[blockInfo.num]?.[day]) || [];
+      }
+
+      return { ...meta, exercises, blockInfo };
     }
   }
 
