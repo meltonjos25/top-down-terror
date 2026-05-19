@@ -752,8 +752,8 @@ function getConjugateBlock(dateStr) {
 }
 
 // helper: create a conjugate exercise object
-const _cex = (name, sets, target, wblock, note = '') =>
-  ({ block: wblock, name, sets, target, demo: '', note });
+const _cex = (name, sets, target, wblock, note = '', demo = '') =>
+  ({ block: wblock, name, sets, target, demo, note });
 
 const CONJUGATE_EXERCISES = {
   husband: {
