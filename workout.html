@@ -165,6 +165,35 @@ input.field::placeholder{color:var(--muted)}
 .uploading{display:flex;align-items:center;justify-content:center;gap:10px;padding:20px;color:var(--muted)}
 .spinner{width:20px;height:20px;border:2px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── WORKOUT LOADING SCREEN ── */
+.wl-screen{position:fixed;inset:0;background:#07090f;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;overflow:hidden;padding:40px 24px;box-sizing:border-box}
+.wl-glow{position:absolute;border-radius:50%;pointer-events:none;will-change:transform,opacity;filter:blur(65px)}
+.wl-glow-a{width:80vmin;height:80vmin;top:-20%;left:50%;transform:translateX(-50%);animation:wlGlowA 3s ease-in-out infinite}
+.wl-glow-b{width:55vmin;height:55vmin;bottom:-10%;left:50%;transform:translateX(-50%);animation:wlGlowB 3s ease-in-out infinite}
+@keyframes wlGlowA{0%,100%{opacity:.2;transform:translateX(-50%) scale(1)}50%{opacity:.32;transform:translateX(-50%) scale(1.1)}}
+@keyframes wlGlowB{0%,100%{opacity:.13;transform:translateX(-50%) scale(1)}50%{opacity:.22;transform:translateX(-50%) scale(.92)}}
+.wl-content{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;gap:18px;width:100%;max-width:340px}
+.wl-phase-badge{font-size:12px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;padding:5px 14px;border-radius:20px;animation:wlBadgeGlow 3s ease-in-out infinite}
+@keyframes wlBadgeGlow{0%,100%{box-shadow:none}50%{box-shadow:var(--wl-bg,none)}}
+.wl-icon-wrap{width:96px;height:96px;display:flex;align-items:center;justify-content:center}
+.wl-icon-wrap svg{width:96px;height:96px;overflow:visible}
+.wl-ri{transform-box:fill-box;transform-origin:center}
+@keyframes wlRDot{0%,100%{transform:scale(1)}50%{transform:scale(1.22)}}
+@keyframes wlR1{0%,100%{opacity:.85;transform:scale(1)}50%{opacity:.45;transform:scale(1.1)}}
+@keyframes wlR2{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:.2;transform:scale(1.22)}}
+@keyframes wlR3{0%,100%{opacity:.22;transform:scale(1)}50%{opacity:.06;transform:scale(1.35)}}
+@keyframes wlBar{0%,100%{opacity:.9;transform:scaleY(1)}50%{opacity:.4;transform:scaleY(.62)}}
+@keyframes wlBand{0%,100%{transform:scaleX(1)}50%{transform:scaleX(1.2)}}
+.wl-title{font-size:21px;font-weight:800;color:#fff;text-align:center;letter-spacing:-.01em;line-height:1.25}
+.wl-phrase{font-size:14px;color:rgba(255,255,255,.55);text-align:center;transition:opacity .35s ease;min-height:20px}
+.wl-progress-track{width:100%;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;margin-top:4px}
+.wl-progress-bar{height:100%;border-radius:2px;animation:wlFill 1.5s ease-out forwards}
+@keyframes wlFill{from{width:0}to{width:100%}}
+@keyframes wlScreenExit{to{opacity:0;transform:scale(.93)}}
+.wl-exit{animation:wlScreenExit .35s ease-out forwards!important;pointer-events:none}
+.wl-workout-enter{animation:wlSlideUp .35s ease-out both}
+@keyframes wlSlideUp{from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:none}}
 .success-screen{padding:60px 24px;text-align:center;display:flex;flex-direction:column;align-items:center;gap:16px}
 .success-screen .check{font-size:64px}
 .success-screen h2{font-size:26px;font-weight:800}
@@ -3074,7 +3103,15 @@ function render() {
   if (S.screen === 'user')      return renderUserSelect();
   if (S.screen === 'week')      return renderWeek();
   if (S.screen === 'loading')   return renderLoading();
-  if (S.screen === 'workout')   return renderWorkout();
+  if (S.screen === 'workout') {
+    renderWorkout();
+    if (S._wlSlideIn) {
+      S._wlSlideIn = false;
+      app.classList.add('wl-workout-enter');
+      app.addEventListener('animationend', () => app.classList.remove('wl-workout-enter'), { once: true });
+    }
+    return;
+  }
   if (S.screen === 'summary')   return renderSummary();
   if (S.screen === 'uploading') return renderUploading();
   if (S.screen === 'success')   return renderSuccess();
@@ -3489,23 +3526,108 @@ async function selectDay(timestamp) {
     await loadHistory();
     S.progression = calcProgression(S.workout.exercises, S.history);
     S.screen = 'workout';
+    S._wlSlideIn = true;
     loadProgress();
+    stopWLPhrases();
+    const wlEl = document.getElementById('wl-screen');
+    if (wlEl) {
+      wlEl.classList.add('wl-exit');
+      setTimeout(() => render(), 350);
+    } else {
+      render();
+    }
   } catch(e) {
+    stopWLPhrases();
     S.error = e.message;
     S.screen = 'week';
+    render();
   }
-  render();
+}
+
+// ── WORKOUT LOADING SCREEN HELPERS ──
+const WL_PHRASES = [
+  'Getting your workout ready…',
+  'Consistency beats perfection.',
+  'You showed up. That’s already a win.',
+  'Loading your gains…',
+  'Time to get to work.',
+  'Your future self is watching.',
+];
+let _wlPhraseIdx = 0, _wlPhraseTimer = null;
+
+function startWLPhrases() {
+  _wlPhraseIdx = 0;
+  if (_wlPhraseTimer) clearInterval(_wlPhraseTimer);
+  _wlPhraseTimer = setInterval(function() {
+    var el = document.getElementById('wl-phrase');
+    if (!el) { clearInterval(_wlPhraseTimer); _wlPhraseTimer = null; return; }
+    el.style.opacity = '0';
+    setTimeout(function() {
+      _wlPhraseIdx = (_wlPhraseIdx + 1) % WL_PHRASES.length;
+      var el2 = document.getElementById('wl-phrase');
+      if (el2) { el2.textContent = WL_PHRASES[_wlPhraseIdx]; el2.style.opacity = '1'; }
+    }, 380);
+  }, 2000);
+}
+
+function stopWLPhrases() {
+  if (_wlPhraseTimer) { clearInterval(_wlPhraseTimer); _wlPhraseTimer = null; }
+}
+
+function _wlRgba(hex, a) {
+  var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+  return 'rgba('+r+','+g+','+b+','+a+')';
+}
+
+function wlIconHTML(type, pc) {
+  if (type === 'ARMS') {
+    return '<div class="wl-icon-wrap"><svg viewBox="0 0 100 100">' +
+      '<rect class="wl-ri" x="18" y="28" width="16" height="44" rx="8" fill="'+pc+'" style="animation:wlBar 1.8s ease-in-out infinite 0s"/>' +
+      '<rect class="wl-ri" x="42" y="14" width="16" height="72" rx="8" fill="'+pc+'" style="animation:wlBar 1.8s ease-in-out infinite .18s"/>' +
+      '<rect class="wl-ri" x="66" y="28" width="16" height="44" rx="8" fill="'+pc+'" style="animation:wlBar 1.8s ease-in-out infinite .36s"/>' +
+      '</svg></div>';
+  }
+  if (type === 'BANDS') {
+    return '<div class="wl-icon-wrap"><svg viewBox="0 0 100 100">' +
+      '<circle class="wl-ri" cx="14" cy="50" r="10" fill="'+pc+'" style="animation:wlR1 1.8s ease-in-out infinite 0s"/>' +
+      '<rect class="wl-ri" x="24" y="44" width="52" height="12" rx="6" fill="'+pc+'" style="animation:wlBand 1.8s ease-in-out infinite"/>' +
+      '<circle class="wl-ri" cx="86" cy="50" r="10" fill="'+pc+'" style="animation:wlR1 1.8s ease-in-out infinite .9s"/>' +
+      '</svg></div>';
+  }
+  // CORE — concentric rings; wife uses slower breath timing
+  var dur = (S.user === 'wife') ? '3s' : '1.8s';
+  return '<div class="wl-icon-wrap"><svg viewBox="0 0 100 100">' +
+    '<circle class="wl-ri" cx="50" cy="50" r="10" fill="'+pc+'" style="animation:wlRDot '+dur+' ease-in-out infinite"/>' +
+    '<circle class="wl-ri" cx="50" cy="50" r="24" fill="none" stroke="'+pc+'" stroke-width="2.5" style="animation:wlR1 '+dur+' ease-in-out infinite .1s"/>' +
+    '<circle class="wl-ri" cx="50" cy="50" r="37" fill="none" stroke="'+pc+'" stroke-width="2" style="animation:wlR2 '+dur+' ease-in-out infinite .2s"/>' +
+    '<circle class="wl-ri" cx="50" cy="50" r="47" fill="none" stroke="'+pc+'" stroke-width="1.5" style="animation:wlR3 '+dur+' ease-in-out infinite .3s"/>' +
+    '</svg></div>';
 }
 
 function renderLoading() {
-  const label = S.selectedDate ? `${S.day}, ${fmtDate(S.selectedDate)}` : 'today';
-  app.innerHTML = `
-  <div class="auth-screen">
-    <div class="uploading" style="flex-direction:column;gap:16px">
-      <div class="spinner" style="width:32px;height:32px;border-width:3px"></div>
-      <div style="font-size:15px">Loading ${label}'s workout…</div>
-    </div>
-  </div>`;
+  var dateStr = S.selectedDate ? localDateStr(S.selectedDate) : localDateStr(new Date());
+  var bi = getConjugateBlock(dateStr) || { color: '#58a6ff', name: 'Stability', num: 1 };
+  var planMeta = (S.user && S.day) ? PLAN_SHEETS[S.user][S.day] : null;
+  var type = planMeta ? planMeta.type : 'CORE';
+  var pc = bi.color;
+  var typeLabel = type.charAt(0) + type.slice(1).toLowerCase();
+
+  app.innerHTML =
+    '<div class="wl-screen" id="wl-screen">' +
+      '<div class="wl-glow wl-glow-a" style="background:'+pc+'"></div>' +
+      '<div class="wl-glow wl-glow-b" style="background:'+pc+'"></div>' +
+      '<div class="wl-content">' +
+        '<div class="wl-phase-badge" style="color:'+pc+';border:1px solid '+_wlRgba(pc,.45)+';background:'+_wlRgba(pc,.12)+';--wl-bg:0 0 20px '+_wlRgba(pc,.38)+'">' +
+          'Phase '+bi.num+' — '+bi.name+
+        '</div>' +
+        wlIconHTML(type, pc) +
+        '<div class="wl-title">Loading '+S.day+' '+typeLabel+'</div>' +
+        '<div class="wl-phrase" id="wl-phrase">'+WL_PHRASES[0]+'</div>' +
+        '<div class="wl-progress-track"><div class="wl-progress-bar" style="background:'+pc+'"></div></div>' +
+      '</div>' +
+    '</div>';
+
+  startWLPhrases();
 }
 
 
