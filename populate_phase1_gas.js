@@ -56,7 +56,7 @@ function populatePhase1Data() {
     Logger.log('Populated: ' + sheetName);
   }
 
-  SpreadsheetApp.getUi().alert('Done! Phase 1 Cycle 1 data has been populated.');
+  Logger.log('All done! Phase 1 Cycle 1 data has been populated.');
 }
 
 // ============================================================
