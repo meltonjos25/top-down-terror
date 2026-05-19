@@ -2727,8 +2727,9 @@ async function fetchPlan(user, day) {
       const conjWorking = conjExercises.filter(ex => ex.block !== 'Warm-Up' && ex.block !== 'Cool-Down');
 
       // Fetch GAS for warm-up and cool-down; silently fall back to local data
+      // Phase 1 has full local data — skip GAS fetch entirely
       let gasWarmUp = [], gasCoolDown = [];
-      try {
+      try { if (blockInfo.num === 1) throw 0;
         const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
         const r = await fetch(url);
         if (r.ok) {
