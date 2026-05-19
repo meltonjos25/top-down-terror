@@ -188,8 +188,7 @@ input.field::placeholder{color:var(--muted)}
 .wl-title{font-size:21px;font-weight:800;color:#fff;text-align:center;letter-spacing:-.01em;line-height:1.25}
 .wl-phrase{font-size:14px;color:rgba(255,255,255,.55);text-align:center;transition:opacity .35s ease;min-height:20px}
 .wl-progress-track{width:100%;height:3px;background:rgba(255,255,255,.1);border-radius:2px;overflow:hidden;margin-top:4px}
-.wl-progress-bar{height:100%;border-radius:2px;animation:wlFill 1.5s ease-out forwards}
-@keyframes wlFill{from{width:0}to{width:100%}}
+.wl-progress-bar{height:100%;border-radius:2px;width:0%;transition:width .4s ease-out}
 @keyframes wlScreenExit{to{opacity:0;transform:scale(.93)}}
 .wl-exit{animation:wlScreenExit .35s ease-out forwards!important;pointer-events:none}
 .wl-workout-enter{animation:wlSlideUp .35s ease-out both}
@@ -3518,13 +3517,17 @@ async function selectDay(timestamp) {
   S.workoutDuration = 0;
   S.screen = 'loading';
   render();
+  setWLProgress(5);
   try {
     S.workout = await fetchPlan(S.user, S.day);
     if (!S.workout) {
       S.workout = { name: 'Rest & Recovery', type: 'REST', duration: '—', exercises: [] };
     }
+    setWLProgress(60);
     await loadHistory();
+    setWLProgress(90);
     S.progression = calcProgression(S.workout.exercises, S.history);
+    setWLProgress(100);
     S.screen = 'workout';
     S._wlSlideIn = true;
     loadProgress();
@@ -3572,6 +3575,11 @@ function startWLPhrases() {
 
 function stopWLPhrases() {
   if (_wlPhraseTimer) { clearInterval(_wlPhraseTimer); _wlPhraseTimer = null; }
+}
+
+function setWLProgress(pct) {
+  var bar = document.getElementById('wl-bar');
+  if (bar) bar.style.width = pct + '%';
 }
 
 function _wlRgba(hex, a) {
@@ -3623,7 +3631,7 @@ function renderLoading() {
         wlIconHTML(type, pc) +
         '<div class="wl-title">Loading '+S.day+' '+typeLabel+'</div>' +
         '<div class="wl-phrase" id="wl-phrase">'+WL_PHRASES[0]+'</div>' +
-        '<div class="wl-progress-track"><div class="wl-progress-bar" style="background:'+pc+'"></div></div>' +
+        '<div class="wl-progress-track"><div class="wl-progress-bar" id="wl-bar" style="background:'+pc+'"></div></div>' +
       '</div>' +
     '</div>';
 
