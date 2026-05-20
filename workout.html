@@ -143,7 +143,9 @@ input.field::placeholder{color:var(--muted)}
 .target-hint strong{color:var(--text)}
 .notes-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;resize:none;outline:none;font-family:inherit;transition:border-color .2s;margin-bottom:16px}
 .notes-input:focus{border-color:var(--accent)}
-.timer-section{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 0;margin-bottom:16px;background:var(--surface2);border-radius:12px}
+.timer-section{display:flex;flex-direction:column;align-items:center;gap:10px;padding:16px 0;margin-bottom:16px;background:var(--surface2);border-radius:12px;transition:background .1s}
+@keyframes timerAlarm{0%,100%{background:var(--surface2)}40%{background:rgba(255,200,0,.35)}}
+.timer-alarm{animation:timerAlarm .55s ease-in-out 6}
 .timer-display{font-size:44px;font-weight:800;letter-spacing:-1px;font-variant-numeric:tabular-nums}
 .timer-display.running{color:var(--accent)}
 .timer-display.done-time{color:var(--yellow)}
@@ -2767,6 +2769,9 @@ async function loadHistory() {
 }
 
 async function submitWorkout() {
+  clearInterval(S.timerInterval);
+  stopAudioKeepAlive();
+  S.timerRunning = false;
   S.workoutDuration = S.workoutStartTime ? Math.floor((Date.now() - S.workoutStartTime) / 1000) : 0;
   S.screen = 'uploading';
   render();
@@ -3715,7 +3720,7 @@ function renderWorkout() {
   app.innerHTML = `
   <div class="header">
     <div class="header-title">${dateLabel}</div>
-    <div class="header-right">${themeBtn()}<button class="header-user" onclick="S.screen='week';render()">← Week</button></div>
+    <div class="header-right">${themeBtn()}<button class="header-user" onclick="leaveWorkout()">← Week</button></div>
   </div>
   <div class="body screen-enter">
     <div class="day-header">
@@ -3771,7 +3776,7 @@ function openModal(i) {
 
 function closeModal() {
   const overlay = document.querySelector('.modal-overlay');
-  function _doClose() { S.modal = null; clearInterval(S.timerInterval); stopAudioKeepAlive(); S.timerRunning = false; S.countdownTarget = null; render(); }
+  function _doClose() { S.modal = null; clearInterval(S.timerInterval); S.timerRunning = false; S.countdownTarget = null; render(); }
   if (overlay) {
     overlay.classList.remove('sheet-enter');
     overlay.classList.add('sheet-exit');
@@ -4092,14 +4097,21 @@ function playAlarm() {
   setTimeout(fireOnce, 5000);
 }
 
+function leaveWorkout() {
+  clearInterval(S.timerInterval);
+  stopAudioKeepAlive();
+  S.timerRunning = false;
+  S.screen = 'week';
+  render();
+}
+
 function timerToggle() {
   if (S.timerRunning) {
     clearInterval(S.timerInterval);
-    stopAudioKeepAlive();
     S.timerRunning = false;
   } else {
     ensureAudioCtx(); // Must happen on this user gesture so iOS allows audio later
-    startAudioKeepAlive();
+    if (!_silenceSource) startAudioKeepAlive(); // only restart if not already keeping alive
     S.timerRunning = true;
     S.timerInterval = setInterval(() => {
       if (S.countdownTarget !== null) {
@@ -4118,9 +4130,10 @@ function timerToggle() {
           if (d) { d.textContent = '00:00'; d.className = 'timer-display done-time'; }
           const btn = document.querySelector('.timer-btn');
           if (btn) btn.textContent = '▶ Start';
+          // Visual flash — works even if audio is blocked
+          const ts = document.querySelector('.timer-section');
+          if (ts) { ts.classList.remove('timer-alarm'); void ts.offsetWidth; ts.classList.add('timer-alarm'); }
           playAlarm();
-          // Stop keep-alive AFTER alarm so the silent buffer stays connected while the alarm plays
-          setTimeout(stopAudioKeepAlive, 6000);
           return;
         }
       } else {
@@ -4140,7 +4153,6 @@ function timerToggle() {
 
 function timerReset() {
   clearInterval(S.timerInterval);
-  stopAudioKeepAlive();
   S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
   S.timerRunning = false;
   render();
@@ -4148,7 +4160,6 @@ function timerReset() {
 
 function setTimerPreset(sec) {
   clearInterval(S.timerInterval);
-  stopAudioKeepAlive();
   S.timerRunning = false;
   S.countdownTarget = sec;
   S.timerSec = sec;
