@@ -1675,22 +1675,38 @@ const CONJUGATE_EXERCISES = {
   },
 };
 
+// Returns days left adjusted for today's completion status.
+// A day counts as "done" if it is today and either: it's a rest day, or the workout is already logged.
+function effectiveDaysLeft(tb) {
+  if (!S.user) return tb.daysLeft;
+  var todayStr = localDateStr(new Date());
+  var todayBlock = getConjugateBlock(todayStr);
+  // Only adjust when the banner's phase matches the current phase
+  if (!todayBlock || todayBlock.num !== tb.num) return tb.daysLeft;
+  var dl = todayBlock.daysLeft;
+  var isRestDay = !PLAN_SHEETS[S.user] || PLAN_SHEETS[S.user][dateDay(new Date())] === null;
+  if (isRestDay || S.loggedDates.has(todayStr)) dl = Math.max(0, dl - 1);
+  return dl;
+}
+
 function blockBannerHTML(dateStr) {
   var tb = getConjugateBlock(dateStr);
   if (!tb) return '';
+  var dl = effectiveDaysLeft(tb);
   return '<div class="week-block-banner" style="--bc:' + tb.color + '">' +
     '<div class="wbb-dot" style="background:' + tb.color + '"></div>' +
     '<div class="wbb-content">' +
     '<div class="wbb-label">Phase ' + tb.num + ': ' + tb.name +
     ' &nbsp;&bull;&nbsp; Cycle ' + tb.cycle + '</div>' +
     '<div class="wbb-meta">Week ' + tb.weekInBlock + ' of ' + tb.weeks +
-    ' &nbsp;&middot;&nbsp; ' + tb.daysLeft +
-    ' day' + (tb.daysLeft === 1 ? '' : 's') + ' left</div>' +
+    ' &nbsp;&middot;&nbsp; ' + dl +
+    ' day' + (dl === 1 ? '' : 's') + ' left</div>' +
     '</div></div>';
 }
 function blockTimelineHTML() {
   var tb = getConjugateBlock(localDateStr(new Date()));
   if (!tb) return '';
+  var dl = effectiveDaysLeft(tb);
   var btks = CONJUGATE_PHASE_META.slice().sort(function(a,b){return a.num-b.num;}).map(function(b) {
     var a = tb.num === b.num;
     return '<div class="bt-block' + (a ? ' bt-active' : '') +
@@ -1703,8 +1719,8 @@ function blockTimelineHTML() {
     '<div class="block-timeline-title">Training Phase &nbsp;&bull;&nbsp; Cycle ' + tb.cycle + '</div>' +
     '<div class="bt-track">' + btks + '</div>' +
     '<div class="bt-info">Week ' + tb.weekInBlock + ' of ' + tb.weeks +
-    ' &nbsp;&middot;&nbsp; ' + tb.daysLeft +
-    ' day' + (tb.daysLeft === 1 ? '' : 's') + ' left in phase</div></div>';
+    ' &nbsp;&middot;&nbsp; ' + dl +
+    ' day' + (dl === 1 ? '' : 's') + ' left in phase</div></div>';
 }
 // Returns false if the plan entry doesn't exist or hasn't started yet for the given dateStr
 function isPlanActive(entry, dateStr) {
