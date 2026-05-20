@@ -3903,13 +3903,13 @@ function setRep(i, s, v) { S.logs[i].repsPerSet[s] = v; saveProgress(); }
 function setNote(i, v) { S.logs[i].notes = v; saveProgress(); }
 
 function toggleSet(i, s) {
-  S.logs[i].setsState[s] = !S.logs[i].setsState[s];
+  const newState = !S.logs[i].setsState[s];
+  S.logs[i].setsState[s] = newState;
   S.logs[i].setsCompleted = S.logs[i].setsState.filter(Boolean).length;
   saveProgress();
-  // re-render just the modal part
-  const overlay = document.querySelector('.modal-overlay');
-  if (overlay) overlay.outerHTML = renderModal();
-  else render();
+  // Update only the tapped button — replacing outerHTML causes a scroll glitch
+  const btn = document.querySelectorAll('.set-check')[s];
+  if (btn) { btn.classList.toggle('done', newState); btn.textContent = newState ? '✓' : ''; }
 }
 
 function checkPR(i) {
