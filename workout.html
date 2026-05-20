@@ -3729,7 +3729,7 @@ function renderWorkout() {
     var _bi = w.blockInfo;
     _conjStrip = '<div class="conj-strip" style="--bc:' + _bi.color + '">' +
       '<span class="conj-strip-name" style="color:' + _bi.color + '">Phase ' + _bi.num + ': ' + _bi.name + '</span>' +
-      '<span class="conj-strip-meta">Wk ' + _bi.weekInBlock + '/3 &nbsp;&middot;&nbsp; ' + _bi.daysLeft + 'd left</span>' +
+      '<span class="conj-strip-meta">Wk ' + _bi.weekInBlock + '/3 &nbsp;&middot;&nbsp; ' + effectiveDaysLeft(_bi) + 'd left</span>' +
       '</div>';
   }
   const canSubmit = done > 0;
