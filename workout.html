@@ -154,6 +154,16 @@ input.field::placeholder{color:var(--muted)}
 .timer-btn:hover{opacity:.8}
 .timer-target{font-size:12px;color:var(--muted)}
 
+/* ---- MODAL NAV ---- */
+.modal-nav-arrow{background:transparent;border:none;color:var(--muted);font-size:22px;padding:4px 8px;cursor:pointer;line-height:1;border-radius:6px;transition:color .15s;flex-shrink:0}
+.modal-nav-arrow:hover{color:var(--text)}
+.modal-nav-arrow:disabled{opacity:.2;cursor:default;pointer-events:none}
+.modal-nav-counter{font-size:11px;color:var(--muted);font-weight:600;margin-top:1px}
+@keyframes modalSlideLeft{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:none}}
+@keyframes modalSlideRight{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
+.modal-slide-left{animation:modalSlideLeft .2s ease-out both}
+.modal-slide-right{animation:modalSlideRight .2s ease-out both}
+
 /* ---- SUMMARY SCREEN ---- */
 .summary{padding:24px 20px;display:flex;flex-direction:column;gap:16px}
 .summary h2{font-size:22px;font-weight:800}
@@ -3800,6 +3810,52 @@ function closeModal() {
   } else { _doClose(); }
 }
 
+function navigateModal(delta) {
+  const total = S.workout.exercises.length;
+  const next = S.modal + delta;
+  if (next < 0 || next >= total) return;
+  _modalSlideDir = delta > 0 ? 'left' : 'right';
+  _modalNavigating = true;
+  clearInterval(S.timerInterval);
+  S.timerRunning = false;
+  S.modal = next;
+  const _ex = S.workout.exercises[next];
+  const _parsed = parseTarget(S.progression[_ex.name]?.target || _ex.target);
+  const _allTimers = parseAllTimers(S.progression[_ex.name]?.target || _ex.target);
+  if (_parsed.unit === 'sec') {
+    S.countdownTarget = _parsed.value;
+  } else if (_allTimers.length > 0) {
+    S.countdownTarget = _allTimers[0];
+  } else {
+    S.countdownTarget = null;
+  }
+  S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
+  if (!S.logs[next]) {
+    const ex = S.workout.exercises[next];
+    const prog = S.progression[ex.name];
+    const target = prog?.target || ex.target;
+    const parsed = parseTarget(target);
+    const prefill = parsed.value != null ? String(parsed.value) : '';
+    S.logs[next] = { done: false, setsCompleted: 0, repsPerSet: Array(ex.sets).fill(prefill), notes: '', setsState: Array(ex.sets).fill(false) };
+  }
+  render();
+  _modalNavigating = false;
+  setTimeout(() => { _modalSlideDir = ''; }, 220);
+}
+
+function modalTouchStart(e) {
+  _touchStartX = e.touches[0].clientX;
+  _touchStartY = e.touches[0].clientY;
+}
+
+function modalTouchEnd(e) {
+  const dx = e.changedTouches[0].clientX - _touchStartX;
+  const dy = e.changedTouches[0].clientY - _touchStartY;
+  if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+    navigateModal(dx < 0 ? 1 : -1);
+  }
+}
+
 function renderModal() {
   const i = S.modal;
   const ex = S.workout.exercises[i];
@@ -3859,12 +3915,19 @@ function renderModal() {
     </div>
   </div>` : '';
 
+  const _last = S.workout.exercises.length - 1;
   return `
-  <div class="modal-overlay sheet-enter" onclick="handleOverlayClick(event)">
-    <div class="modal" onclick="event.stopPropagation()">
+  <div class="modal-overlay ${_modalNavigating ? '' : 'sheet-enter'}" onclick="handleOverlayClick(event)">
+    <div class="modal" onclick="event.stopPropagation()" ontouchstart="modalTouchStart(event)" ontouchend="modalTouchEnd(event)">
       <div class="modal-handle"></div>
+      <div class="${_modalSlideDir ? 'modal-slide-'+_modalSlideDir : ''}">
       <div class="modal-header">
-        <div class="modal-title">${ex.name}</div>
+        <button class="modal-nav-arrow" onclick="navigateModal(-1)" ${i===0?'disabled':''}>‹</button>
+        <div style="flex:1;min-width:0">
+          <div class="modal-title">${ex.name}</div>
+          <div class="modal-nav-counter">${i+1} of ${_last+1}</div>
+        </div>
+        <button class="modal-nav-arrow" onclick="navigateModal(1)" ${i===_last?'disabled':''}>›</button>
         <button class="modal-close" onclick="closeModal()">×</button>
       </div>
       <div class="modal-body">
@@ -3877,6 +3940,7 @@ function renderModal() {
         <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it felt…" oninput="setNote(${i},this.value)">${log.notes}</textarea>
         <button class="btn btn-primary" onclick="markDone(${i})">✓ Mark Complete</button>
         <button class="btn btn-secondary" style="margin-top:10px" onclick="closeModal()">Close</button>
+      </div>
       </div>
     </div>
   </div>`;
@@ -4014,6 +4078,10 @@ let _userCardAnim = false; // true only on the first render after navigating to 
 let _silenceSource = null;   // looping silent buffer — holds iOS from suspending AudioContext
 let _msgPollInterval = null;
 let _introSkipped = false;
+let _modalSlideDir = '';
+let _modalNavigating = false;
+let _touchStartX = 0;
+let _touchStartY = 0;
 
 function startMessagePolling(user) {
   stopMessagePolling();
