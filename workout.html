@@ -120,7 +120,7 @@ input.field::placeholder{color:var(--muted)}
 
 /* ---- EXERCISE LOG MODAL ---- */
 .modal-overlay{position:fixed;inset:0;background:#000a;z-index:100;display:flex;align-items:flex-end;justify-content:center}
-.modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:0 0 40px;max-height:92vh;overflow-y:auto}
+.modal{background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:480px;max-height:92vh;overflow:hidden}
 .modal-handle{width:36px;height:4px;background:var(--surface3);border-radius:2px;margin:12px auto 0}
 .modal-header{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .modal-title{font-size:17px;font-weight:700}
@@ -159,6 +159,9 @@ input.field::placeholder{color:var(--muted)}
 .modal-nav-arrow:hover{color:var(--text)}
 .modal-nav-arrow:disabled{opacity:.2;cursor:default;pointer-events:none}
 .modal-nav-counter{font-size:11px;color:var(--muted);font-weight:600;margin-top:1px}
+#modal-slide-viewport{overflow:hidden}
+#modal-slide-track{display:flex;will-change:transform}
+.modal-pane{min-width:100%;overflow-y:auto;max-height:calc(92vh - 20px);padding-bottom:40px;box-sizing:border-box}
 
 /* ---- SUMMARY SCREEN ---- */
 .summary{padding:24px 20px;display:flex;flex-direction:column;gap:16px}
@@ -3794,6 +3797,12 @@ function openModal(i) {
     S.logs[i] = { done: false, setsCompleted: 0, repsPerSet: Array(ex.sets).fill(prefill), notes: '', setsState: Array(ex.sets).fill(false) };
   }
   render();
+  const _vp = document.getElementById('modal-slide-viewport');
+  if (_vp) {
+    _slideVW = _vp.offsetWidth;
+    const _track = document.getElementById('modal-slide-track');
+    if (_track) { _track.style.transition = 'none'; _track.style.transform = `translateX(${-_slideVW}px)`; }
+  }
 }
 
 function closeModal() {
@@ -3804,6 +3813,30 @@ function closeModal() {
     overlay.classList.add('sheet-exit');
     setTimeout(_doClose, 230);
   } else { _doClose(); }
+}
+
+function ensureLog(i) {
+  if (S.logs[i]) return;
+  const ex = S.workout.exercises[i];
+  const prog = S.progression[ex.name];
+  const target = prog?.target || ex.target;
+  const parsed = parseTarget(target);
+  const prefill = parsed.value != null ? String(parsed.value) : '';
+  S.logs[i] = { done: false, setsCompleted: 0, repsPerSet: Array(ex.sets).fill(prefill), notes: '', setsState: Array(ex.sets).fill(false) };
+}
+
+function _renderAllPanes() {
+  const i = S.modal;
+  const total = S.workout.exercises.length;
+  ensureLog(i);
+  if (i > 0) ensureLog(i - 1);
+  if (i < total - 1) ensureLog(i + 1);
+  const prev = document.getElementById('pane-prev');
+  const curr = document.getElementById('pane-curr');
+  const nxt  = document.getElementById('pane-next');
+  if (prev) prev.innerHTML = i > 0 ? renderModalInner(i - 1) : '';
+  if (curr) curr.innerHTML = renderModalInner(i);
+  if (nxt)  nxt.innerHTML  = i < total - 1 ? renderModalInner(i + 1) : '';
 }
 
 function _commitNav(next, delta) {
@@ -3821,22 +3854,11 @@ function _commitNav(next, delta) {
     S.countdownTarget = null;
   }
   S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
-  if (!S.logs[next]) {
-    const ex = S.workout.exercises[next];
-    const prog = S.progression[ex.name];
-    const target = prog?.target || ex.target;
-    const parsed = parseTarget(target);
-    const prefill = parsed.value != null ? String(parsed.value) : '';
-    S.logs[next] = { done: false, setsCompleted: 0, repsPerSet: Array(ex.sets).fill(prefill), notes: '', setsState: Array(ex.sets).fill(false) };
-  }
-  const wrap = document.getElementById('modal-content-wrap');
-  if (wrap) {
-    wrap.innerHTML = renderModalInner(next);
-    const startX = delta > 0 ? 48 : -48;
-    wrap.style.cssText = `transition:none;transform:translateX(${startX}px);opacity:0`;
-    void wrap.offsetWidth;
-    wrap.style.cssText = 'transition:transform 0.28s cubic-bezier(.22,1,.36,1),opacity 0.22s ease-out;transform:translateX(0);opacity:1';
-    setTimeout(() => { wrap.style.cssText = ''; }, 300);
+  _renderAllPanes();
+  const track = document.getElementById('modal-slide-track');
+  if (track) {
+    track.style.transition = 'none';
+    track.style.transform = `translateX(${-_slideVW}px)`;
   } else {
     render();
   }
@@ -3846,12 +3868,13 @@ function navigateModal(delta) {
   const total = S.workout.exercises.length;
   const next = S.modal + delta;
   if (next < 0 || next >= total) return;
-  const wrap = document.getElementById('modal-content-wrap');
-  if (wrap) {
-    const outX = delta > 0 ? -36 : 36;
-    wrap.style.cssText = `transition:transform 0.15s ease-in,opacity 0.15s ease-in;transform:translateX(${outX}px);opacity:0`;
+  const track = document.getElementById('modal-slide-track');
+  const targetX = delta > 0 ? -2 * _slideVW : 0;
+  if (track) {
+    track.style.transition = 'transform 0.22s ease-out';
+    track.style.transform = `translateX(${targetX}px)`;
   }
-  setTimeout(() => _commitNav(next, delta), 150);
+  setTimeout(() => _commitNav(next, delta), 220);
 }
 
 function modalTouchStart(e) {
@@ -3859,6 +3882,8 @@ function modalTouchStart(e) {
   _touchStartY = e.touches[0].clientY;
   _swipeDir = null;
   _swipeActive = false;
+  const vp = document.getElementById('modal-slide-viewport');
+  if (vp) _slideVW = vp.offsetWidth;
 }
 
 function modalTouchMove(e) {
@@ -3872,35 +3897,35 @@ function modalTouchMove(e) {
   }
   if (_swipeDir !== 'h') return;
   e.preventDefault();
-  const wrap = document.getElementById('modal-content-wrap');
-  if (!wrap) return;
+  const track = document.getElementById('modal-slide-track');
+  if (!track) return;
   const total = S.workout.exercises.length;
   const atStart = S.modal <= 0 && dx > 0;
   const atEnd   = S.modal >= total - 1 && dx < 0;
-  const resist  = (atStart || atEnd) ? 0.25 : 1;
-  wrap.style.cssText = `transition:none;transform:translateX(${dx * resist}px);opacity:${1 - Math.min(Math.abs(dx) / 220, 0.45)}`;
+  const resist  = (atStart || atEnd) ? 0.2 : 1;
+  track.style.transition = 'none';
+  track.style.transform = `translateX(${-_slideVW + dx * resist}px)`;
 }
 
 function modalTouchEnd(e) {
   if (!_swipeActive) return;
   _swipeActive = false;
   const dx = e.changedTouches[0].clientX - _touchStartX;
-  const wrap = document.getElementById('modal-content-wrap');
+  const track = document.getElementById('modal-slide-track');
   const total = S.workout.exercises.length;
   const delta = dx < 0 ? 1 : -1;
   const next = S.modal + delta;
   if (Math.abs(dx) > 52 && next >= 0 && next < total) {
-    // Flick current content fully off-screen, then swap
-    const outX = dx < 0 ? -120 : 120;
-    if (wrap) {
-      wrap.style.cssText = `transition:transform 0.16s ease-in,opacity 0.16s ease-in;transform:translateX(${outX}px);opacity:0`;
+    const targetX = delta > 0 ? -2 * _slideVW : 0;
+    if (track) {
+      track.style.transition = 'transform 0.22s ease-out';
+      track.style.transform = `translateX(${targetX}px)`;
     }
-    setTimeout(() => _commitNav(next, delta), 160);
+    setTimeout(() => _commitNav(next, delta), 220);
   } else {
-    // Snap back to center
-    if (wrap) {
-      wrap.style.cssText = 'transition:transform 0.32s cubic-bezier(.22,1,.36,1),opacity 0.25s ease-out;transform:translateX(0);opacity:1';
-      setTimeout(() => { wrap.style.cssText = ''; }, 340);
+    if (track) {
+      track.style.transition = 'transform 0.3s cubic-bezier(.22,1,.36,1)';
+      track.style.transform = `translateX(${-_slideVW}px)`;
     }
   }
 }
@@ -3939,16 +3964,21 @@ function renderModalInner(i) {
     </div>`;
   }).join('');
 
-  const timerSec = S.timerSec;
+  const isCurrentPane = i === S.modal;
+  const _cdTarget = isCurrentPane ? S.countdownTarget
+    : (parsed.unit === 'sec' ? (parsed.value || 0)
+      : (allTimers.length > 0 ? allTimers[0] : null));
+  const timerSec = isCurrentPane ? S.timerSec : (_cdTarget !== null ? _cdTarget : 0);
   const mm = String(Math.floor(timerSec/60)).padStart(2,'0');
   const ss = String(timerSec%60).padStart(2,'0');
-  const timerClass = S.timerRunning ? 'running' : S.countdownTarget !== null ? (timerSec === 0 ? 'done-time' : '') : (timerSec > 0 ? 'done-time' : '');
+  const timerClass = (isCurrentPane && S.timerRunning) ? 'running'
+    : _cdTarget !== null ? (timerSec === 0 ? 'done-time' : '') : (timerSec > 0 ? 'done-time' : '');
 
   const fmtSec = v => v >= 60 ? `${Math.floor(v/60)}m${v%60 ? v%60+'s' : ''}` : `${v}s`;
   const presetsHTML = allTimers.length > 1 ? `
     <div class="timer-row" style="margin-bottom:4px">
       ${allTimers.map(v => `<button class="timer-btn" onclick="setTimerPreset(${v})"
-        style="${S.countdownTarget===v?'background:var(--accent);color:#000;font-weight:700;':''}">${fmtSec(v)}</button>`).join('')}
+        style="${_cdTarget===v?'background:var(--accent);color:#000;font-weight:700;':''}">${fmtSec(v)}</button>`).join('')}
     </div>` : '';
 
   const timerHTML = isTimed ? `
@@ -3988,12 +4018,21 @@ function renderModalInner(i) {
 }
 
 function renderModal() {
+  const i = S.modal;
+  const total = S.workout.exercises.length;
+  ensureLog(i);
+  if (i > 0) ensureLog(i - 1);
+  if (i < total - 1) ensureLog(i + 1);
   return `
   <div class="modal-overlay sheet-enter" onclick="handleOverlayClick(event)">
     <div class="modal" onclick="event.stopPropagation()" ontouchstart="modalTouchStart(event)" ontouchmove="modalTouchMove(event)" ontouchend="modalTouchEnd(event)">
       <div class="modal-handle"></div>
-      <div id="modal-content-wrap">
-        ${renderModalInner(S.modal)}
+      <div id="modal-slide-viewport">
+        <div id="modal-slide-track" style="display:flex;will-change:transform;transform:translateX(0)">
+          <div class="modal-pane" id="pane-prev">${i > 0 ? renderModalInner(i - 1) : ''}</div>
+          <div class="modal-pane" id="pane-curr">${renderModalInner(i)}</div>
+          <div class="modal-pane" id="pane-next">${i < total - 1 ? renderModalInner(i + 1) : ''}</div>
+        </div>
       </div>
     </div>
   </div>`;
@@ -4135,6 +4174,7 @@ let _touchStartX = 0;
 let _touchStartY = 0;
 let _swipeDir = null;
 let _swipeActive = false;
+let _slideVW = 0;
 
 function startMessagePolling(user) {
   stopMessagePolling();
