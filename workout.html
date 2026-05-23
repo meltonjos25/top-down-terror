@@ -3807,7 +3807,6 @@ function closeModal() {
 }
 
 function _commitNav(next, delta) {
-  _modalNavigating = true;
   clearInterval(S.timerInterval);
   S.timerRunning = false;
   S.modal = next;
@@ -3830,16 +3829,16 @@ function _commitNav(next, delta) {
     const prefill = parsed.value != null ? String(parsed.value) : '';
     S.logs[next] = { done: false, setsCompleted: 0, repsPerSet: Array(ex.sets).fill(prefill), notes: '', setsState: Array(ex.sets).fill(false) };
   }
-  render();
-  _modalNavigating = false;
-  // Slide new content in from the opposite side
   const wrap = document.getElementById('modal-content-wrap');
   if (wrap) {
+    wrap.innerHTML = renderModalInner(next);
     const startX = delta > 0 ? 48 : -48;
     wrap.style.cssText = `transition:none;transform:translateX(${startX}px);opacity:0`;
     void wrap.offsetWidth;
     wrap.style.cssText = 'transition:transform 0.28s cubic-bezier(.22,1,.36,1),opacity 0.22s ease-out;transform:translateX(0);opacity:1';
     setTimeout(() => { wrap.style.cssText = ''; }, 300);
+  } else {
+    render();
   }
 }
 
@@ -3906,8 +3905,7 @@ function modalTouchEnd(e) {
   }
 }
 
-function renderModal() {
-  const i = S.modal;
+function renderModalInner(i) {
   const ex = S.workout.exercises[i];
   const log = S.logs[i];
   const prog = S.progression[ex.name];
@@ -3967,30 +3965,35 @@ function renderModal() {
 
   const _last = S.workout.exercises.length - 1;
   return `
-  <div class="modal-overlay ${_modalNavigating ? '' : 'sheet-enter'}" onclick="handleOverlayClick(event)">
+  <div class="modal-header">
+    <button class="modal-nav-arrow" onclick="navigateModal(-1)" ${i===0?'disabled':''}>‹</button>
+    <div style="flex:1;min-width:0">
+      <div class="modal-title">${ex.name}</div>
+      <div class="modal-nav-counter">${i+1} of ${_last+1}</div>
+    </div>
+    <button class="modal-nav-arrow" onclick="navigateModal(1)" ${i===_last?'disabled':''}>›</button>
+    <button class="modal-close" onclick="closeModal()">×</button>
+  </div>
+  <div class="modal-body">
+    ${ex.note ? `<div class="modal-note">${ex.note}</div>` : ''}
+    ${ex.demo ? `<button class="modal-demo" onclick="openGifModal('${ex.demo.replace(/'/g,"\\'")}','${ex.name.replace(/'/g,"\\'")}')">▶ Watch Demo</button>` : ''}
+    <div class="target-hint">Target: <strong>${ex.sets} × ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">↑ PROGRESSED</span>' : ''}</div>
+    ${diagramHTML}
+    ${timerHTML}
+    <div class="sets-section">${setsHTML}</div>
+    <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it felt…" oninput="setNote(${i},this.value)">${log.notes}</textarea>
+    <button class="btn btn-primary" onclick="markDone(${i})">✓ Mark Complete</button>
+    <button class="btn btn-secondary" style="margin-top:10px" onclick="closeModal()">Close</button>
+  </div>`;
+}
+
+function renderModal() {
+  return `
+  <div class="modal-overlay sheet-enter" onclick="handleOverlayClick(event)">
     <div class="modal" onclick="event.stopPropagation()" ontouchstart="modalTouchStart(event)" ontouchmove="modalTouchMove(event)" ontouchend="modalTouchEnd(event)">
       <div class="modal-handle"></div>
       <div id="modal-content-wrap">
-      <div class="modal-header">
-        <button class="modal-nav-arrow" onclick="navigateModal(-1)" ${i===0?'disabled':''}>‹</button>
-        <div style="flex:1;min-width:0">
-          <div class="modal-title">${ex.name}</div>
-          <div class="modal-nav-counter">${i+1} of ${_last+1}</div>
-        </div>
-        <button class="modal-nav-arrow" onclick="navigateModal(1)" ${i===_last?'disabled':''}>›</button>
-        <button class="modal-close" onclick="closeModal()">×</button>
-      </div>
-      <div class="modal-body">
-        ${ex.note ? `<div class="modal-note">${ex.note}</div>` : ''}
-        ${ex.demo ? `<button class="modal-demo" onclick="openGifModal('${ex.demo.replace(/'/g,"\\'")}','${ex.name.replace(/'/g,"\\'")}')">▶ Watch Demo</button>` : ''}
-        <div class="target-hint">Target: <strong>${ex.sets} × ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">↑ PROGRESSED</span>' : ''}</div>
-        ${diagramHTML}
-        ${timerHTML}
-        <div class="sets-section">${setsHTML}</div>
-        <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it felt…" oninput="setNote(${i},this.value)">${log.notes}</textarea>
-        <button class="btn btn-primary" onclick="markDone(${i})">✓ Mark Complete</button>
-        <button class="btn btn-secondary" style="margin-top:10px" onclick="closeModal()">Close</button>
-      </div>
+        ${renderModalInner(S.modal)}
       </div>
     </div>
   </div>`;
@@ -4128,7 +4131,6 @@ let _userCardAnim = false; // true only on the first render after navigating to 
 let _silenceSource = null;   // looping silent buffer — holds iOS from suspending AudioContext
 let _msgPollInterval = null;
 let _introSkipped = false;
-let _modalNavigating = false;
 let _touchStartX = 0;
 let _touchStartY = 0;
 let _swipeDir = null;
