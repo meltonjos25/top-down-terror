@@ -160,8 +160,8 @@ input.field::placeholder{color:var(--muted)}
 .modal-nav-arrow:disabled{opacity:.2;cursor:default;pointer-events:none}
 .modal-nav-counter{font-size:11px;color:var(--muted);font-weight:600;margin-top:1px}
 #modal-slide-viewport{overflow:hidden}
-#modal-slide-track{display:flex;will-change:transform}
-.modal-pane{min-width:100%;overflow-y:auto;max-height:calc(92vh - 20px);padding-bottom:40px;box-sizing:border-box}
+#modal-slide-track{display:flex;will-change:transform;width:300%}
+.modal-pane{width:33.333%;overflow-y:auto;max-height:calc(92vh - 20px);padding-bottom:40px;box-sizing:border-box}
 
 /* ---- SUMMARY SCREEN ---- */
 .summary{padding:24px 20px;display:flex;flex-direction:column;gap:16px}
@@ -3857,6 +3857,8 @@ function _commitNav(next, delta) {
   _renderAllPanes();
   const track = document.getElementById('modal-slide-track');
   if (track) {
+    const vp = document.getElementById('modal-slide-viewport');
+    if (vp && vp.offsetWidth > 0) _slideVW = vp.offsetWidth;
     track.style.transition = 'none';
     track.style.transform = `translateX(${-_slideVW}px)`;
   } else {
@@ -3874,7 +3876,8 @@ function navigateModal(delta) {
     track.style.transition = 'transform 0.22s ease-out';
     track.style.transform = `translateX(${targetX}px)`;
   }
-  setTimeout(() => _commitNav(next, delta), 220);
+  clearTimeout(_navTimeout);
+  _navTimeout = setTimeout(() => _commitNav(next, delta), 220);
 }
 
 function modalTouchStart(e) {
@@ -3883,7 +3886,12 @@ function modalTouchStart(e) {
   _swipeDir = null;
   _swipeActive = false;
   const vp = document.getElementById('modal-slide-viewport');
-  if (vp) _slideVW = vp.offsetWidth;
+  if (vp && vp.offsetWidth > 0) _slideVW = vp.offsetWidth;
+}
+
+function modalTouchCancel() {
+  _swipeActive = false;
+  _swipeDir = null;
 }
 
 function modalTouchMove(e) {
@@ -3921,7 +3929,8 @@ function modalTouchEnd(e) {
       track.style.transition = 'transform 0.22s ease-out';
       track.style.transform = `translateX(${targetX}px)`;
     }
-    setTimeout(() => _commitNav(next, delta), 220);
+    clearTimeout(_navTimeout);
+    _navTimeout = setTimeout(() => _commitNav(next, delta), 220);
   } else {
     if (track) {
       track.style.transition = 'transform 0.3s cubic-bezier(.22,1,.36,1)';
@@ -4025,7 +4034,7 @@ function renderModal() {
   if (i < total - 1) ensureLog(i + 1);
   return `
   <div class="modal-overlay sheet-enter" onclick="handleOverlayClick(event)">
-    <div class="modal" onclick="event.stopPropagation()" ontouchstart="modalTouchStart(event)" ontouchmove="modalTouchMove(event)" ontouchend="modalTouchEnd(event)">
+    <div class="modal" onclick="event.stopPropagation()" ontouchstart="modalTouchStart(event)" ontouchmove="modalTouchMove(event)" ontouchend="modalTouchEnd(event)" ontouchcancel="modalTouchCancel()">
       <div class="modal-handle"></div>
       <div id="modal-slide-viewport">
         <div id="modal-slide-track" style="display:flex;will-change:transform;transform:translateX(0)">
@@ -4175,6 +4184,7 @@ let _touchStartY = 0;
 let _swipeDir = null;
 let _swipeActive = false;
 let _slideVW = 0;
+let _navTimeout = null;
 
 function startMessagePolling(user) {
   stopMessagePolling();
