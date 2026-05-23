@@ -2576,7 +2576,7 @@ async function loadStreaks() {
     S.xp.wife = 0;
   }
   S.streaksLoading = false;
-  render();
+  if (S.screen !== 'intro') render();
 }
 
 async function loadWeekDurations() {
