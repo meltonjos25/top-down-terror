@@ -159,10 +159,6 @@ input.field::placeholder{color:var(--muted)}
 .modal-nav-arrow:hover{color:var(--text)}
 .modal-nav-arrow:disabled{opacity:.2;cursor:default;pointer-events:none}
 .modal-nav-counter{font-size:11px;color:var(--muted);font-weight:600;margin-top:1px}
-@keyframes modalSlideLeft{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:none}}
-@keyframes modalSlideRight{from{opacity:0;transform:translateX(-36px)}to{opacity:1;transform:none}}
-.modal-slide-left{animation:modalSlideLeft .2s ease-out both}
-.modal-slide-right{animation:modalSlideRight .2s ease-out both}
 
 /* ---- SUMMARY SCREEN ---- */
 .summary{padding:24px 20px;display:flex;flex-direction:column;gap:16px}
@@ -3810,11 +3806,7 @@ function closeModal() {
   } else { _doClose(); }
 }
 
-function navigateModal(delta) {
-  const total = S.workout.exercises.length;
-  const next = S.modal + delta;
-  if (next < 0 || next >= total) return;
-  _modalSlideDir = delta > 0 ? 'left' : 'right';
+function _commitNav(next, delta) {
   _modalNavigating = true;
   clearInterval(S.timerInterval);
   S.timerRunning = false;
@@ -3840,19 +3832,77 @@ function navigateModal(delta) {
   }
   render();
   _modalNavigating = false;
-  setTimeout(() => { _modalSlideDir = ''; }, 220);
+  // Slide new content in from the opposite side
+  const wrap = document.getElementById('modal-content-wrap');
+  if (wrap) {
+    const startX = delta > 0 ? 48 : -48;
+    wrap.style.cssText = `transition:none;transform:translateX(${startX}px);opacity:0`;
+    void wrap.offsetWidth;
+    wrap.style.cssText = 'transition:transform 0.28s cubic-bezier(.22,1,.36,1),opacity 0.22s ease-out;transform:translateX(0);opacity:1';
+    setTimeout(() => { wrap.style.cssText = ''; }, 300);
+  }
+}
+
+function navigateModal(delta) {
+  const total = S.workout.exercises.length;
+  const next = S.modal + delta;
+  if (next < 0 || next >= total) return;
+  const wrap = document.getElementById('modal-content-wrap');
+  if (wrap) {
+    const outX = delta > 0 ? -36 : 36;
+    wrap.style.cssText = `transition:transform 0.15s ease-in,opacity 0.15s ease-in;transform:translateX(${outX}px);opacity:0`;
+  }
+  setTimeout(() => _commitNav(next, delta), 150);
 }
 
 function modalTouchStart(e) {
   _touchStartX = e.touches[0].clientX;
   _touchStartY = e.touches[0].clientY;
+  _swipeDir = null;
+  _swipeActive = false;
+}
+
+function modalTouchMove(e) {
+  if (_swipeDir === 'v') return;
+  const dx = e.touches[0].clientX - _touchStartX;
+  const dy = e.touches[0].clientY - _touchStartY;
+  if (_swipeDir === null) {
+    if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+    _swipeDir = Math.abs(dx) > Math.abs(dy) ? 'h' : 'v';
+    if (_swipeDir === 'h') _swipeActive = true;
+  }
+  if (_swipeDir !== 'h') return;
+  e.preventDefault();
+  const wrap = document.getElementById('modal-content-wrap');
+  if (!wrap) return;
+  const total = S.workout.exercises.length;
+  const atStart = S.modal <= 0 && dx > 0;
+  const atEnd   = S.modal >= total - 1 && dx < 0;
+  const resist  = (atStart || atEnd) ? 0.25 : 1;
+  wrap.style.cssText = `transition:none;transform:translateX(${dx * resist}px);opacity:${1 - Math.min(Math.abs(dx) / 220, 0.45)}`;
 }
 
 function modalTouchEnd(e) {
+  if (!_swipeActive) return;
+  _swipeActive = false;
   const dx = e.changedTouches[0].clientX - _touchStartX;
-  const dy = e.changedTouches[0].clientY - _touchStartY;
-  if (Math.abs(dx) > 55 && Math.abs(dx) > Math.abs(dy) * 1.5) {
-    navigateModal(dx < 0 ? 1 : -1);
+  const wrap = document.getElementById('modal-content-wrap');
+  const total = S.workout.exercises.length;
+  const delta = dx < 0 ? 1 : -1;
+  const next = S.modal + delta;
+  if (Math.abs(dx) > 52 && next >= 0 && next < total) {
+    // Flick current content fully off-screen, then swap
+    const outX = dx < 0 ? -120 : 120;
+    if (wrap) {
+      wrap.style.cssText = `transition:transform 0.16s ease-in,opacity 0.16s ease-in;transform:translateX(${outX}px);opacity:0`;
+    }
+    setTimeout(() => _commitNav(next, delta), 160);
+  } else {
+    // Snap back to center
+    if (wrap) {
+      wrap.style.cssText = 'transition:transform 0.32s cubic-bezier(.22,1,.36,1),opacity 0.25s ease-out;transform:translateX(0);opacity:1';
+      setTimeout(() => { wrap.style.cssText = ''; }, 340);
+    }
   }
 }
 
@@ -3918,9 +3968,9 @@ function renderModal() {
   const _last = S.workout.exercises.length - 1;
   return `
   <div class="modal-overlay ${_modalNavigating ? '' : 'sheet-enter'}" onclick="handleOverlayClick(event)">
-    <div class="modal" onclick="event.stopPropagation()" ontouchstart="modalTouchStart(event)" ontouchend="modalTouchEnd(event)">
+    <div class="modal" onclick="event.stopPropagation()" ontouchstart="modalTouchStart(event)" ontouchmove="modalTouchMove(event)" ontouchend="modalTouchEnd(event)">
       <div class="modal-handle"></div>
-      <div class="${_modalSlideDir ? 'modal-slide-'+_modalSlideDir : ''}">
+      <div id="modal-content-wrap">
       <div class="modal-header">
         <button class="modal-nav-arrow" onclick="navigateModal(-1)" ${i===0?'disabled':''}>‹</button>
         <div style="flex:1;min-width:0">
@@ -4078,10 +4128,11 @@ let _userCardAnim = false; // true only on the first render after navigating to 
 let _silenceSource = null;   // looping silent buffer — holds iOS from suspending AudioContext
 let _msgPollInterval = null;
 let _introSkipped = false;
-let _modalSlideDir = '';
 let _modalNavigating = false;
 let _touchStartX = 0;
 let _touchStartY = 0;
+let _swipeDir = null;
+let _swipeActive = false;
 
 function startMessagePolling(user) {
   stopMessagePolling();
