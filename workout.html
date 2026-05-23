@@ -4096,8 +4096,8 @@ function toggleSet(i, s) {
   S.logs[i].setsState[s] = newState;
   S.logs[i].setsCompleted = S.logs[i].setsState.filter(Boolean).length;
   saveProgress();
-  // Update only the tapped button — replacing outerHTML causes a scroll glitch
-  const btn = document.querySelectorAll('.set-check')[s];
+  // Scope to pane-curr — querySelectorAll across all panes hits the wrong pane's button
+  const btn = document.querySelectorAll('#pane-curr .set-check')[s];
   if (btn) { btn.classList.toggle('done', newState); btn.textContent = newState ? '✓' : ''; }
 }
 
@@ -4301,17 +4301,26 @@ function leaveWorkout() {
 }
 
 function timerToggle() {
+  // All DOM queries scoped to pane-curr so they don't hit adjacent panes in the carousel
+  const pane = () => document.getElementById('pane-curr');
   if (S.timerRunning) {
     clearInterval(S.timerInterval);
     S.timerRunning = false;
+    const startBtn = pane()?.querySelector('.timer-btn');
+    if (startBtn) startBtn.textContent = '▶ Start';
+    const d = pane()?.querySelector('.timer-display');
+    if (d) d.classList.remove('running');
   } else {
     ensureAudioCtx(); // Must happen on this user gesture so iOS allows audio later
     if (!_silenceSource) startAudioKeepAlive(); // only restart if not already keeping alive
     S.timerRunning = true;
+    const startBtn = pane()?.querySelector('.timer-btn');
+    if (startBtn) startBtn.textContent = '⏸ Pause';
     S.timerInterval = setInterval(() => {
+      const p = pane();
       if (S.countdownTarget !== null) {
         S.timerSec--;
-        const d = document.querySelector('.timer-display');
+        const d = p?.querySelector('.timer-display');
         if (d) {
           const rem = Math.max(0, S.timerSec);
           d.textContent = `${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`;
@@ -4321,36 +4330,36 @@ function timerToggle() {
           clearInterval(S.timerInterval);
           S.timerRunning = false;
           S.timerSec = 0;
-          const d = document.querySelector('.timer-display');
-          if (d) { d.textContent = '00:00'; d.className = 'timer-display done-time'; }
-          const btn = document.querySelector('.timer-btn');
+          const d2 = p?.querySelector('.timer-display');
+          if (d2) { d2.textContent = '00:00'; d2.className = 'timer-display done-time'; }
+          const btn = p?.querySelector('.timer-btn');
           if (btn) btn.textContent = '▶ Start';
           // Visual flash — works even if audio is blocked
-          const ts = document.querySelector('.timer-section');
+          const ts = p?.querySelector('.timer-section');
           if (ts) { ts.classList.remove('timer-alarm'); void ts.offsetWidth; ts.classList.add('timer-alarm'); }
           playAlarm();
           return;
         }
       } else {
         S.timerSec++;
-        const d = document.querySelector('.timer-display');
+        const d = p?.querySelector('.timer-display');
         if (d) {
           d.textContent = `${String(Math.floor(S.timerSec/60)).padStart(2,'0')}:${String(S.timerSec%60).padStart(2,'0')}`;
           d.className = 'timer-display running';
         }
       }
-      const btn = document.querySelector('.timer-btn');
+      const btn = p?.querySelector('.timer-btn');
       if (btn) btn.textContent = '⏸ Pause';
     }, 1000);
   }
-  render();
+  // No render() — calling render() rebuilds the modal HTML with translateX(0) which snaps to pane-prev
 }
 
 function timerReset() {
   clearInterval(S.timerInterval);
   S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
   S.timerRunning = false;
-  render();
+  _renderAllPanes();
 }
 
 function setTimerPreset(sec) {
@@ -4358,7 +4367,7 @@ function setTimerPreset(sec) {
   S.timerRunning = false;
   S.countdownTarget = sec;
   S.timerSec = sec;
-  render();
+  _renderAllPanes();
 }
 
 function timerUse(i) {
