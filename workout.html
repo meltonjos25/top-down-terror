@@ -4993,6 +4993,7 @@ function renderIntro() {
     </video>
   </div>`;
   const vid = document.getElementById('intro-video');
+  vid.playbackRate = 1.25;
   vid.addEventListener('ended', skipIntro);
   // If autoplay is blocked by the browser, skip straight through
   vid.play().catch(() => skipIntro());
