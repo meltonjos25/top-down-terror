@@ -372,6 +372,28 @@ input.field::placeholder{color:var(--muted)}
 .wbb-meta{font-size:11px;color:var(--muted)}
 @keyframes newBlockSlide{from{opacity:0;transform:translateX(-50%) translateY(-18px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 .new-block-toast{position:fixed;top:68px;left:50%;transform:translateX(-50%);z-index:9000;border-radius:20px;padding:10px 20px;font-size:13px;font-weight:700;color:#fff;box-shadow:0 4px 24px rgba(0,0,0,.45);animation:newBlockSlide .4s cubic-bezier(.22,1,.36,1) both;white-space:nowrap;text-align:center}
+
+/* ---- FULLSCREEN TIMER ---- */
+.fs-overlay{position:fixed;inset:0;z-index:9500;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;opacity:0;transform:scale(.96);pointer-events:none;transition:opacity .3s ease-out,transform .3s ease-out}
+.fs-overlay.fs-in{opacity:1;transform:scale(1);pointer-events:all}
+.fs-overlay.fs-out{opacity:0;transform:scale(.96);transition:opacity .3s ease-in,transform .3s ease-in;pointer-events:none}
+.fs-base{position:absolute;inset:0;background:#0d1117}
+.fs-tint{position:absolute;inset:0;background:var(--fsc,#58a6ff);opacity:.12}
+.fs-fill{position:absolute;bottom:0;left:0;right:0;height:0%;background:var(--fsc,#58a6ff);opacity:.68;transition:height 1.05s linear}
+.fs-body{position:relative;z-index:3;display:flex;flex-direction:column;align-items:center;gap:12px;padding:0 28px;text-align:center;pointer-events:none}
+.fs-name{font-size:19px;font-weight:600;color:rgba(255,255,255,.82);max-width:320px;line-height:1.3}
+.fs-time{font-size:96px;font-weight:900;color:#fff;letter-spacing:-4px;line-height:1;font-variant-numeric:tabular-nums;text-shadow:0 2px 32px rgba(0,0,0,.45)}
+.fs-btn{position:absolute;background:rgba(0,0,0,.3);border:1.5px solid rgba(255,255,255,.22);color:#fff;font-size:15px;font-weight:700;padding:11px 22px;border-radius:24px;cursor:pointer;z-index:5;-webkit-tap-highlight-color:transparent;top:52px;touch-action:manipulation}
+.fs-cancel-btn{left:20px}
+.fs-reset-btn{right:20px}
+.fs-flash{position:absolute;inset:0;background:#fff;opacity:0;z-index:10;pointer-events:none}
+@keyframes fs-flash{0%{opacity:.92}100%{opacity:0}}
+.fs-flash.on{animation:fs-flash .6s ease-out forwards}
+.fs-confirm{position:absolute;inset:0;background:rgba(0,0,0,.72);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:20}
+.fs-confirm.show{display:flex}
+.fs-confirm-msg{color:#fff;font-size:19px;font-weight:700;text-align:center}
+.fs-confirm-btn{border:1.5px solid rgba(255,255,255,.28);color:#fff;font-size:16px;font-weight:600;padding:13px 0;border-radius:26px;cursor:pointer;width:220px;text-align:center;background:rgba(255,255,255,.12);touch-action:manipulation}
+.fs-confirm-btn.red{background:rgba(248,81,73,.38);border-color:rgba(248,81,73,.55)}
 </style>
 </head>
 <body>
@@ -4235,6 +4257,7 @@ let _swipeDir = null;
 let _swipeActive = false;
 let _slideVW = 0;
 let _navTimeout = null;
+let _fsTimerActive = false;
 
 function startMessagePolling(user) {
   stopMessagePolling();
@@ -4358,10 +4381,13 @@ function timerToggle() {
     S.timerRunning = true;
     const startBtn = pane()?.querySelector('.timer-btn');
     if (startBtn) startBtn.textContent = '⏸ Pause';
+    // Open fullscreen overlay for countdown timers
+    if (S.countdownTarget !== null && !_fsTimerActive) openFullscreenTimer();
     S.timerInterval = setInterval(() => {
       const p = pane();
       if (S.countdownTarget !== null) {
         S.timerSec--;
+        _fsUpdateDisplay(); // keep fullscreen fill + time in sync
         const d = p?.querySelector('.timer-display');
         if (d) {
           const rem = Math.max(0, S.timerSec);
@@ -4376,10 +4402,11 @@ function timerToggle() {
           if (d2) { d2.textContent = '00:00'; d2.className = 'timer-display done-time'; }
           const btn = p?.querySelector('.timer-btn');
           if (btn) btn.textContent = '▶ Start';
-          // Visual flash — works even if audio is blocked
+          // Visual flash on pane (also fires even if fullscreen is active)
           const ts = p?.querySelector('.timer-section');
           if (ts) { ts.classList.remove('timer-alarm'); void ts.offsetWidth; ts.classList.add('timer-alarm'); }
           playAlarm();
+          if (_fsTimerActive) _fsComplete(); // fullscreen completion sequence
           return;
         }
       } else {
@@ -4411,6 +4438,108 @@ function setTimerPreset(sec) {
   S.timerSec = sec;
   _renderAllPanes();
 }
+
+// ── Fullscreen timer ────────────────────────────────────────────────────────
+function openFullscreenTimer() {
+  if (_fsTimerActive || S.countdownTarget === null) return;
+  _fsTimerActive = true;
+  const phaseColor = S.workout?.blockInfo?.color || '#58a6ff';
+  const exName = (S.modal !== null) ? (S.workout?.exercises[S.modal]?.name || '') : '';
+  const fmt = s => `${String(Math.floor(s/60)).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`;
+
+  const el = document.createElement('div');
+  el.id = 'fs-timer';
+  el.className = 'fs-overlay';
+  el.style.setProperty('--fsc', phaseColor);
+  el.innerHTML = `
+    <div class="fs-base"></div>
+    <div class="fs-tint"></div>
+    <div class="fs-fill" id="fs-fill"></div>
+    <button class="fs-btn fs-cancel-btn" onclick="fsCancelTap()">✕ Cancel</button>
+    <button class="fs-btn fs-reset-btn" onclick="fsResetTap()">↺ Reset</button>
+    <div class="fs-body">
+      <div class="fs-name">${exName}</div>
+      <div class="fs-time" id="fs-time">${fmt(S.timerSec)}</div>
+    </div>
+    <div class="fs-flash" id="fs-flash"></div>
+    <div class="fs-confirm" id="fs-confirm">
+      <div class="fs-confirm-msg">Cancel this timer?</div>
+      <button class="fs-confirm-btn red" onclick="fsConfirmCancel()">Yes, cancel</button>
+      <button class="fs-confirm-btn" onclick="fsDismissConfirm()">Keep going</button>
+    </div>`;
+  document.body.appendChild(el);
+  // Double rAF to ensure the initial opacity:0 is painted before transitioning in
+  requestAnimationFrame(() => requestAnimationFrame(() => el.classList.add('fs-in')));
+}
+
+function _fsUpdateDisplay() {
+  if (!_fsTimerActive) return;
+  const rem = Math.max(0, S.timerSec);
+  const timeEl = document.getElementById('fs-time');
+  if (timeEl) timeEl.textContent = `${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`;
+  const fillEl = document.getElementById('fs-fill');
+  if (fillEl && S.countdownTarget > 0) {
+    fillEl.style.height = ((S.countdownTarget - rem) / S.countdownTarget * 100) + '%';
+  }
+}
+
+function _fsClose(cb) {
+  const el = document.getElementById('fs-timer');
+  if (!el) { _fsTimerActive = false; cb && cb(); return; }
+  el.classList.remove('fs-in');
+  el.classList.add('fs-out');
+  setTimeout(() => { el.remove(); _fsTimerActive = false; cb && cb(); }, 320);
+}
+
+function fsCancelTap() {
+  // Pause timer while confirm is shown
+  if (S.timerRunning) {
+    clearInterval(S.timerInterval);
+    S.timerRunning = false;
+    const p = document.getElementById('pane-curr');
+    const btn = p?.querySelector('.timer-btn'); if (btn) btn.textContent = '▶ Start';
+    const d = p?.querySelector('.timer-display'); if (d) d.classList.remove('running');
+  }
+  document.getElementById('fs-confirm')?.classList.add('show');
+}
+
+function fsDismissConfirm() {
+  document.getElementById('fs-confirm')?.classList.remove('show');
+}
+
+function fsConfirmCancel() {
+  _fsClose();
+}
+
+function fsResetTap() {
+  clearInterval(S.timerInterval);
+  S.timerRunning = false;
+  S.timerSec = S.countdownTarget;
+  // Reset fill instantly (no transition) then re-enable
+  const fillEl = document.getElementById('fs-fill');
+  if (fillEl) {
+    fillEl.style.transition = 'none';
+    fillEl.style.height = '0%';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      if (fillEl) fillEl.style.transition = 'height 1.05s linear';
+    }));
+  }
+  _renderAllPanes();
+  _fsClose();
+}
+
+function _fsComplete() {
+  // Flash the screen white
+  const flashEl = document.getElementById('fs-flash');
+  if (flashEl) { void flashEl.offsetWidth; flashEl.classList.add('on'); }
+  // After flash: auto-complete the exercise, close fullscreen
+  setTimeout(() => {
+    const i = S.modal;
+    if (i !== null) markDone(i); // marks done, saves, calls render() — shows workout screen
+    _fsClose();
+  }, 600);
+}
+// ────────────────────────────────────────────────────────────────────────────
 
 function timerUse(i) {
   const log = S.logs[i];
