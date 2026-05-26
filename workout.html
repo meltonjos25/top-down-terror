@@ -4544,6 +4544,8 @@ function _fsComplete() {
         saveProgress();
       }
     }
+    // Reset timer so it's ready for the next set without needing a manual Reset tap
+    S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
     _fsClose(() => _renderAllPanes());
   }, 600);
 }
