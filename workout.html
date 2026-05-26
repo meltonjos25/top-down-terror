@@ -4532,11 +4532,19 @@ function _fsComplete() {
   // Flash the screen white
   const flashEl = document.getElementById('fs-flash');
   if (flashEl) { void flashEl.offsetWidth; flashEl.classList.add('on'); }
-  // After flash: auto-complete the exercise, close fullscreen
+  // After flash: tick the next unchecked set only, then close fullscreen and stay in the modal
   setTimeout(() => {
     const i = S.modal;
-    if (i !== null) markDone(i); // marks done, saves, calls render() — shows workout screen
-    _fsClose();
+    if (i !== null && S.logs[i]) {
+      const log = S.logs[i];
+      const nextSet = log.setsState.findIndex(v => !v);
+      if (nextSet !== -1) {
+        log.setsState[nextSet] = true;
+        log.setsCompleted = log.setsState.filter(Boolean).length;
+        saveProgress();
+      }
+    }
+    _fsClose(() => _renderAllPanes());
   }, 600);
 }
 // ────────────────────────────────────────────────────────────────────────────
