@@ -3233,14 +3233,15 @@ function render() {
 const GAS_CODE = `const SHEET_ID = '1zqR0CeERQg_8YtgWnQYxiFKAbGcZb4Zvf-R1Iqn46t8';
 
 function doGet(e) {
-  var action = e.parameter.action || 'ping';
+  var params = (e && e.parameter) ? e.parameter : {};
+  var action = params.action || 'ping';
   var ss = SpreadsheetApp.openById(SHEET_ID);
 
   if (action === 'get_plan') {
-    var sheet = ss.getSheetByName(e.parameter.sheet);
-    if (!sheet) return res({error: 'Sheet not found: ' + e.parameter.sheet});
+    var sheet = ss.getSheetByName(params.sheet);
+    if (!sheet) return res({error: 'Sheet not found: ' + params.sheet});
     var rows = sheet.getDataRange().getValues();
-    var day = e.parameter.day;
+    var day = params.day;
     var exercises = rows.slice(1)
       .filter(function(r){ return String(r[0]) === day; })
       .map(function(r){
@@ -3251,26 +3252,26 @@ function doGet(e) {
   }
 
   if (action === 'log') {
-    var data = JSON.parse(decodeURIComponent(e.parameter.data));
+    var data = JSON.parse(decodeURIComponent(params.data));
     var logSheet = ss.getSheetByName(data.sheet) || ss.insertSheet(data.sheet);
     data.rows.forEach(function(row){ logSheet.appendRow(row); });
     return res({success: true});
   }
 
   if (action === 'read') {
-    var s = ss.getSheetByName(e.parameter.sheet);
+    var s = ss.getSheetByName(params.sheet);
     var vals = s ? s.getDataRange().getValues().slice(1) : [];
     return res({rows: vals});
   }
 
   if (action === 'read_all') {
-    var s = ss.getSheetByName(e.parameter.sheet);
+    var s = ss.getSheetByName(params.sheet);
     var vals = s ? s.getDataRange().getValues() : [];
     return res({rows: vals});
   }
 
   if (action === 'claude_benefit') {
-    var data = JSON.parse(decodeURIComponent(e.parameter.data));
+    var data = JSON.parse(decodeURIComponent(params.data));
     var apiKey = data.apiKey || '';
     var exName = data.exName || '';
     if (!apiKey || !exName) return res({error: 'Missing apiKey or exName'});
