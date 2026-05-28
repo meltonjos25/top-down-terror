@@ -394,6 +394,13 @@ input.field::placeholder{color:var(--muted)}
 .fs-confirm-msg{color:#fff;font-size:19px;font-weight:700;text-align:center}
 .fs-confirm-btn{border:1.5px solid rgba(255,255,255,.28);color:#fff;font-size:16px;font-weight:600;padding:13px 0;border-radius:26px;cursor:pointer;width:220px;text-align:center;background:rgba(255,255,255,.12);touch-action:manipulation}
 .fs-confirm-btn.red{background:rgba(248,81,73,.38);border-color:rgba(248,81,73,.55)}
+/* ---- EXERCISE BENEFITS ---- */
+.benefit-section{margin-bottom:14px}
+.benefit-header{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
+.benefit-text{font-size:13px;line-height:1.65;color:var(--muted);animation:benefit-fadein .4s ease forwards}
+@keyframes benefit-fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.benefit-loading{height:52px;border-radius:8px;background:linear-gradient(90deg,var(--surface2) 0%,var(--surface) 50%,var(--surface2) 100%);background-size:200% 100%;animation:benefit-shimmer 1.5s ease-in-out infinite}
+@keyframes benefit-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
 </style>
 </head>
 <body>
@@ -3293,6 +3300,12 @@ function renderSetup() {
     ${S.error ? `<div class="error-msg">${S.error}</div>` : ''}
     <button class="btn btn-primary" onclick="saveGasUrl()">Continue →</button>
     <div class="skip-link">Already set up? <a onclick="trySkip()">Skip to workout</a></div>
+    <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border)">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">AI Exercise Explanations (Optional)</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Enter a Claude API key to get a short "Why This Works" explanation on every exercise card.</div>
+      <input class="field" id="claude-key" type="password" placeholder="sk-ant-…" value="${escapeHtml(localStorage.getItem('claudeApiKey') || '')}">
+      <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="saveClaudeKey()">Save API Key</button>
+    </div>
   </div>`;
 }
 
@@ -3309,6 +3322,13 @@ function saveGasUrl() {
   localStorage.setItem('gasUrl', v);
   S.error = '';
   _exitSplash(() => goUserSelect());
+}
+
+function saveClaudeKey() {
+  const v = (document.getElementById('claude-key')?.value || '').trim();
+  if (v) { localStorage.setItem('claudeApiKey', v); } else { localStorage.removeItem('claudeApiKey'); }
+  const btn = document.querySelector('[onclick="saveClaudeKey()"]');
+  if (btn) { btn.textContent = 'Saved!'; setTimeout(() => btn.textContent = 'Save API Key', 2000); }
 }
 
 function trySkip() {
@@ -3875,6 +3895,7 @@ function openModal(i) {
     const _track = document.getElementById('modal-slide-track');
     if (_track) { _track.style.transition = 'none'; _track.style.transform = `translateX(${-_slideVW}px)`; }
   }
+  loadBenefitForCurrentPane();
 }
 
 function closeModal() {
@@ -3909,6 +3930,7 @@ function _renderAllPanes() {
   if (prev) prev.innerHTML = i > 0 ? renderModalInner(i - 1) : '';
   if (curr) curr.innerHTML = renderModalInner(i);
   if (nxt)  nxt.innerHTML  = i < total - 1 ? renderModalInner(i + 1) : '';
+  loadBenefitForCurrentPane();
 }
 
 function _commitNav(next, delta) {
@@ -4075,6 +4097,15 @@ function renderModalInner(i) {
   </div>` : '';
 
   const _last = S.workout.exercises.length - 1;
+  const _benefitCache = getBenefitsCache();
+  const _benefitText = _benefitCache[ex.name];
+  const _hasClaude = !!localStorage.getItem('claudeApiKey');
+  const _benefitHTML = _hasClaude ? `
+  <div class="benefit-section" data-exname="${escapeHtml(ex.name)}">
+    ${_benefitText
+      ? `<div class="benefit-header">💡 Why This Works</div><div class="benefit-text">${escapeHtml(_benefitText)}</div>`
+      : `<div class="benefit-loading"></div>`}
+  </div>` : '';
   return `
   <div class="modal-header">
     <button class="modal-nav-arrow" onclick="navigateModal(-1)" ${i===0?'disabled':''}>‹</button>
@@ -4086,6 +4117,7 @@ function renderModalInner(i) {
     <button class="modal-close" onclick="closeModal()">×</button>
   </div>
   <div class="modal-body">
+    ${_benefitHTML}
     ${ex.note ? `<div class="modal-note">${ex.note}</div>` : ''}
     ${ex.demo ? `<button class="modal-demo" onclick="openGifModal('${ex.demo.replace(/'/g,"\\'")}','${ex.name.replace(/'/g,"\\'")}')">▶ Watch Demo</button>` : ''}
     <div class="target-hint">Target: <strong>${ex.sets} × ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">↑ PROGRESSED</span>' : ''}</div>
@@ -4820,6 +4852,63 @@ function saveBday(user, val) {
   if (!val) { setBirthday(user, ''); return; }
   const m = val.match(/^\d{4}-(\d{2}-\d{2})$/);
   if (m) setBirthday(user, m[1]);
+}
+
+// ---- EXERCISE BENEFITS (Claude AI) ----
+function getBenefitsCache() {
+  try { return JSON.parse(localStorage.getItem('benefits_cache') || '{}'); } catch(e) { return {}; }
+}
+function setBenefitCache(name, text) {
+  const c = getBenefitsCache();
+  c[name] = text;
+  try { localStorage.setItem('benefits_cache', JSON.stringify(c)); } catch(e) {}
+}
+
+async function fetchExerciseBenefit(exName) {
+  const apiKey = localStorage.getItem('claudeApiKey') || '';
+  if (!apiKey) return null;
+  const resp = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+      'anthropic-dangerous-direct-browser-api-usage': 'true'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 150,
+      messages: [{ role: 'user', content: `In 2 to 3 sentences explain the fitness benefits of the exercise called ${exName}, what muscles it works, and why it is valuable for someone doing a home bodyweight and resistance band workout. Keep the explanation simple, motivating, and easy to understand for a non-athlete.` }]
+    })
+  });
+  if (!resp.ok) throw new Error(`Claude API error: ${resp.status}`);
+  const data = await resp.json();
+  return data.content?.[0]?.text?.trim() || null;
+}
+
+async function loadBenefitForCurrentPane() {
+  if (S.modal === null || !S.workout) return;
+  const exName = S.workout.exercises[S.modal].name;
+  if (!localStorage.getItem('claudeApiKey')) return;
+  const cache = getBenefitsCache();
+  if (cache[exName]) return; // already cached — was rendered inline
+
+  // Verify the current pane still shows this exercise before and after the async call
+  const getSection = () => {
+    const p = document.getElementById('pane-curr');
+    const s = p?.querySelector('.benefit-section');
+    return (s?.dataset?.exname === exName) ? s : null;
+  };
+  if (!getSection()) return;
+
+  try {
+    const text = await fetchExerciseBenefit(exName);
+    if (!text) return;
+    setBenefitCache(exName, text);
+    const sec = getSection();
+    if (!sec) return; // user navigated away during fetch
+    sec.innerHTML = `<div class="benefit-header">💡 Why This Works</div><div class="benefit-text">${escapeHtml(text)}</div>`;
+  } catch(e) {}
 }
 
 // ---- MESSAGES TAB ----
