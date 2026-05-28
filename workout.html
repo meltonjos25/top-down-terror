@@ -3269,6 +3269,34 @@ function doGet(e) {
     return res({rows: vals});
   }
 
+  if (action === 'claude_benefit') {
+    var data = JSON.parse(decodeURIComponent(e.parameter.data));
+    var apiKey = data.apiKey || '';
+    var exName = data.exName || '';
+    if (!apiKey || !exName) return res({error: 'Missing apiKey or exName'});
+    var prompt = 'In 2 to 3 sentences explain the fitness benefits of the exercise called ' + exName + ', what muscles it works, and why it is valuable for someone doing a home bodyweight and resistance band workout. Keep the explanation simple, motivating, and easy to understand for a non-athlete.';
+    try {
+      var claudeResp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+        method: 'post',
+        contentType: 'application/json',
+        headers: { 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+        payload: JSON.stringify({
+          model: 'claude-haiku-4-5-20251001',
+          max_tokens: 150,
+          messages: [{ role: 'user', content: prompt }]
+        }),
+        muteHttpExceptions: true
+      });
+      var code = claudeResp.getResponseCode();
+      if (code !== 200) return res({error: 'Claude error ' + code + ': ' + claudeResp.getContentText()});
+      var result = JSON.parse(claudeResp.getContentText());
+      var text = (result.content && result.content[0]) ? result.content[0].text.trim() : '';
+      return res({text: text});
+    } catch(err) {
+      return res({error: 'Proxy exception: ' + err.toString()});
+    }
+  }
+
   return res({status: 'ok'});
 }
 
@@ -3302,7 +3330,7 @@ function renderSetup() {
     <div class="skip-link">Already set up? <a onclick="trySkip()">Skip to workout</a></div>
     <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border)">
       <div style="font-size:13px;font-weight:700;margin-bottom:4px">AI Exercise Explanations (Optional)</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Enter a Claude API key to get a short "Why This Works" explanation on every exercise card.</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Get a short "Why This Works" explanation on every exercise card. Requires a Claude API key and an updated GAS script (copy the code above, paste it into your GAS editor, then click <strong>Deploy → Manage deployments → Edit → New version → Deploy</strong>).</div>
       <input class="field" id="claude-key" type="password" placeholder="sk-ant-…" value="${escapeHtml(localStorage.getItem('claudeApiKey') || '')}">
       <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="saveClaudeKey()">Save API Key</button>
     </div>
@@ -4866,38 +4894,27 @@ function setBenefitCache(name, text) {
 
 async function fetchExerciseBenefit(exName) {
   const apiKey = localStorage.getItem('claudeApiKey') || '';
-  if (!apiKey) { console.warn('[Benefits] No API key found in localStorage (key: claudeApiKey)'); return null; }
-  console.log(`[Benefits] Calling Claude API for: "${exName}" (key starts with: ${apiKey.slice(0,10)}…)`);
+  if (!apiKey) { console.warn('[Benefits] No claudeApiKey in localStorage'); return null; }
+  if (!S.gasUrl) { console.warn('[Benefits] No GAS URL configured'); return null; }
+  console.log(`[Benefits] Calling Claude via GAS proxy for: "${exName}" (key: ${apiKey.slice(0,10)}…)`);
+  const payload = encodeURIComponent(JSON.stringify({ apiKey, exName }));
   let resp;
   try {
-    resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-api-usage': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 150,
-        messages: [{ role: 'user', content: `In 2 to 3 sentences explain the fitness benefits of the exercise called ${exName}, what muscles it works, and why it is valuable for someone doing a home bodyweight and resistance band workout. Keep the explanation simple, motivating, and easy to understand for a non-athlete.` }]
-      })
-    });
+    resp = await fetch(`${S.gasUrl}?action=claude_benefit&data=${payload}`);
   } catch(networkErr) {
-    console.error('[Benefits] Network/CORS error (fetch itself failed):', networkErr);
+    console.error('[Benefits] Network error calling GAS proxy:', networkErr);
     throw networkErr;
   }
-  console.log(`[Benefits] API response status: ${resp.status}`);
+  console.log(`[Benefits] GAS proxy response status: ${resp.status}`);
   if (!resp.ok) {
-    let errBody = '';
-    try { errBody = await resp.text(); } catch(e) {}
-    console.error(`[Benefits] API error ${resp.status}:`, errBody);
-    throw new Error(`Claude API error ${resp.status}: ${errBody}`);
+    let body = ''; try { body = await resp.text(); } catch(e) {}
+    console.error(`[Benefits] GAS proxy HTTP error ${resp.status}:`, body);
+    throw new Error(`GAS proxy error ${resp.status}`);
   }
   const data = await resp.json();
-  console.log('[Benefits] API success, content:', data.content);
-  return data.content?.[0]?.text?.trim() || null;
+  if (data.error) { console.error('[Benefits] GAS proxy returned error:', data.error); throw new Error(data.error); }
+  console.log(`[Benefits] Success — "${exName}":`, data.text?.slice(0, 60) + '…');
+  return data.text || null;
 }
 
 async function loadBenefitForCurrentPane() {
