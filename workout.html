@@ -4866,32 +4866,47 @@ function setBenefitCache(name, text) {
 
 async function fetchExerciseBenefit(exName) {
   const apiKey = localStorage.getItem('claudeApiKey') || '';
-  if (!apiKey) return null;
-  const resp = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
-      'anthropic-dangerous-direct-browser-api-usage': 'true'
-    },
-    body: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
-      max_tokens: 150,
-      messages: [{ role: 'user', content: `In 2 to 3 sentences explain the fitness benefits of the exercise called ${exName}, what muscles it works, and why it is valuable for someone doing a home bodyweight and resistance band workout. Keep the explanation simple, motivating, and easy to understand for a non-athlete.` }]
-    })
-  });
-  if (!resp.ok) throw new Error(`Claude API error: ${resp.status}`);
+  if (!apiKey) { console.warn('[Benefits] No API key found in localStorage (key: claudeApiKey)'); return null; }
+  console.log(`[Benefits] Calling Claude API for: "${exName}" (key starts with: ${apiKey.slice(0,10)}…)`);
+  let resp;
+  try {
+    resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-api-usage': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 150,
+        messages: [{ role: 'user', content: `In 2 to 3 sentences explain the fitness benefits of the exercise called ${exName}, what muscles it works, and why it is valuable for someone doing a home bodyweight and resistance band workout. Keep the explanation simple, motivating, and easy to understand for a non-athlete.` }]
+      })
+    });
+  } catch(networkErr) {
+    console.error('[Benefits] Network/CORS error (fetch itself failed):', networkErr);
+    throw networkErr;
+  }
+  console.log(`[Benefits] API response status: ${resp.status}`);
+  if (!resp.ok) {
+    let errBody = '';
+    try { errBody = await resp.text(); } catch(e) {}
+    console.error(`[Benefits] API error ${resp.status}:`, errBody);
+    throw new Error(`Claude API error ${resp.status}: ${errBody}`);
+  }
   const data = await resp.json();
+  console.log('[Benefits] API success, content:', data.content);
   return data.content?.[0]?.text?.trim() || null;
 }
 
 async function loadBenefitForCurrentPane() {
-  if (S.modal === null || !S.workout) return;
+  if (S.modal === null || !S.workout) { console.log('[Benefits] loadBenefit: no modal/workout, skipping'); return; }
   const exName = S.workout.exercises[S.modal].name;
-  if (!localStorage.getItem('claudeApiKey')) return;
+  console.log(`[Benefits] loadBenefit called for: "${exName}"`);
+  if (!localStorage.getItem('claudeApiKey')) { console.log('[Benefits] No claudeApiKey in localStorage, skipping'); return; }
   const cache = getBenefitsCache();
-  if (cache[exName]) return; // already cached — was rendered inline
+  if (cache[exName]) { console.log(`[Benefits] "${exName}" already cached, skipping fetch`); return; }
 
   // Verify the current pane still shows this exercise before and after the async call
   const getSection = () => {
@@ -4899,16 +4914,19 @@ async function loadBenefitForCurrentPane() {
     const s = p?.querySelector('.benefit-section');
     return (s?.dataset?.exname === exName) ? s : null;
   };
-  if (!getSection()) return;
+  if (!getSection()) { console.warn(`[Benefits] benefit-section not found in pane-curr for "${exName}"`); return; }
 
   try {
     const text = await fetchExerciseBenefit(exName);
-    if (!text) return;
+    if (!text) { console.warn('[Benefits] API returned empty text'); return; }
     setBenefitCache(exName, text);
     const sec = getSection();
-    if (!sec) return; // user navigated away during fetch
+    if (!sec) { console.log('[Benefits] pane changed during fetch, text cached but not rendered'); return; }
     sec.innerHTML = `<div class="benefit-header">💡 Why This Works</div><div class="benefit-text">${escapeHtml(text)}</div>`;
-  } catch(e) {}
+    console.log(`[Benefits] "${exName}" rendered successfully`);
+  } catch(e) {
+    console.error('[Benefits] loadBenefit failed:', e);
+  }
 }
 
 // ---- MESSAGES TAB ----
