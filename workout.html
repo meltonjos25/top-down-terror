@@ -4833,7 +4833,7 @@ async function loadMessages() {
     const deleted = new Set(JSON.parse(localStorage.getItem('deletedMsgs_' + user) || '[]'));
     const sent = [], received = [];
     rows.forEach(row => {
-      const date = String(row[0] || '').trim();
+      const date = normDateStr(String(row[0] || ''));
       const time = String(row[1] || '').trim();
       const from = String(row[2] || '').trim().toLowerCase();
       const to   = String(row[3] || '').trim().toLowerCase();
@@ -4991,6 +4991,11 @@ function deleteReceivedMsg(key) {
   const stored = JSON.parse(localStorage.getItem('deletedMsgs_' + S.user) || '[]');
   if (!stored.includes(key)) stored.push(key);
   localStorage.setItem('deletedMsgs_' + S.user, JSON.stringify(stored));
+  // Also mark as shown so the popup never fires again for this deleted message
+  const shownKey = 'shownPopups_' + S.user;
+  const shown = JSON.parse(localStorage.getItem(shownKey) || '[]');
+  if (!shown.includes(key)) shown.push(key);
+  localStorage.setItem(shownKey, JSON.stringify(shown));
   render();
 }
 
@@ -4998,6 +5003,7 @@ function checkAndShowDedicationPopup(user) {
   gasReadAll(MESSAGES_SHEET).then(rows => {
     const storageKey = `shownPopups_${user}`;
     const shown = new Set(JSON.parse(localStorage.getItem(storageKey) || '[]'));
+    const deleted = new Set(JSON.parse(localStorage.getItem('deletedMsgs_' + user) || '[]'));
     const unread = [];
     rows.forEach(row => {
       const date = normDateStr(String(row[0] || ''));
@@ -5006,8 +5012,8 @@ function checkAndShowDedicationPopup(user) {
       const text = String(row[4] || '').trim();
       if (to !== user || !date || !text) return;
       const from = String(row[2] || '').trim();
-      const key  = `${date}|${time}|${from}|${text.slice(0, 60)}`;
-      if (!shown.has(key)) unread.push({ date, time, from, text, key });
+      const key  = `${date}|${from}|${text.slice(0, 60)}`;  // no time — stable key matching msgKey format
+      if (!shown.has(key) && !deleted.has(key)) unread.push({ date, time, from, text, key });
     });
     if (unread.length) {
       unread.forEach(m => shown.add(m.key));
