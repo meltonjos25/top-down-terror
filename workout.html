@@ -3309,6 +3309,16 @@ function res(data) {
   return ContentService
     .createTextOutput(JSON.stringify(data))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+// Run this function ONCE manually after pasting code to grant all required permissions.
+// Select "triggerAuth" in the function dropdown and click Run. Accept all permission prompts.
+// After it logs "Auth OK" you can deploy. You never need to run it again unless you
+// create a brand-new GAS project.
+function triggerAuth() {
+  SpreadsheetApp.openById(SHEET_ID);
+  UrlFetchApp.fetch('https://www.google.com', {muteHttpExceptions: true});
+  Logger.log('Auth OK — permissions granted. Now deploy via Manage deployments > Edit > New version > Deploy.');
 }`;
 
 function renderSetup() {
@@ -3321,9 +3331,9 @@ function renderSetup() {
     <p>One-time setup: deploy a tiny Google Apps Script so the app can write to your sheet — no sign-in needed on your phone.</p>
     <div class="setup-steps">
       <div class="step"><div class="step-num">1</div><div class="step-text">Go to <a href="https://script.google.com" target="_blank">script.google.com</a> → click <strong>New project</strong></div></div>
-      <div class="step"><div class="step-num">2</div><div class="step-text">Delete everything in the editor, paste the code below, then click <strong>Save</strong> (disk icon)</div></div>
-      <div class="step"><div class="step-num">3</div><div class="step-text">Click <strong>Deploy → New deployment</strong> → gear icon → <strong>Web app</strong><br>• Execute as: <strong>Me</strong><br>• Who has access: <strong>Anyone</strong><br>→ click <strong>Deploy</strong></div></div>
-      <div class="step"><div class="step-num">4</div><div class="step-text">Copy the <strong>Web app URL</strong> and paste it below</div></div>
+      <div class="step"><div class="step-num">2</div><div class="step-text">Delete everything in the editor, paste the code below, click <strong>Save</strong> (disk icon)</div></div>
+      <div class="step"><div class="step-num">3</div><div class="step-text"><strong>Authorize permissions (do this first, every time you paste new code):</strong> In the function dropdown next to the Run button, select <strong>triggerAuth</strong> → click <strong>Run</strong> → click <strong>Review Permissions</strong> → choose your Google account → click <strong>Advanced</strong> → <strong>Go to [project] (unsafe)</strong> → click <strong>Allow</strong>. Wait for the log to say "Auth OK".</div></div>
+      <div class="step"><div class="step-num">4</div><div class="step-text"><strong>First-time deploy only:</strong> Click <strong>Deploy → New deployment</strong> → gear icon → <strong>Web app</strong> · Execute as: <strong>Me</strong> · Who has access: <strong>Anyone</strong> → <strong>Deploy</strong> → copy the Web app URL and paste it below.<br><strong>For all future updates:</strong> Deploy → <strong>Manage deployments</strong> → pencil icon → <strong>New version</strong> → <strong>Deploy</strong>. Never click "New deployment" again — it breaks authorization.</div></div>
     </div>
     <div style="position:relative">
       <pre style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;font-size:11px;overflow-x:auto;white-space:pre;color:var(--muted);line-height:1.5">${GAS_CODE.replace(/</g,'&lt;')}</pre>
@@ -3335,7 +3345,7 @@ function renderSetup() {
     <div class="skip-link">Already set up? <a onclick="trySkip()">Skip to workout</a></div>
     <div style="margin-top:28px;padding-top:20px;border-top:1px solid var(--border)">
       <div style="font-size:13px;font-weight:700;margin-bottom:4px">AI Exercise Explanations (Optional)</div>
-      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Get a short "Why This Works" explanation on every exercise card. Requires a Claude API key and an updated GAS script (copy the code above, paste it into your GAS editor, then click <strong>Deploy → Manage deployments → Edit → New version → Deploy</strong>).</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Get a "Why This Works" explanation on every exercise card. Requires a Claude API key. To update the GAS script: paste the code above into your GAS editor → run <strong>triggerAuth</strong> → Deploy → <strong>Manage deployments → pencil → New version → Deploy</strong>.</div>
       <input class="field" id="claude-key" type="password" placeholder="sk-ant-…" value="${escapeHtml(localStorage.getItem('claudeApiKey') || '')}">
       <button class="btn btn-secondary btn-sm" style="margin-top:8px" onclick="saveClaudeKey()">Save API Key</button>
     </div>
