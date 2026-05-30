@@ -3275,7 +3275,7 @@ function doGet(e) {
     var apiKey = data.apiKey || '';
     var exName = data.exName || '';
     if (!apiKey || !exName) return res({error: 'Missing apiKey or exName'});
-    var prompt = 'In 2 to 3 sentences explain the fitness benefits of the exercise called ' + exName + ', what muscles it works, and why it is valuable for someone doing a home bodyweight and resistance band workout. Keep the explanation simple, motivating, and easy to understand for a non-athlete.';
+    var prompt = 'For the exercise called ' + exName + ', give me exactly three sentences and nothing else. Sentence 1 must begin with exactly the words Muscles Targeted: followed by the specific named muscles this exercise works such as transverse abdominis, glutes, triceps — never say core or upper body. Sentence 2 must begin with exactly the words Movement Benefit: followed by the specific functional movement pattern this exercise builds. Sentence 3 must begin with exactly the words Sport Application: followed by one specific sport and one specific movement in that sport that this exercise directly improves. Every response must be completely unique and specific to the exact exercise name provided. Never give the same response for two different exercises.';
     try {
       var claudeResp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
         method: 'post',
@@ -4896,6 +4896,22 @@ function setBenefitCache(name, text) {
   c[name] = text;
   try { localStorage.setItem('benefits_cache', JSON.stringify(c)); } catch(e) {}
 }
+
+// Clear cache when prompt version changes so stale responses are discarded
+(function() {
+  const V = 'prompt-v2';
+  if (localStorage.getItem('benefits_cache_ver') !== V) {
+    localStorage.removeItem('benefits_cache');
+    localStorage.setItem('benefits_cache_ver', V);
+    console.log('[Benefits] Cache cleared for prompt-v2');
+  }
+})();
+
+window.clearBenefitsCache = function() {
+  localStorage.removeItem('benefits_cache');
+  localStorage.removeItem('benefits_cache_ver');
+  console.log('[Benefits] Cache cleared — reload the exercise to refetch.');
+};
 
 async function fetchExerciseBenefit(exName) {
   const apiKey = localStorage.getItem('claudeApiKey') || '';
