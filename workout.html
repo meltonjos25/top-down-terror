@@ -4949,36 +4949,31 @@ window.testBenefitProxy = function(exName) {
 };
 
 const BENEFIT_FALLBACK = 'This exercise builds strength and develops the muscles needed for everyday movement, improving stability and long-term fitness.';
+const _benefitInFlight = new Set();
 
 async function loadBenefitForCurrentPane() {
   if (S.modal === null || !S.workout) return;
-  const modalIdx = S.modal;
-  const exName = S.workout.exercises[modalIdx].name;
+  const exName = S.workout.exercises[S.modal].name;
   if (!localStorage.getItem('claudeApiKey')) return;
   const cache = getBenefitsCache();
-  if (cache[exName]) return;
+  if (cache[exName] || _benefitInFlight.has(exName)) return;
 
-  const getSection = () => document.getElementById('pane-curr')?.querySelector('.benefit-section') || null;
-  if (!getSection()) return;
-
-  const showBenefit = (text) => {
-    if (S.modal !== modalIdx) return;
-    const sec = getSection();
-    if (!sec) return;
-    sec.innerHTML = `<div class="benefit-header">💡 Why This Works</div><div class="benefit-text">${escapeHtml(text)}</div>`;
-    console.log(`[Benefits] rendered "${exName}": ${text.slice(0, 60)}…`);
-  };
-
+  _benefitInFlight.add(exName);
+  let finalText;
   try {
     const text = await fetchExerciseBenefit(exName);
-    const final = (text && text.trim()) ? text.trim() : BENEFIT_FALLBACK;
-    setBenefitCache(exName, final);
-    showBenefit(final);
+    finalText = (text && text.trim()) ? text.trim() : BENEFIT_FALLBACK;
+    console.log('[Benefits] fetched "' + exName + '": ' + finalText.slice(0, 60) + '…');
   } catch(e) {
     console.error('[Benefits] fetch failed for "' + exName + '":', e.message);
-    setBenefitCache(exName, BENEFIT_FALLBACK);
-    showBenefit(BENEFIT_FALLBACK);
+    finalText = BENEFIT_FALLBACK;
+  } finally {
+    _benefitInFlight.delete(exName);
   }
+
+  setBenefitCache(exName, finalText);
+  // Re-render panes so renderModalInner picks up the cached text — no fragile DOM surgery
+  if (S.modal !== null) _renderAllPanes();
 }
 
 // ---- MESSAGES TAB ----
