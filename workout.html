@@ -3291,7 +3291,11 @@ function doGet(e) {
       var code = claudeResp.getResponseCode();
       if (code !== 200) return res({error: 'Claude error ' + code + ': ' + claudeResp.getContentText()});
       var result = JSON.parse(claudeResp.getContentText());
-      var text = (result.content && result.content[0]) ? result.content[0].text.trim() : '';
+      var text = '';
+      if (result.content && Array.isArray(result.content)) {
+        var tb = result.content.find(function(b){ return b.type === 'text'; });
+        text = tb ? (tb.text || '').trim() : '';
+      }
       return res({text: text});
     } catch(err) {
       return res({error: 'Proxy exception: ' + err.toString()});
@@ -4944,33 +4948,36 @@ window.testBenefitProxy = function(exName) {
   fetch(url).then(r => r.json()).then(d => console.log('[Benefits] Test result:', d)).catch(e => console.error('[Benefits] Test failed:', e));
 };
 
+const BENEFIT_FALLBACK = 'This exercise builds strength and develops the muscles needed for everyday movement, improving stability and long-term fitness.';
+
 async function loadBenefitForCurrentPane() {
   if (S.modal === null || !S.workout) return;
-  const exName = S.workout.exercises[S.modal].name;
-  console.log(`[Benefits] loadBenefit called for: "${exName}"`);
-  if (!localStorage.getItem('claudeApiKey')) { console.log('[Benefits] No claudeApiKey, skipping'); return; }
+  const modalIdx = S.modal;
+  const exName = S.workout.exercises[modalIdx].name;
+  if (!localStorage.getItem('claudeApiKey')) return;
   const cache = getBenefitsCache();
-  if (cache[exName]) { console.log(`[Benefits] "${exName}" cached, skipping fetch`); return; }
+  if (cache[exName]) return;
 
-  const getSection = () => {
-    const p = document.getElementById('pane-curr');
-    const s = p?.querySelector('.benefit-section');
-    return (s?.dataset?.exname === exName) ? s : null;
-  };
-  if (!getSection()) { console.warn(`[Benefits] .benefit-section not found in pane-curr for "${exName}"`); return; }
+  const getSection = () => document.getElementById('pane-curr')?.querySelector('.benefit-section') || null;
+  if (!getSection()) return;
 
-  try {
-    const text = await fetchExerciseBenefit(exName);
-    setBenefitCache(exName, text);
+  const showBenefit = (text) => {
+    if (S.modal !== modalIdx) return;
     const sec = getSection();
     if (!sec) return;
     sec.innerHTML = `<div class="benefit-header">💡 Why This Works</div><div class="benefit-text">${escapeHtml(text)}</div>`;
-    console.log(`[Benefits] "${exName}" rendered`);
+    console.log(`[Benefits] rendered "${exName}": ${text.slice(0, 60)}…`);
+  };
+
+  try {
+    const text = await fetchExerciseBenefit(exName);
+    const final = (text && text.trim()) ? text.trim() : BENEFIT_FALLBACK;
+    setBenefitCache(exName, final);
+    showBenefit(final);
   } catch(e) {
-    console.error('[Benefits] loadBenefit failed:', e.message);
-    // Replace spinner with a subtle error so the user doesn't see an endless loading bar
-    const sec = getSection();
-    if (sec) sec.innerHTML = '';
+    console.error('[Benefits] fetch failed for "' + exName + '":', e.message);
+    setBenefitCache(exName, BENEFIT_FALLBACK);
+    showBenefit(BENEFIT_FALLBACK);
   }
 }
 
