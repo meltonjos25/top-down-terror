@@ -3272,15 +3272,16 @@ function doGet(e) {
 
   if (action === 'claude_benefit') {
     var data = JSON.parse(decodeURIComponent(params.data));
-    var apiKey = data.apiKey || '';
-    var exName = data.exName || '';
+    var apiKey = (data.apiKey || '').trim();
+    var exName = (data.exName || '').trim();
     if (!apiKey || !exName) return res({error: 'Missing apiKey or exName'});
+    Logger.log('claude_benefit: keyPrefix=' + apiKey.slice(0,10) + ' keyLen=' + apiKey.length + ' exName=' + exName);
     var prompt = 'For the exercise called ' + exName + ', give me exactly three sentences and nothing else. Sentence 1 must begin with exactly the words Muscles Targeted: followed by the specific named muscles this exercise works such as transverse abdominis, glutes, triceps — never say core or upper body. Sentence 2 must begin with exactly the words Movement Benefit: followed by the specific functional movement pattern this exercise builds. Sentence 3 must begin with exactly the words Sport Application: followed by one specific sport and one specific movement in that sport that this exercise directly improves. Every response must be completely unique and specific to the exact exercise name provided. Never give the same response for two different exercises.';
     try {
       var claudeResp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
         method: 'post',
         contentType: 'application/json',
-        headers: { 'Authorization': 'Bearer ' + apiKey, 'anthropic-version': '2023-06-01' },
+        headers: { 'x-api-key': apiKey, 'Authorization': 'Bearer ' + apiKey, 'anthropic-version': '2023-06-01' },
         payload: JSON.stringify({
           model: 'claude-sonnet-4-20250514',
           max_tokens: 300,
@@ -3289,7 +3290,7 @@ function doGet(e) {
         muteHttpExceptions: true
       });
       var code = claudeResp.getResponseCode();
-      if (code !== 200) return res({error: 'Claude error ' + code + ': ' + claudeResp.getContentText()});
+      if (code !== 200) return res({error: 'Claude error ' + code + ': ' + claudeResp.getContentText(), keyPrefix: apiKey.slice(0,10), keyLen: apiKey.length});
       var result = JSON.parse(claudeResp.getContentText());
       var text = '';
       if (result.content && Array.isArray(result.content)) {
@@ -4924,9 +4925,10 @@ window.clearBenefitsCache = function() {
 };
 
 async function fetchExerciseBenefit(exName) {
-  const apiKey = localStorage.getItem('claudeApiKey') || '';
+  const apiKey = (localStorage.getItem('claudeApiKey') || '').trim();
   if (!apiKey) { console.warn('[Benefits] No claudeApiKey in localStorage'); return null; }
   if (!S.gasUrl) { console.warn('[Benefits] No GAS URL configured'); return null; }
+  console.log(`[Benefits] Sending key prefix: "${apiKey.slice(0,10)}…" length: ${apiKey.length}`);
   const payload = encodeURIComponent(JSON.stringify({ apiKey, exName }));
   const fullUrl = `${S.gasUrl}?action=claude_benefit&data=${payload}`;
   console.log(`[Benefits] GAS URL (open in new tab to test): ${S.gasUrl}?action=claude_benefit&data=${encodeURIComponent(JSON.stringify({ apiKey: apiKey.slice(0,10)+'…', exName }))}`);
