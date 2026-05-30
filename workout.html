@@ -396,8 +396,10 @@ input.field::placeholder{color:var(--muted)}
 .fs-confirm-btn.red{background:rgba(248,81,73,.38);border-color:rgba(248,81,73,.55)}
 /* ---- EXERCISE BENEFITS ---- */
 .benefit-section{margin-bottom:14px}
-.benefit-header{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin-bottom:5px}
-.benefit-text{font-size:13px;line-height:1.65;color:var(--muted);animation:benefit-fadein .4s ease forwards}
+.benefit-header{font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px}
+.benefit-row{margin-bottom:7px;font-size:13px;line-height:1.65;animation:benefit-fadein .4s ease forwards}
+.benefit-label{font-weight:700;color:var(--text)}
+.benefit-text{color:var(--muted)}
 @keyframes benefit-fadein{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 </style>
 </head>
@@ -4093,10 +4095,24 @@ function renderModalInner(i) {
 
   const _last = S.workout.exercises.length - 1;
   const _benefitText = EXERCISE_BENEFITS[ex.name] || '';
-  const _benefitHTML = _benefitText ? `
-  <div class="benefit-section">
-    <div class="benefit-header">Why This Works</div><div class="benefit-text">${escapeHtml(_benefitText)}</div>
-  </div>` : '';
+  let _benefitHTML = '';
+  if (_benefitText) {
+    const _bParts = [
+      { label: 'Muscles Targeted', key: 'Muscles Targeted:' },
+      { label: 'Movement Benefit', key: 'Movement Benefit:' },
+      { label: 'Sport Application', key: 'Sport Application:' },
+    ];
+    const _bIdxs = _bParts.map(p => _benefitText.indexOf(p.key));
+    const _bSections = _bParts.map((p, i) => {
+      if (_bIdxs[i] === -1) return '';
+      const start = _bIdxs[i] + p.key.length;
+      const end = _bParts.slice(i + 1).map((_, j) => _bIdxs[i + 1 + j]).find(x => x > _bIdxs[i]) ?? _benefitText.length;
+      return escapeHtml(_benefitText.slice(start, end).trim());
+    });
+    _benefitHTML = `<div class="benefit-section"><div class="benefit-header">Why This Works</div>${
+      _bSections.map((txt, i) => txt ? `<div class="benefit-row"><span class="benefit-label">${_bParts[i].label}:</span> <span class="benefit-text">${txt}</span></div>` : '').join('')
+    }</div>`;
+  }
   return `
   <div class="modal-header">
     <button class="modal-nav-arrow" onclick="navigateModal(-1)" ${i===0?'disabled':''}>‹</button>
