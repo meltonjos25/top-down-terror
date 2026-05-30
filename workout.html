@@ -5454,6 +5454,31 @@ async function loadTogetherRecords() {
 }
 
 // ---- RECORDS TAB ----
+
+// Scans CONJUGATE_EXERCISES for all trackable single-movement finishers.
+// Excludes: interval exercises (Tabata), multi-step circuits (note contains '->').
+function getTrackedFinisherMap(userKey) {
+  const map = new Map();
+  const userData = CONJUGATE_EXERCISES[userKey];
+  if (!userData) return map;
+  for (const [typeKey, phases] of Object.entries(userData)) {
+    const workout = typeKey.charAt(0) + typeKey.slice(1).toLowerCase(); // 'Core', 'Arms', 'Bands'
+    for (const days of Object.values(phases)) {
+      for (const exercises of Object.values(days)) {
+        for (const ex of exercises) {
+          if (ex.block !== 'Finisher' || map.has(ex.name)) continue;
+          const parsed = parseTarget(ex.target);
+          if (parsed.unit === 'interval' || parsed.unit === 'complex') continue;
+          if ((ex.note || '').includes('->') || (ex.target || '').includes('->')) continue;
+          const unit = (parsed.unit === 'sec' || /plank|hold/i.test(ex.name)) ? 'sec' : 'reps';
+          map.set(ex.name, { unit, workout });
+        }
+      }
+    }
+  }
+  return map;
+}
+
 async function loadRecordsData() {
   if (S.recordsLoading || S.recordsLoaded) return;
   S.recordsLoading = true;
@@ -5462,21 +5487,29 @@ async function loadRecordsData() {
     const logSheet = S.user === 'husband' ? HUSBAND_LOG_SHEET : WIFE_LOG_SHEET;
     const logRows = await gasRead(logSheet);
 
-    const TRACKED = new Set(['Max Plank Hold', 'Push-Up Burnout', 'Pike Push-Up Burnout']);
-    const TIMED_RECORDS = new Set(['Max Plank Hold']);
+    const finisherMap = getTrackedFinisherMap(S.user);
+
+    // Legacy exercises with logged history that predate dynamic tracking
+    const LEGACY = S.user === 'husband'
+      ? [{ name: 'Max Plank Hold',       unit: 'sec',  workout: 'Core' },
+         { name: 'Push-Up Burnout',       unit: 'reps', workout: 'Arms' },
+         { name: 'Pike Push-Up Burnout',  unit: 'reps', workout: 'Arms' }]
+      : [];
+    for (const leg of LEGACY) {
+      if (!finisherMap.has(leg.name)) finisherMap.set(leg.name, { unit: leg.unit, workout: leg.workout });
+    }
 
     const bests = {};
     logRows.forEach(row => {
-      const name = String(row[3] || '').trim();
+      const name    = String(row[3] || '').trim();
       const repsStr = String(row[5] || '').trim();
-      if (!name || !repsStr || !TRACKED.has(name)) return;
+      const meta    = finisherMap.get(name);
+      if (!name || !repsStr || !meta) return;
       const vals = repsStr.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0);
       if (!vals.length) return;
       const best = Math.max(...vals);
       if (!bests[name] || best > bests[name].value) {
-        const parsed = parseTarget(String(row[4] || ''));
-        const unit = TIMED_RECORDS.has(name) ? 'sec' : (parsed.unit === 'sec' ? 'sec' : 'reps');
-        bests[name] = { value: best, unit };
+        bests[name] = { value: best, unit: meta.unit, workout: meta.workout, date: normDateStr(String(row[0] || '')) };
       }
     });
     S.allTimeRecords = bests;
@@ -5510,8 +5543,12 @@ function renderRecordsBody() {
         } else {
           valDisplay = `${r.value} <span style="font-size:12px;color:var(--muted);font-weight:600">${r.unit}</span>`;
         }
+        const subLine = [r.workout, r.date ? badgeDateLabel(r.date) : ''].filter(Boolean).join(' · ');
         return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
-          <div style="font-size:14px;font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+          <div style="flex:1;min-width:0;overflow:hidden">
+            <div style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+            ${subLine ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${subLine}</div>` : ''}
+          </div>
           <div style="font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${valDisplay}</div>
         </div>`;
       }).join('');
