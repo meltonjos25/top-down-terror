@@ -5572,7 +5572,7 @@ function renderRecordsBody() {
     if (!entries.length) {
       personalHTML = `<div style="color:var(--muted);text-align:center;padding:24px 0;font-size:14px">No finisher records logged yet.</div>`;
     } else {
-      personalHTML = entries.map(([name, r]) => {
+      function prCard([name, r]) {
         let valDisplay;
         if (r.unit === 'sec') {
           const m = Math.floor(r.value / 60);
@@ -5591,7 +5591,13 @@ function renderRecordsBody() {
           </div>
           <div style="font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${valDisplay}</div>
         </div>`;
-      }).join('');
+      }
+      const timed = entries.filter(([,r]) => r.unit === 'sec');
+      const reps  = entries.filter(([,r]) => r.unit !== 'sec');
+      const subHead = label => `<div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin:14px 0 8px">${label}</div>`;
+      personalHTML =
+        (timed.length ? subHead('Timed Holds') + timed.map(prCard).join('') : '') +
+        (reps.length  ? subHead('Max Reps')    + reps.map(prCard).join('')  : '');
     }
   }
 
