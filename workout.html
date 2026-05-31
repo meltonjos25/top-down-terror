@@ -3356,6 +3356,7 @@ function goUserSelect() { _userCardAnim = true; S.screen = 'user'; render(); }
 function renderUserSelect() {
   stopMessagePolling();
   if (S.streaks.husband === null && !S.streaksLoading) loadStreaks();
+  if (!S.togetherRecordsLoaded && !S.togetherRecordsLoading) loadTogetherRecords();
   const _anim1 = _userCardAnim ? 'card-enter-1' : '';
   const _anim2 = _userCardAnim ? 'card-enter-2' : '';
   _userCardAnim = false;
@@ -3411,6 +3412,28 @@ function renderUserSelect() {
       ${streakHTML('husband')}
       ${xpBarHTML('husband')}
     </div>
+    ${(() => {
+      const tr = S.togetherRecords;
+      if (!tr && !S.togetherRecordsLoading) return '';
+      if (!tr) return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:8px 16px;display:flex;align-items:center;justify-content:center;gap:6px"><div class="spinner" style="width:12px;height:12px;border-width:2px"></div><span style="font-size:11px;color:var(--muted)">Loading…</span></div>`;
+      const cur = tr.currentStreak || 0;
+      const best = tr.bestStreak || 0;
+      const flame = cur > 0 ? '🔥' : '💤';
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:9px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:14px">${flame}</span>
+          <span style="font-size:12px;font-weight:700;color:var(--text)">${cur}</span>
+          <span style="font-size:11px;color:var(--muted)">day${cur !== 1 ? 's' : ''} together</span>
+        </div>
+        <div style="width:1px;height:16px;background:var(--border)"></div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:13px">🏆</span>
+          <span style="font-size:11px;color:var(--muted)">Best</span>
+          <span style="font-size:12px;font-weight:700;color:var(--yellow)">${best}</span>
+          <span style="font-size:11px;color:var(--muted)">day${best !== 1 ? 's' : ''}</span>
+        </div>
+      </div>`;
+    })()}
     <div class="user-card ${_anim2}" onclick="selectUser('wife')">
       <div style="display:flex;align-items:center;justify-content:center;gap:8px">
         <div class="icon" style="margin:0">🌟</div>
