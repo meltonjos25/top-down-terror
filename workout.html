@@ -303,6 +303,8 @@ input.field::placeholder{color:var(--muted)}
 .nav-item.active{color:var(--accent)}
 .nav-item svg{width:22px;height:22px;flex-shrink:0}
 .nav-label{font-size:10px;font-weight:600;letter-spacing:.3px}
+.nav-badge{position:absolute;top:-5px;right:-8px;min-width:16px;height:16px;background:var(--red);border-radius:8px;font-size:10px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none}
+.msg-unread-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:3px}
 .act-dot{width:11px;height:11px;border-radius:3px;background:var(--surface3)}
 .act-dot.logged{background:var(--accent)}
 .act-dot.rest{background:var(--surface2);opacity:.35}
@@ -1851,6 +1853,7 @@ const S = {
   messages: null,       // { sent: [], received: [] } once loaded
   messagesLoading: false,
   messagesLoaded: false,
+  pendingUnreadCount: 0, // unread count known from popup check before messages tab loads
   messageDraft: '',
   messageSending: false,
   messageSendError: '',
@@ -3194,9 +3197,12 @@ function renderNavBar() {
     {id:'records',  label:'Records'},
     {id:'messages', label:'Messages'},
   ];
-  return `<nav class="nav-bar">${tabs.map(t =>
-    `<button class="nav-item${S.navTab===t.id?' active':''}" onclick="navTo('${t.id}')">${navIcon(t.id)}<span class="nav-label">${t.label}</span></button>`
-  ).join('')}</nav>`;
+  const unread = getUnreadCount();
+  return `<nav class="nav-bar">${tabs.map(t => {
+    const badge = (t.id === 'messages' && unread > 0)
+      ? `<span class="nav-badge">${unread > 9 ? '9+' : unread}</span>` : '';
+    return `<button class="nav-item${S.navTab===t.id?' active':''}" onclick="navTo('${t.id}')"><span style="position:relative;display:inline-flex">${navIcon(t.id)}${badge}</span><span class="nav-label">${t.label}</span></button>`;
+  }).join('')}</nav>`;
 }
 
 function navTo(tab) {
@@ -3444,6 +3450,7 @@ function selectUser(who) {
   S.messages = null;
   S.messagesLoaded = false;
   S.messagesLoading = false;
+  S.pendingUnreadCount = 0;
   S.messageDraft = '';
   S.messageSending = false;
   S.messageSendError = '';
@@ -5257,8 +5264,15 @@ async function sendDedicationMessage() {
 function renderMessagesBody() {
   if (!S.messagesLoaded && !S.messagesLoading) loadMessages();
 
+  // Mark all visible received messages as read when the tab is open
+  if (S.messagesLoaded && S.messages) {
+    S.messages.received.forEach(m => markMsgRead(S.user, msgKey(m)));
+    S.pendingUnreadCount = 0;
+  }
+
   const otherName = S.user === 'husband' ? 'Wife' : 'Husband';
   const msgs = S.messages || { sent: [], received: [] };
+  const readSet = getReadMsgs(S.user);
 
   const composerHTML = `
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:24px">
@@ -5281,17 +5295,22 @@ function renderMessagesBody() {
       ? `To ${S.user === 'husband' ? 'Wife' : 'Husband'}`
       : `From ${S.user === 'husband' ? 'Wife' : 'Husband'}`;
     const labelColor = isSent ? 'var(--blue)' : 'var(--accent)';
-    const inner = `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px;">
+    const key = msgKey(m);
+    const isUnread = !isSent && !readSet.has(key);
+    const inner = `<div style="background:var(--surface);border:1px solid ${isUnread ? 'var(--accent)' : 'var(--border)'};border-radius:12px;padding:14px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div style="font-size:11px;font-weight:700;color:${labelColor};text-transform:uppercase;letter-spacing:.5px">${label}</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div style="font-size:11px;font-weight:700;color:${labelColor};text-transform:uppercase;letter-spacing:.5px">${label}</div>
+          ${isUnread ? '<div class="msg-unread-dot"></div>' : ''}
+        </div>
         <div style="font-size:11px;color:var(--muted)">${m.date}${m.time ? ' · ' + m.time : ''}</div>
       </div>
-      <div style="font-size:14px;line-height:1.55;color:var(--text)">${escapeHtml(m.text)}</div>
+      <div style="font-size:14px;line-height:1.55;color:var(--text);font-weight:${isUnread ? '600' : '400'}">${escapeHtml(m.text)}</div>
     </div>`;
     if (isSent) return `<div style="margin-bottom:8px">${inner}</div>`;
-    const key = escapeHtml(msgKey(m));
+    const safeKey = escapeHtml(key);
     return `<div class="swipe-row">
-      <div class="swipe-delete-btn" onclick="deleteReceivedMsg('${key}')">
+      <div class="swipe-delete-btn" onclick="deleteReceivedMsg('${safeKey}')">
         <svg viewBox="0 0 24 24" fill="white" width="22" height="22"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6h14z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
       </div>
       <div class="swipe-content" style="touch-action:pan-y"
@@ -5363,41 +5382,62 @@ function swipeEnd(e, el) {
 }
 
 function msgKey(m) {
-  return `${m.date}|${m.from}|${String(m.text).slice(0, 60)}`;
+  return `${m.date}|${String(m.from).toLowerCase()}|${String(m.text).slice(0, 60)}`;
 }
+
+// ---- READ RECEIPTS ----
+function getReadMsgs(user) {
+  try { return new Set(JSON.parse(localStorage.getItem('readMsgs_' + user) || '[]')); }
+  catch(e) { return new Set(); }
+}
+function markMsgRead(user, key) {
+  if (!user || !key) return;
+  try {
+    const s = getReadMsgs(user);
+    if (s.has(key)) return;
+    s.add(key);
+    localStorage.setItem('readMsgs_' + user, JSON.stringify([...s]));
+  } catch(e) {}
+}
+function getUnreadCount() {
+  if (!S.user) return 0;
+  if (S.messages) {
+    const read = getReadMsgs(S.user);
+    return S.messages.received.filter(m => !read.has(msgKey(m))).length;
+  }
+  return S.pendingUnreadCount || 0;
+}
+
 function deleteReceivedMsg(key) {
   if (!S.messages) return;
   S.messages.received = S.messages.received.filter(m => msgKey(m) !== key);
-  const stored = JSON.parse(localStorage.getItem('deletedMsgs_' + S.user) || '[]');
-  if (!stored.includes(key)) stored.push(key);
-  localStorage.setItem('deletedMsgs_' + S.user, JSON.stringify(stored));
-  // Also mark as shown so the popup never fires again for this deleted message
-  const shownKey = 'shownPopups_' + S.user;
-  const shown = JSON.parse(localStorage.getItem(shownKey) || '[]');
-  if (!shown.includes(key)) shown.push(key);
-  localStorage.setItem(shownKey, JSON.stringify(shown));
+  try {
+    const stored = JSON.parse(localStorage.getItem('deletedMsgs_' + S.user) || '[]');
+    if (!stored.includes(key)) stored.push(key);
+    localStorage.setItem('deletedMsgs_' + S.user, JSON.stringify(stored));
+  } catch(e) {}
+  markMsgRead(S.user, key);
   render();
 }
 
 function checkAndShowDedicationPopup(user) {
   gasReadAll(MESSAGES_SHEET).then(rows => {
-    const storageKey = `shownPopups_${user}`;
-    const shown = new Set(JSON.parse(localStorage.getItem(storageKey) || '[]'));
+    const read    = getReadMsgs(user);
     const deleted = new Set(JSON.parse(localStorage.getItem('deletedMsgs_' + user) || '[]'));
-    const unread = [];
+    const unread  = [];
     rows.forEach(row => {
       const date = normDateStr(String(row[0] || ''));
       const time = normTimeStr(String(row[1] || ''));
       const to   = String(row[3] || '').trim().toLowerCase();
       const text = String(row[4] || '').trim();
       if (to !== user || !date || !text) return;
-      const from = String(row[2] || '').trim();
-      const key  = `${date}|${from}|${text.slice(0, 60)}`;  // no time — stable key matching msgKey format
-      if (!shown.has(key) && !deleted.has(key)) unread.push({ date, time, from, text, key });
+      const from = String(row[2] || '').trim().toLowerCase();
+      const key  = `${date}|${from}|${text.slice(0, 60)}`;
+      if (!read.has(key) && !deleted.has(key)) unread.push({ date, time, from, text, key });
     });
+    S.pendingUnreadCount = unread.length;
     if (unread.length) {
-      unread.forEach(m => shown.add(m.key));
-      localStorage.setItem(storageKey, JSON.stringify([...shown]));
+      unread.forEach(m => markMsgRead(user, m.key));
       setTimeout(() => showDedicationPopup(unread, user), 400);
     }
   }).catch(() => {});
