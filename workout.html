@@ -3710,6 +3710,7 @@ async function selectDay(timestamp) {
     S.screen = 'workout';
     S._wlSlideIn = true;
     loadProgress();
+    if (!S.recordsLoaded && !S.recordsLoading) loadRecordsData();
     stopWLPhrases();
     const wlEl = document.getElementById('wl-screen');
     if (wlEl) {
@@ -4198,6 +4199,23 @@ function renderModalInner(i) {
     ${ex.note ? `<div class="modal-note">${ex.note}</div>` : ''}
     ${ex.demo ? `<button class="modal-demo" onclick="openGifModal('${ex.demo.replace(/'/g,"\\'")}','${ex.name.replace(/'/g,"\\'")}')">▶ Watch Demo</button>` : ''}
     <div class="target-hint">Target: <strong>${ex.sets} × ${target}</strong>${prog?.progressed ? ' <span class="prog-badge">↑ PROGRESSED</span>' : ''}</div>
+    ${(() => {
+      if (ex.block !== 'Finisher') return '';
+      const _pr = S.allTimeRecords[ex.name];
+      if (!_pr) return '';
+      let _prVal;
+      if (_pr.unit === 'sec') {
+        const _m = Math.floor(_pr.value / 60), _s = Math.round(_pr.value % 60);
+        _prVal = _m > 0 ? `${_m}m ${String(_s).padStart(2,'0')}s` : `${_s}s`;
+      } else {
+        _prVal = `${_pr.value} ${_pr.unit}`;
+      }
+      return `<div style="background:rgba(210,153,34,.12);border:1px solid rgba(210,153,34,.3);border-radius:8px;padding:7px 12px;display:flex;align-items:center;gap:8px;margin-bottom:2px">
+        <span style="font-size:15px">🏆</span>
+        <span style="font-size:13px;color:var(--muted)">Previous Best:</span>
+        <span style="font-size:14px;font-weight:700;color:var(--yellow)">${_prVal}</span>
+      </div>`;
+    })()}
     ${diagramHTML}
     ${timerHTML}
     <div class="sets-section">${setsHTML}</div>
