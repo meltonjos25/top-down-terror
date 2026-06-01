@@ -4108,7 +4108,8 @@ function renderModalInner(i) {
   const parsed = parseTarget(target);
   const allTimers = parseAllTimers(target);
   const isTimedByName = /plank|hold/i.test(ex.name);
-  const isTimed = parsed.unit === 'sec' || (isTimedByName && parsed.unit === 'max') || allTimers.length > 0;
+  const isTimedByTarget = /hold/i.test(ex.target);
+  const isTimed = parsed.unit === 'sec' || ((isTimedByName || isTimedByTarget) && parsed.unit === 'max') || allTimers.length > 0;
   const isMax = !isTimed && (parsed.unit === 'max' || parsed.unit === 'complex');
 
   const muscles = getMuscles(ex.name);
@@ -4306,7 +4307,7 @@ function checkPR(i) {
   const values = log.repsPerSet.map(v => parseFloat(v)).filter(v => !isNaN(v) && v > 0);
   if (!values.length) return;
   const sessionBest = Math.max(...values);
-  const unit = (parsed.unit === 'sec' || /plank|hold/i.test(ex.name)) ? 'sec' : 'reps';
+  const unit = (parsed.unit === 'sec' || /plank|hold/i.test(ex.name) || /hold/i.test(ex.target)) ? 'sec' : 'reps';
 
   // Find all-time best from history (excludes current session)
   let prevBest = null;
@@ -5611,7 +5612,7 @@ function getTrackedFinisherMap(userKey) {
           const parsed = parseTarget(ex.target);
           if (parsed.unit === 'interval' || parsed.unit === 'complex') continue;
           if ((ex.note || '').includes('->') || (ex.target || '').includes('->')) continue;
-          const unit = (parsed.unit === 'sec' || /plank|hold/i.test(ex.name)) ? 'sec' : 'reps';
+          const unit = (parsed.unit === 'sec' || /plank|hold/i.test(ex.name) || /hold/i.test(ex.target)) ? 'sec' : 'reps';
           map.set(ex.name, { unit, workout });
         }
       }
@@ -5653,6 +5654,10 @@ async function loadRecordsData() {
         bests[name] = { value: best, unit: meta.unit, workout: meta.workout, date: normDateStr(String(row[0] || '')) };
       }
     });
+    // One-time correction: Shoulder Isometric Burnout was logged as 128 reps before unit was fixed to sec
+    if (bests['Shoulder Isometric Burnout'] && bests['Shoulder Isometric Burnout'].unit !== 'sec') {
+      bests['Shoulder Isometric Burnout'] = { value: 120, unit: 'sec', workout: bests['Shoulder Isometric Burnout'].workout, date: bests['Shoulder Isometric Burnout'].date };
+    }
     S.allTimeRecords = bests;
     S.recordsLoaded = true;
   } catch(e) {}
