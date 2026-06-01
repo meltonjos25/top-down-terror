@@ -400,6 +400,8 @@ input.field::placeholder{color:var(--muted)}
 .fs-flash{position:absolute;inset:0;background:#fff;opacity:0;z-index:10;pointer-events:none}
 @keyframes fs-flash{0%{opacity:.92}100%{opacity:0}}
 .fs-flash.on{animation:fs-flash .6s ease-out forwards}
+.fs-switch-label{font-size:24px;font-weight:800;color:var(--fsc,#58a6ff);letter-spacing:.5px;min-height:32px;opacity:0;transition:opacity .25s ease}
+.fs-switch-label.show{opacity:1}
 .fs-confirm{position:absolute;inset:0;background:rgba(0,0,0,.72);display:none;flex-direction:column;align-items:center;justify-content:center;gap:18px;z-index:20}
 .fs-confirm.show{display:flex}
 .fs-confirm-msg{color:#fff;font-size:19px;font-weight:700;text-align:center}
@@ -1850,6 +1852,8 @@ const S = {
   timerSec: 0,
   timerRunning: false,
   countdownTarget: null,
+  timerPhase: null,       // null | 'switch' | 'second' — tracks per-side timer phases
+  timerOrigTarget: null,  // saves countdownTarget while switch (7s) phase runs
   weekJustCompleted: false,
   navTab: 'workout',    // 'workout' | 'calendar' | 'progress' | 'records'
   recordsLoading: false,
@@ -3968,7 +3972,7 @@ function openModal(i) {
 
 function closeModal() {
   const overlay = document.querySelector('.modal-overlay');
-  function _doClose() { S.modal = null; clearInterval(S.timerInterval); S.timerRunning = false; S.countdownTarget = null; render(); }
+  function _doClose() { S.modal = null; clearInterval(S.timerInterval); S.timerRunning = false; S.countdownTarget = null; S.timerPhase = null; S.timerOrigTarget = null; render(); }
   if (overlay) {
     overlay.classList.remove('sheet-enter');
     overlay.classList.add('sheet-exit');
@@ -4531,49 +4535,67 @@ function timerToggle() {
     if (startBtn) startBtn.textContent = '⏸ Pause';
     // Open fullscreen overlay for countdown timers
     if (S.countdownTarget !== null && !_fsTimerActive) openFullscreenTimer();
-    S.timerInterval = setInterval(() => {
-      const p = pane();
-      if (S.countdownTarget !== null) {
-        S.timerSec--;
-        _fsUpdateDisplay(); // keep fullscreen fill + time in sync
-        const d = p?.querySelector('.timer-display');
-        if (d) {
-          const rem = Math.max(0, S.timerSec);
-          d.textContent = `${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`;
-          d.className = 'timer-display running';
-        }
-        if (S.timerSec <= 0) {
-          clearInterval(S.timerInterval);
-          S.timerRunning = false;
-          S.timerSec = 0;
-          const d2 = p?.querySelector('.timer-display');
-          if (d2) { d2.textContent = '00:00'; d2.className = 'timer-display done-time'; }
-          const btn = p?.querySelector('.timer-btn');
-          if (btn) btn.textContent = '▶ Start';
-          // Visual flash on pane (also fires even if fullscreen is active)
-          const ts = p?.querySelector('.timer-section');
-          if (ts) { ts.classList.remove('timer-alarm'); void ts.offsetWidth; ts.classList.add('timer-alarm'); }
-          playAlarm();
-          if (_fsTimerActive) _fsComplete(); // fullscreen completion sequence
-          return;
-        }
-      } else {
-        S.timerSec++;
-        const d = p?.querySelector('.timer-display');
-        if (d) {
-          d.textContent = `${String(Math.floor(S.timerSec/60)).padStart(2,'0')}:${String(S.timerSec%60).padStart(2,'0')}`;
-          d.className = 'timer-display running';
-        }
-      }
-      const btn = p?.querySelector('.timer-btn');
-      if (btn) btn.textContent = '⏸ Pause';
-    }, 1000);
+    S.timerInterval = setInterval(_timerTick, 1000);
   }
   // No render() — calling render() rebuilds the modal HTML with translateX(0) which snaps to pane-prev
 }
 
+function _timerTick() {
+  const p = document.getElementById('pane-curr');
+  if (S.countdownTarget !== null) {
+    S.timerSec--;
+    _fsUpdateDisplay();
+    const d = p?.querySelector('.timer-display');
+    if (d) {
+      const rem = Math.max(0, S.timerSec);
+      d.textContent = `${String(Math.floor(rem/60)).padStart(2,'0')}:${String(rem%60).padStart(2,'0')}`;
+      d.className = 'timer-display running';
+    }
+    if (S.timerSec <= 0) {
+      clearInterval(S.timerInterval);
+      S.timerRunning = false;
+      S.timerSec = 0;
+      const d2 = p?.querySelector('.timer-display');
+      if (d2) { d2.textContent = '00:00'; d2.className = 'timer-display done-time'; }
+      const btn = p?.querySelector('.timer-btn');
+      if (btn) btn.textContent = '▶ Start';
+      const ts = p?.querySelector('.timer-section');
+      if (ts) { ts.classList.remove('timer-alarm'); void ts.offsetWidth; ts.classList.add('timer-alarm'); }
+      playAlarm();
+      if (_fsTimerActive) _fsComplete();
+      return;
+    }
+  } else {
+    S.timerSec++;
+    const d = p?.querySelector('.timer-display');
+    if (d) {
+      d.textContent = `${String(Math.floor(S.timerSec/60)).padStart(2,'0')}:${String(S.timerSec%60).padStart(2,'0')}`;
+      d.className = 'timer-display running';
+    }
+  }
+  const btn = p?.querySelector('.timer-btn');
+  if (btn) btn.textContent = '⏸ Pause';
+}
+
+function _fsRestartCountdown(sec) {
+  clearInterval(S.timerInterval);
+  S.timerRunning = true;
+  S.countdownTarget = sec;
+  S.timerSec = sec;
+  const fillEl = document.getElementById('fs-fill');
+  if (fillEl) {
+    fillEl.style.transition = 'none';
+    fillEl.style.height = '0%';
+    requestAnimationFrame(() => requestAnimationFrame(() => { if (fillEl) fillEl.style.transition = 'height 1.05s linear'; }));
+  }
+  _fsUpdateDisplay();
+  S.timerInterval = setInterval(_timerTick, 1000);
+}
+
 function timerReset() {
   clearInterval(S.timerInterval);
+  if (S.timerOrigTarget !== null) { S.countdownTarget = S.timerOrigTarget; S.timerOrigTarget = null; }
+  S.timerPhase = null;
   S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
   S.timerRunning = false;
   _renderAllPanes();
@@ -4606,8 +4628,9 @@ function openFullscreenTimer() {
     <button class="fs-btn fs-cancel-btn" onclick="fsCancelTap()">✕ Cancel</button>
     <button class="fs-btn fs-reset-btn" onclick="fsResetTap()">↺ Reset</button>
     <div class="fs-body">
-      <div class="fs-name">${exName}</div>
+      <div class="fs-name" id="fs-name">${exName}</div>
       <div class="fs-time" id="fs-time">${fmt(S.timerSec)}</div>
+      <div class="fs-switch-label" id="fs-switch-label"></div>
     </div>
     <div class="fs-flash" id="fs-flash"></div>
     <div class="fs-confirm" id="fs-confirm">
@@ -4656,14 +4679,21 @@ function fsDismissConfirm() {
 }
 
 function fsConfirmCancel() {
+  // Restore original target if cancelled mid-per-side sequence
+  if (S.timerOrigTarget !== null) { S.countdownTarget = S.timerOrigTarget; S.timerOrigTarget = null; }
+  S.timerPhase = null;
   _fsClose();
 }
 
 function fsResetTap() {
   clearInterval(S.timerInterval);
   S.timerRunning = false;
+  // Restore original target if reset during switch/second-side phase
+  if (S.timerOrigTarget !== null) { S.countdownTarget = S.timerOrigTarget; S.timerOrigTarget = null; }
+  S.timerPhase = null;
   S.timerSec = S.countdownTarget;
-  // Reset fill instantly (no transition) then re-enable
+  const lbl = document.getElementById('fs-switch-label');
+  if (lbl) lbl.classList.remove('show');
   const fillEl = document.getElementById('fs-fill');
   if (fillEl) {
     fillEl.style.transition = 'none';
@@ -4677,12 +4707,38 @@ function fsResetTap() {
 }
 
 function _fsComplete() {
-  // Flash the screen white
+  const i = S.modal;
+  const ex = (i !== null) ? S.workout?.exercises[i] : null;
+  const target = ex ? (S.progression[ex.name]?.target || ex.target) : '';
+  const isPerSide = ex ? parseTarget(target).perSide : false;
   const flashEl = document.getElementById('fs-flash');
+
+  if (isPerSide && !S.timerPhase) {
+    // First side done → 7-second switch-sides countdown (no user action needed)
+    S.timerOrigTarget = S.countdownTarget;
+    S.timerPhase = 'switch';
+    const lbl = document.getElementById('fs-switch-label');
+    if (lbl) { lbl.textContent = 'Switch sides'; lbl.classList.add('show'); }
+    if (flashEl) { void flashEl.offsetWidth; flashEl.classList.add('on'); }
+    setTimeout(() => _fsRestartCountdown(7), 400);
+    return;
+  }
+
+  if (S.timerPhase === 'switch') {
+    // Switch sides done → auto-start second side
+    S.timerPhase = 'second';
+    const lbl = document.getElementById('fs-switch-label');
+    if (lbl) lbl.classList.remove('show');
+    if (flashEl) { void flashEl.offsetWidth; flashEl.classList.add('on'); }
+    setTimeout(() => _fsRestartCountdown(S.timerOrigTarget), 400);
+    return;
+  }
+
+  // Normal completion (non-per-side, or second side just finished)
+  S.timerPhase = null;
+  S.timerOrigTarget = null;
   if (flashEl) { void flashEl.offsetWidth; flashEl.classList.add('on'); }
-  // After flash: tick the next unchecked set only, then close fullscreen and stay in the modal
   setTimeout(() => {
-    const i = S.modal;
     if (i !== null && S.logs[i]) {
       const log = S.logs[i];
       const nextSet = log.setsState.findIndex(v => !v);
@@ -4692,7 +4748,6 @@ function _fsComplete() {
         saveProgress();
       }
     }
-    // Reset timer so it's ready for the next set without needing a manual Reset tap
     S.timerSec = S.countdownTarget !== null ? S.countdownTarget : 0;
     _fsClose(() => _renderAllPanes());
   }, 600);
