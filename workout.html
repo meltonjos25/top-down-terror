@@ -1835,6 +1835,8 @@ const S = {
   calendarMonth: null,
   workoutStartTime: null,  // Date.now() when first exercise is marked done
   workoutDuration: 0,      // seconds, set when submit is pressed
+  workoutSubmitted: false, // true after workout has been successfully uploaded
+  workoutEditing: false,   // true when user taps Edit after submission
   timerInterval: null,
   timerSec: 0,
   timerRunning: false,
@@ -2880,6 +2882,7 @@ async function submitWorkout() {
   stopAudioKeepAlive();
   S.timerRunning = false;
   S.workoutDuration = S.workoutStartTime ? Math.floor((Date.now() - S.workoutStartTime) / 1000) : 0;
+  const isResubmit = S.workoutEditing; // true when correcting an already-submitted workout
   S.screen = 'uploading';
   render();
   try {
@@ -2891,6 +2894,9 @@ async function submitWorkout() {
     S.workout.exercises.forEach((ex, i) => {
       const log = S.logs[i];
       if (!log || !log.done) return;
+      const notes = isResubmit
+        ? ('(corrected) ' + (log.notes || '')).trim()
+        : (log.notes || '');
       rows.push([
         dateStr,
         S.day,
@@ -2898,7 +2904,7 @@ async function submitWorkout() {
         ex.name,
         String(log.setsCompleted || ex.sets),
         log.reps || '',
-        log.notes || '',
+        notes,
         '✅',
         durationStr,
         timeStr
@@ -2907,37 +2913,44 @@ async function submitWorkout() {
     if (rows.length) await gasWrite(sheet, rows);
 
     // Write PR history (for "PR 3 weeks in a row" badge tracking)
-    if (Object.keys(S.prs).length > 0) {
+    if (!isResubmit && Object.keys(S.prs).length > 0) {
       const prSheet = S.user === 'husband' ? HUSBAND_PR_HISTORY_SHEET : WIFE_PR_HISTORY_SHEET;
       const prRows = Object.keys(S.prs).map(name => [dateStr, name, S.prs[name].value || '']);
       gasWrite(prSheet, prRows).catch(() => {});
     }
     S.loggedDates.add(dateStr);
     if (durationStr) S.weekDurations[dateStr] = durationStr;
-    S.weekJustCompleted = isCurrentWeekComplete();
+    S.weekJustCompleted = !isResubmit && isCurrentWeekComplete();
 
-    // XP
-    const exercisesDone = Object.values(S.logs).filter(l => l.done).length;
-    const prCount = Object.keys(S.prs).length;
-    const xpEarned = calcWorkoutXP(exercisesDone, prCount, S.streaks[S.user] || 0);
-    const prevXP   = S.xp[S.user] || 0;
-    const prevLevel = levelFromXP(prevXP);
-    S.xp[S.user]   = prevXP + xpEarned;
-    S.lastXPEarned  = xpEarned;
-    const newLevel  = levelFromXP(S.xp[S.user]);
-    S.levelUpInfo   = newLevel > prevLevel ? { level: newLevel, title: getLevelTitle(newLevel) } : null;
-    const xpNote = `${exercisesDone} ex${prCount > 0 ? `, ${prCount} PR` : ''}${(S.streaks[S.user]||0) >= 7 ? ', streak' : ''}`;
-    gasWrite(S.user === 'husband' ? HUSBAND_XP_SHEET : WIFE_XP_SHEET,
-      [[dateStr, S.workout.name, xpEarned, xpNote]]).catch(() => {});
+    // XP — only on first submission, not corrections
+    if (!isResubmit) {
+      const exercisesDone = Object.values(S.logs).filter(l => l.done).length;
+      const prCount = Object.keys(S.prs).length;
+      const xpEarned = calcWorkoutXP(exercisesDone, prCount, S.streaks[S.user] || 0);
+      const prevXP   = S.xp[S.user] || 0;
+      const prevLevel = levelFromXP(prevXP);
+      S.xp[S.user]   = prevXP + xpEarned;
+      S.lastXPEarned  = xpEarned;
+      const newLevel  = levelFromXP(S.xp[S.user]);
+      S.levelUpInfo   = newLevel > prevLevel ? { level: newLevel, title: getLevelTitle(newLevel) } : null;
+      const xpNote = `${exercisesDone} ex${prCount > 0 ? `, ${prCount} PR` : ''}${(S.streaks[S.user]||0) >= 7 ? ', streak' : ''}`;
+      gasWrite(S.user === 'husband' ? HUSBAND_XP_SHEET : WIFE_XP_SHEET,
+        [[dateStr, S.workout.name, xpEarned, xpNote]]).catch(() => {});
+      S.togetherRecordsLoaded = false;
+      S.togetherRecordsLoading = false;
+      S.togetherRecords = null;
+    }
 
-    S.togetherRecordsLoaded = false;
-    S.togetherRecordsLoading = false;
-    S.togetherRecords = null;
-    clearProgress();
+    // Mark as submitted and persist — does NOT clear progress
+    S.workoutSubmitted = true;
+    S.workoutEditing = false;
+    saveProgress();
     S.screen = 'success';
     render();
-    checkAndNotifyNewBadges();
-    if (S.levelUpInfo) setTimeout(() => showLevelUpNotification(S.levelUpInfo), 700);
+    if (!isResubmit) {
+      checkAndNotifyNewBadges();
+      if (S.levelUpInfo) setTimeout(() => showLevelUpNotification(S.levelUpInfo), 700);
+    }
   } catch(e) {
     S.error = e.message;
     S.screen = 'summary';
@@ -3670,6 +3683,8 @@ async function selectDay(timestamp) {
   S.error = '';
   S.workoutStartTime = null;
   S.workoutDuration = 0;
+  S.workoutSubmitted = false;
+  S.workoutEditing = false;
   S.screen = 'loading';
   render();
   setWLProgress(5);
@@ -3814,7 +3829,8 @@ function renderWorkout() {
 
   const total = w.exercises.length;
   const done = Object.values(S.logs).filter(l => l.done).length;
-  const pct = total ? Math.round(done/total*100) : 0;
+  const isSubmitted = S.workoutSubmitted && !S.workoutEditing;
+  const pct = isSubmitted ? 100 : (total ? Math.round(done/total*100) : 0);
 
   const blocks = {};
   w.exercises.forEach((ex, i) => {
@@ -3863,6 +3879,23 @@ function renderWorkout() {
       '</div>';
   }
   const canSubmit = done > 0;
+  const submittedBanner = isSubmitted ? `
+    <div style="background:#238636;border-radius:10px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">✅</span>
+        <div>
+          <div style="font-size:14px;font-weight:700;color:#fff">Workout Submitted</div>
+          <div style="font-size:12px;color:rgba(255,255,255,.75)">${badgeDateLabel(localDateStr(S.selectedDate))}</div>
+        </div>
+      </div>
+    </div>` : (S.workoutEditing ? `
+    <div style="background:var(--surface);border:1px solid var(--accent);border-radius:10px;padding:10px 16px;display:flex;align-items:center;gap:8px;margin-bottom:6px">
+      <span style="font-size:16px">✎</span>
+      <div style="font-size:13px;font-weight:600;color:var(--accent)">Editing — tap exercises to update values, then re-submit</div>
+    </div>` : '');
+  const bottomBar = isSubmitted
+    ? `<button class="btn btn-secondary" onclick="startEditWorkout()">✎ Edit Workout</button>`
+    : `<button class="btn btn-primary" onclick="S.screen='summary';render()" ${!canSubmit ? 'disabled style="opacity:.4"' : ''}>Review & Submit Workout →</button>`;
   app.innerHTML = `
   <div class="header">
     <div class="header-title">${dateLabel}</div>
@@ -3879,17 +3912,14 @@ function renderWorkout() {
       </div>
     </div>
     ${_conjStrip}
+    ${submittedBanner}
     <div class="progress-bar-wrap">
       <div class="progress-label">${pct}% complete</div>
       <div class="progress-bar-bg"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
     </div>
     ${blockHTML}
   </div>
-  <div class="bottom-bar">
-    <button class="btn btn-primary" onclick="S.screen='summary';render()" ${!canSubmit ? 'disabled style="opacity:.4"' : ''}>
-      Review & Submit Workout →
-    </button>
-  </div>
+  <div class="bottom-bar">${bottomBar}</div>
   ${S.modal !== null ? renderModal() : ''}`;
 }
 
@@ -4081,16 +4111,17 @@ function renderModalInner(i) {
     ${bodyDiagramSVG(muscles.primary, muscles.secondary)}
   </div>` : '';
 
+  const _locked = S.workoutSubmitted && !S.workoutEditing;
   const setsHTML = Array.from({length: ex.sets}, (_, s) => {
     const checked = log.setsState?.[s];
     return `
     <div class="set-row">
       <div class="set-label">Set ${s+1}</div>
       <div class="set-input-wrap">
-        <input class="set-input" type="number" min="0" value="${log.repsPerSet[s] || ''}" placeholder="${isMax ? '—' : (isTimed ? '0' : '0')}" oninput="setRep(${i},${s},this.value)">
+        <input class="set-input" type="number" min="0" value="${log.repsPerSet[s] || ''}" placeholder="${isMax ? '—' : (isTimed ? '0' : '0')}" ${_locked ? 'readonly style="opacity:.7"' : `oninput="setRep(${i},${s},this.value)"`}>
         <span class="set-unit">${isTimed ? 'sec' : isMax ? 'reps' : parsed.unit === 'reps' ? 'reps' : ''}</span>
       </div>
-      <button class="set-check${checked ? ' done' : ''}" onclick="toggleSet(${i},${s})">${checked ? '✓' : ''}</button>
+      <button class="set-check${checked ? ' done' : ''}" ${_locked ? 'disabled' : `onclick="toggleSet(${i},${s})"`}>${checked ? '✓' : ''}</button>
     </div>`;
   }).join('');
 
@@ -4161,8 +4192,10 @@ function renderModalInner(i) {
     ${diagramHTML}
     ${timerHTML}
     <div class="sets-section">${setsHTML}</div>
-    <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it felt…" oninput="setNote(${i},this.value)">${log.notes}</textarea>
-    <button class="btn btn-primary" onclick="markDone(${i})">✓ Mark Complete</button>
+    <textarea class="notes-input" rows="2" placeholder="Notes, PR, or how it felt…" ${_locked ? 'readonly style="opacity:.7"' : `oninput="setNote(${i},this.value)"`}>${log.notes}</textarea>
+    ${_locked
+      ? `<button class="btn btn-secondary" disabled style="opacity:.6;margin-top:4px">✓ Submitted</button>`
+      : `<button class="btn btn-primary" onclick="markDone(${i})">✓ Mark Complete</button>`}
     <button class="btn btn-secondary" style="margin-top:10px" onclick="closeModal()">Close</button>
   </div>`;
 }
@@ -4284,13 +4317,23 @@ function markDone(i) {
   if (gotPR) setTimeout(() => launchConfetti('pr'), 150);
 }
 
+function startEditWorkout() {
+  S.workoutEditing = true;
+  S.modal = null;
+  render();
+}
+
 // ---- PROGRESS PERSISTENCE ----
 function progressKey() {
   return 'wod_progress_' + S.user + '_' + localDateStr(S.selectedDate);
 }
 function saveProgress() {
   if (!S.selectedDate || !S.user) return;
-  try { localStorage.setItem(progressKey(), JSON.stringify({ logs: S.logs, workoutStartTime: S.workoutStartTime, prs: S.prs })); } catch(e) {}
+  try {
+    const data = { logs: S.logs, workoutStartTime: S.workoutStartTime, prs: S.prs, submitted: S.workoutSubmitted };
+    if (S.workoutSubmitted) data.progression = S.progression; // snapshot targets at submission time
+    localStorage.setItem(progressKey(), JSON.stringify(data));
+  } catch(e) {}
 }
 function loadProgress() {
   if (!S.selectedDate || !S.user) return;
@@ -4304,6 +4347,14 @@ function loadProgress() {
     }
     if (data.workoutStartTime) S.workoutStartTime = data.workoutStartTime;
     if (data.prs) S.prs = data.prs;
+    if (data.submitted) {
+      S.workoutSubmitted = true;
+      // Restore the progression snapshot so we show the targets that were active
+      // at submission time, not next-session's targets (which calcProgression
+      // would produce now that today's workout is in history).
+      if (data.progression) S.progression = data.progression;
+    }
+    S.workoutEditing = false; // never persist editing state across page reloads
   } catch(e) {}
 }
 function clearProgress() {
