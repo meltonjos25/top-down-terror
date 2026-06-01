@@ -254,6 +254,14 @@ input.field::placeholder{color:var(--muted)}
 .pr-card-title{font-size:12px;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.8px}
 .pr-card-row{font-size:14px;color:var(--text);display:flex;justify-content:space-between;align-items:baseline}
 .pr-card-row span{font-size:12px;color:var(--muted)}
+.pr-record-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:default}
+.pr-record-card.tappable{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pr-record-top{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.pr-chevron{font-size:15px;color:var(--muted);transition:transform .25s ease;display:inline-block;margin-left:4px;line-height:1}
+.pr-chevron.open{transform:rotate(180deg)}
+.pr-note-drop{max-height:0;overflow:hidden;transition:max-height .28s ease,padding-top .28s ease}
+.pr-note-drop.open{max-height:300px;padding-top:10px}
+.pr-note-inner{border-top:1px solid var(--border);padding-top:10px;font-size:13px;color:var(--muted);line-height:1.55;font-style:italic}
 .summary-ex.has-pr{border-left:3px solid var(--yellow)}
 
 /* ---- STREAK FLAME ---- */
@@ -5706,7 +5714,7 @@ async function loadRecordsData() {
       if (!vals.length) return;
       const best = Math.max(...vals);
       if (!bests[name] || best > bests[name].value) {
-        bests[name] = { value: best, unit: meta.unit, workout: meta.workout, date: normDateStr(String(row[0] || '')) };
+        bests[name] = { value: best, unit: meta.unit, workout: meta.workout, date: normDateStr(String(row[0] || '')), notes: String(row[6] || '').trim() };
       }
     });
     // One-time correction: Shoulder Isometric Burnout was logged as 128 reps before unit was fixed to sec
@@ -5718,6 +5726,13 @@ async function loadRecordsData() {
   } catch(e) {}
   S.recordsLoading = false;
   render();
+}
+
+function togglePRNote(id) {
+  const drop = document.getElementById(id);
+  if (drop) drop.classList.toggle('open');
+  const chev = document.getElementById(id + '-chev');
+  if (chev) chev.classList.toggle('open');
 }
 
 function renderRecordsBody() {
@@ -5745,12 +5760,21 @@ function renderRecordsBody() {
           valDisplay = `${r.value} <span style="font-size:12px;color:var(--muted);font-weight:600">${r.unit}</span>`;
         }
         const subLine = [r.workout, r.date ? badgeDateLabel(r.date) : ''].filter(Boolean).join(' · ');
-        return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;display:flex;justify-content:space-between;align-items:center;gap:12px">
-          <div style="flex:1;min-width:0;overflow:hidden">
-            <div style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
-            ${subLine ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${subLine}</div>` : ''}
+        const hasNotes = !!(r.notes);
+        const noteId = 'pr-note-' + name.replace(/[^a-zA-Z0-9]/g, '_');
+        const chevron = hasNotes ? `<span class="pr-chevron" id="${noteId}-chev">▾</span>` : '';
+        return `<div class="pr-record-card${hasNotes ? ' tappable' : ''}" ${hasNotes ? `onclick="togglePRNote('${noteId}')"` : ''}>
+          <div class="pr-record-top">
+            <div style="flex:1;min-width:0;overflow:hidden">
+              <div style="font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${name}</div>
+              ${subLine ? `<div style="font-size:12px;color:var(--muted);margin-top:2px">${subLine}</div>` : ''}
+            </div>
+            <div style="display:flex;align-items:center;flex-shrink:0">
+              <div style="font-size:18px;font-weight:800;color:var(--accent)">${valDisplay}</div>
+              ${chevron}
+            </div>
           </div>
-          <div style="font-size:18px;font-weight:800;color:var(--accent);flex-shrink:0">${valDisplay}</div>
+          ${hasNotes ? `<div class="pr-note-drop" id="${noteId}"><div class="pr-note-inner">"${r.notes}"</div></div>` : ''}
         </div>`;
       }
       const timed = entries.filter(([,r]) => r.unit === 'sec');
