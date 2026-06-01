@@ -72,13 +72,22 @@ input.field::placeholder{color:var(--muted)}
 .g-btn svg{width:20px;height:20px;flex-shrink:0}
 
 /* ---- USER SELECT ---- */
-.user-select{padding:32px 24px;display:flex;flex-direction:column;gap:16px}
+.user-select{padding:12px 20px;display:flex;flex-direction:column;gap:10px}
 .user-select h2{font-size:22px;font-weight:800;text-align:center;margin-bottom:8px}
 .user-card{background:var(--surface);border:2px solid var(--border);border-radius:var(--r);padding:24px;cursor:pointer;transition:border-color .2s,background .2s;text-align:center}
 .user-card:hover,.user-card.active{border-color:var(--accent);background:var(--accent-glow)}
 .user-card h3{font-size:20px;font-weight:700;margin-bottom:6px}
 .user-card p{font-size:14px;color:var(--muted)}
 .user-card .icon{font-size:36px;margin-bottom:12px}
+/* sign-in screen: compact card internals so everything fits without scrolling */
+.user-select .user-card{padding:12px 18px}
+.user-select .user-card .icon{font-size:26px;margin-bottom:4px}
+.user-select .user-card h3{font-size:17px;margin-bottom:2px}
+.user-select .user-card p{font-size:12px}
+.user-select .quote-card{padding:8px 14px}
+.user-select .quote-text{font-size:12px;line-height:1.5}
+.user-select .streak-badge{margin-top:4px;font-size:12px}
+.user-select .block-timeline{padding:8px 12px;margin-bottom:0}
 
 /* ---- WORKOUT OVERVIEW ---- */
 .day-header{padding:20px 20px 12px;display:flex;flex-direction:column;gap:4px}
