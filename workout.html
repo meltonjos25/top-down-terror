@@ -248,6 +248,39 @@ input.field::placeholder{color:var(--muted)}
 @keyframes msg-pop-right{from{opacity:0;transform:translateX(16px) scale(.96)}to{opacity:1;transform:none}}
 .msg-anim-left{animation:msg-slide-up .22s ease forwards}
 .msg-anim-right{animation:msg-pop-right .22s ease forwards}
+/* Sent bubble interaction */
+.msg-bubble-wrap.sent{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;cursor:default}
+/* Fade-out on delete */
+@keyframes msg-fade-out{to{opacity:0;transform:translateX(24px) scale(.88)}}
+.msg-bubble-wrap.msg-fading{animation:msg-fade-out .32s ease forwards;pointer-events:none}
+/* Edited label */
+.msg-edited{font-size:10px;color:var(--muted);font-style:italic;margin-top:2px;padding:0 3px;text-align:right}
+/* Action menu */
+.msg-action-menu{position:fixed;background:rgba(28,32,38,.96);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.12);border-radius:12px;overflow:hidden;z-index:1000;min-width:130px;opacity:0;transform:scale(.82);transform-origin:top right;transition:opacity .18s ease-out,transform .18s ease-out;pointer-events:none}
+.msg-action-menu.msg-action-in{opacity:1;transform:scale(1);pointer-events:all}
+.msg-menu-btn{display:flex;align-items:center;gap:10px;width:100%;padding:12px 16px;background:transparent;border:none;color:#fff;font-size:14px;font-weight:500;cursor:pointer;text-align:left;transition:background .12s}
+.msg-menu-btn:active{background:rgba(255,255,255,.12)}
+.msg-menu-delete-btn{color:#ff453a}
+.msg-menu-divider{height:1px;background:rgba(255,255,255,.1);margin:0}
+/* Delete confirm overlay */
+.msg-confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:1001;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .18s ease}
+.msg-confirm-overlay.msg-confirm-in{opacity:1}
+.msg-confirm-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:24px 20px;max-width:280px;width:90%;transform:scale(.9);transition:transform .18s ease}
+.msg-confirm-overlay.msg-confirm-in .msg-confirm-box{transform:scale(1)}
+.msg-confirm-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:8px;text-align:center}
+.msg-confirm-text{font-size:13px;color:var(--muted);text-align:center;line-height:1.5;margin-bottom:20px}
+.msg-confirm-btns{display:flex;gap:10px}
+.msg-confirm-btn{flex:1;padding:11px 0;border-radius:10px;border:1px solid var(--border);background:var(--surface2);color:var(--text);font-size:14px;font-weight:600;cursor:pointer}
+.msg-confirm-del{background:#ff453a22;border-color:#ff453a55;color:#ff453a}
+/* Inline edit form */
+.msg-edit-wrap{max-width:82%;align-self:flex-end}
+.msg-edit-bubble{border-radius:18px 18px 4px 18px;padding:12px 14px;box-shadow:0 1px 8px rgba(0,0,0,.35)}
+.msg-edit-input{width:100%;background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:8px 10px;color:#fff;font-size:14px;line-height:1.45;resize:none;outline:none;font-family:inherit;min-height:56px;box-sizing:border-box}
+.msg-edit-input::placeholder{color:rgba(255,255,255,.5)}
+.msg-edit-btns{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.msg-edit-btn{border:none;padding:7px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer}
+.msg-edit-cancel{background:rgba(255,255,255,.18);color:#fff}
+.msg-edit-save{background:#fff;color:#000}
 
 /* ---- MISC ---- */
 .error-msg{background:#f8514922;border:1px solid #f8514966;border-radius:10px;padding:12px 16px;font-size:14px;color:var(--red);margin-top:4px}
@@ -1905,6 +1938,9 @@ const S = {
   messageDraft: '',
   messageSending: false,
   messageSendError: '',
+  msgEditingKey: null,
+  msgEditDraft: '',
+  msgFadingKey: null,
   xp: { husband: null, wife: null },
   lastXPEarned: 0,
   levelUpInfo: null,    // { level, title } while on success screen
@@ -3333,6 +3369,40 @@ function doGet(e) {
     var s = ss.getSheetByName(params.sheet);
     var vals = s ? s.getDataRange().getValues() : [];
     return res({rows: vals});
+  }
+
+  if (action === 'edit_msg') {
+    var data = JSON.parse(decodeURIComponent(params.data));
+    var s = ss.getSheetByName(data.sheet);
+    if (!s) return res({error: 'Sheet not found'});
+    var rows = s.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      var r = rows[i];
+      if (String(r[0]) === data.date && String(r[1]) === data.time &&
+          String(r[2]).toLowerCase() === data.from && String(r[3]).toLowerCase() === data.to &&
+          String(r[4]) === data.oldText) {
+        s.getRange(i + 1, 5).setValue(data.newText);
+        return res({success: true});
+      }
+    }
+    return res({error: 'Message not found'});
+  }
+
+  if (action === 'delete_msg') {
+    var data = JSON.parse(decodeURIComponent(params.data));
+    var s = ss.getSheetByName(data.sheet);
+    if (!s) return res({error: 'Sheet not found'});
+    var rows = s.getDataRange().getValues();
+    for (var i = 1; i < rows.length; i++) {
+      var r = rows[i];
+      if (String(r[0]) === data.date && String(r[1]) === data.time &&
+          String(r[2]).toLowerCase() === data.from && String(r[3]).toLowerCase() === data.to &&
+          String(r[4]) === data.text) {
+        s.deleteRow(i + 1);
+        return res({success: true});
+      }
+    }
+    return res({error: 'Message not found'});
   }
 
   return res({status: 'ok'});
@@ -5479,6 +5549,143 @@ function msgInputGrow(el) {
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 }
 
+// ---- MSG EDIT / DELETE ----
+let _msgLpTimer = null, _msgLpMoved = false, _msgLpX = 0, _msgLpY = 0;
+let _msgMenuEl = null, _msgMenuMsg = null;
+let _msgConfirmEl = null, _msgConfirmMsg = null;
+window._sentMsgs = [];
+
+async function gasEditMessage(msg, newText) {
+  const data = encodeURIComponent(JSON.stringify({ sheet: MESSAGES_SHEET, date: msg.date, time: msg.time, from: msg.from, to: msg.to, oldText: msg.text, newText }));
+  const r = await fetch(`${S.gasUrl}?action=edit_msg&data=${data}`);
+  if (!r.ok) throw new Error('Edit failed');
+  return r.json();
+}
+async function gasDeleteMessage(msg) {
+  const data = encodeURIComponent(JSON.stringify({ sheet: MESSAGES_SHEET, date: msg.date, time: msg.time, from: msg.from, to: msg.to, text: msg.text }));
+  const r = await fetch(`${S.gasUrl}?action=delete_msg&data=${data}`);
+  if (!r.ok) throw new Error('Delete failed');
+  return r.json();
+}
+
+function msgLpStart(e, idx) {
+  clearTimeout(_msgLpTimer); _msgLpMoved = false;
+  const touch = e.touches[0];
+  _msgLpX = touch.clientX; _msgLpY = touch.clientY;
+  const el = e.currentTarget;
+  _msgLpTimer = setTimeout(() => {
+    if (_msgLpMoved) return;
+    if (navigator.vibrate) navigator.vibrate(50);
+    const msg = window._sentMsgs[idx];
+    if (msg) msgShowMenu(msg, el);
+  }, 500);
+}
+function msgLpMove(e) {
+  if (!_msgLpTimer) return;
+  const t = e.touches[0];
+  if (Math.abs(t.clientX - _msgLpX) > 8 || Math.abs(t.clientY - _msgLpY) > 8) {
+    clearTimeout(_msgLpTimer); _msgLpTimer = null; _msgLpMoved = true;
+  }
+}
+function msgLpEnd() { clearTimeout(_msgLpTimer); _msgLpTimer = null; }
+function msgCtxMenu(e, idx) {
+  e.preventDefault();
+  const msg = window._sentMsgs[idx];
+  if (msg) msgShowMenu(msg, e.currentTarget);
+}
+
+function msgShowMenu(msg, anchorEl) {
+  msgHideMenu();
+  const rect = anchorEl.getBoundingClientRect();
+  const el = document.createElement('div');
+  el.className = 'msg-action-menu';
+  const menuH = 90, spaceAbove = rect.top;
+  el.style.top  = (spaceAbove >= menuH + 10 ? rect.top - menuH - 8 : rect.bottom + 8) + 'px';
+  el.style.right = Math.max(8, window.innerWidth - rect.right) + 'px';
+  el.innerHTML = `
+    <button class="msg-menu-btn" onclick="msgStartEdit()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      Edit
+    </button>
+    <div class="msg-menu-divider"></div>
+    <button class="msg-menu-btn msg-menu-delete-btn" onclick="msgConfirmDelete()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      Delete
+    </button>`;
+  document.body.appendChild(el);
+  _msgMenuEl = el; _msgMenuMsg = msg;
+  requestAnimationFrame(() => el.classList.add('msg-action-in'));
+  setTimeout(() => document.addEventListener('pointerdown', _msgMenuOutside, { once: true, capture: true }), 30);
+}
+function _msgMenuOutside(e) { if (!_msgMenuEl?.contains(e.target)) msgHideMenu(); }
+function msgHideMenu() {
+  if (_msgMenuEl) { _msgMenuEl.remove(); _msgMenuEl = null; }
+  document.removeEventListener('pointerdown', _msgMenuOutside, { capture: true });
+}
+
+function msgStartEdit() {
+  const msg = _msgMenuMsg; msgHideMenu();
+  if (!msg) return;
+  S.msgEditingKey = msgKey(msg); S.msgEditDraft = msg.text;
+  const body = document.querySelector('.body'); const st = body?.scrollTop || 0;
+  render();
+  requestAnimationFrame(() => {
+    if (body) body.scrollTop = st;
+    const inp = document.getElementById('msg-edit-input');
+    if (inp) { inp.focus(); inp.selectionStart = inp.selectionEnd = inp.value.length; }
+  });
+}
+function msgCancelEdit() {
+  S.msgEditingKey = null; S.msgEditDraft = '';
+  const body = document.querySelector('.body'); const st = body?.scrollTop || 0;
+  render(); requestAnimationFrame(() => { if (body) body.scrollTop = st; });
+}
+async function msgSaveEdit() {
+  const newText = (S.msgEditDraft || '').trim();
+  if (!newText || !S.msgEditingKey) return;
+  const key = S.msgEditingKey;
+  const msg = S.messages?.sent.find(m => msgKey(m) === key);
+  if (!msg) return;
+  const oldText = msg.text;
+  msg.text = newText; msg.edited = true;
+  S.msgEditingKey = null; S.msgEditDraft = '';
+  const body = document.querySelector('.body'); const st = body?.scrollTop || 0;
+  render(); requestAnimationFrame(() => { if (body) body.scrollTop = st; });
+  try { await gasEditMessage({ ...msg, text: oldText }, newText); }
+  catch(e) { msg.text = oldText; msg.edited = false; render(); }
+}
+
+function msgConfirmDelete() {
+  const msg = _msgMenuMsg; msgHideMenu(); if (!msg) return;
+  const el = document.createElement('div');
+  el.className = 'msg-confirm-overlay';
+  el.innerHTML = `<div class="msg-confirm-box">
+    <div class="msg-confirm-title">Delete Message</div>
+    <div class="msg-confirm-text">Are you sure you want to delete this message?</div>
+    <div class="msg-confirm-btns">
+      <button class="msg-confirm-btn" onclick="msgHideConfirm()">Cancel</button>
+      <button class="msg-confirm-btn msg-confirm-del" onclick="msgDoDelete()">Delete</button>
+    </div>
+  </div>`;
+  document.body.appendChild(el);
+  _msgConfirmEl = el; _msgConfirmMsg = msg;
+  requestAnimationFrame(() => el.classList.add('msg-confirm-in'));
+}
+function msgHideConfirm() {
+  if (_msgConfirmEl) { _msgConfirmEl.remove(); _msgConfirmEl = null; }
+  _msgConfirmMsg = null;
+}
+async function msgDoDelete() {
+  const msg = _msgConfirmMsg; msgHideConfirm(); if (!msg || !S.messages) return;
+  const key = msgKey(msg);
+  S.msgFadingKey = key; render();
+  setTimeout(async () => {
+    S.messages.sent = S.messages.sent.filter(m => msgKey(m) !== key);
+    S.msgFadingKey = null; render();
+    try { await gasDeleteMessage(msg); } catch(e) {}
+  }, 350);
+}
+
 function msgUpdateSendBtn() {
   const btn = document.getElementById('msg-send-btn');
   if (!btn) return;
@@ -5540,6 +5747,7 @@ function renderMessagesBody() {
     </div></div>${inputBar}`;
   }
 
+  window._sentMsgs = [];
   let chatHTML = '';
   let lastDate = '';
   const total = allMsgs.length;
@@ -5560,10 +5768,33 @@ function renderMessagesBody() {
     })();
 
     if (m.isSent) {
-      chatHTML += `<div class="msg-bubble-wrap sent${animClass}">
-        <div class="msg-bubble sent" style="background:${myColor}">${escapeHtml(m.text)}</div>
-        ${timeLabel ? `<div class="msg-time">${timeLabel}</div>` : ''}
-      </div>`;
+      const sentIdx = window._sentMsgs.length;
+      window._sentMsgs.push(m);
+      const key = msgKey(m);
+      const isEditing = S.msgEditingKey === key;
+      const isFading = S.msgFadingKey === key;
+      if (isEditing) {
+        chatHTML += `<div class="msg-bubble-wrap sent msg-edit-wrap">
+          <div class="msg-edit-bubble" style="background:${myColor}">
+            <textarea id="msg-edit-input" class="msg-edit-input" rows="3"
+              oninput="S.msgEditDraft=this.value">${escapeHtml(S.msgEditDraft)}</textarea>
+            <div class="msg-edit-btns">
+              <button class="msg-edit-btn msg-edit-cancel" onclick="msgCancelEdit()">Cancel</button>
+              <button class="msg-edit-btn msg-edit-save" onclick="msgSaveEdit()">Save</button>
+            </div>
+          </div>
+        </div>`;
+      } else {
+        chatHTML += `<div class="msg-bubble-wrap sent${animClass}${isFading ? ' msg-fading' : ''}"
+          ontouchstart="msgLpStart(event,${sentIdx})"
+          ontouchmove="msgLpMove(event)"
+          ontouchend="msgLpEnd()"
+          oncontextmenu="msgCtxMenu(event,${sentIdx})">
+          <div class="msg-bubble sent" style="background:${myColor}">${escapeHtml(m.text)}</div>
+          ${m.edited ? `<div class="msg-edited">edited</div>` : ''}
+          ${timeLabel ? `<div class="msg-time">${timeLabel}</div>` : ''}
+        </div>`;
+      }
     } else {
       const key = msgKey(m);
       const isUnread = !readSet.has(key);
