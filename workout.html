@@ -380,6 +380,8 @@ input.field::placeholder{color:var(--muted)}
 .nav-item svg{width:22px;height:22px;flex-shrink:0}
 .nav-label{font-size:10px;font-weight:600;letter-spacing:.3px}
 .nav-badge{position:absolute;top:-5px;right:-8px;min-width:16px;height:16px;background:var(--red);border-radius:8px;font-size:10px;font-weight:700;color:#fff;display:flex;align-items:center;justify-content:center;padding:0 3px;line-height:1;pointer-events:none}
+@keyframes heartbeat{0%,100%{transform:scale(1)}14%{transform:scale(1.28)}28%{transform:scale(1.1)}42%{transform:scale(1.32)}70%{transform:scale(1)}}
+.nav-heart-beat{display:inline-flex;animation:heartbeat 1.5s ease-in-out infinite;transform-origin:center;color:var(--red)!important}
 .msg-unread-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);flex-shrink:0;margin-top:3px}
 .act-dot{width:11px;height:11px;border-radius:3px;background:var(--surface3)}
 .act-dot.logged{background:var(--accent)}
@@ -3325,9 +3327,10 @@ function renderNavBar() {
   ];
   const unread = getUnreadCount();
   return `<nav class="nav-bar">${tabs.map(t => {
-    const badge = (t.id === 'messages' && unread > 0)
-      ? `<span class="nav-badge">${unread > 9 ? '9+' : unread}</span>` : '';
-    return `<button class="nav-item${S.navTab===t.id?' active':''}" onclick="navTo('${t.id}')"><span style="position:relative;display:inline-flex">${navIcon(t.id)}${badge}</span><span class="nav-label">${t.label}</span></button>`;
+    const hasUnread = t.id === 'messages' && unread > 0;
+    const badge = hasUnread ? `<span class="nav-badge">${unread > 9 ? '9+' : unread}</span>` : '';
+    const icon = hasUnread ? `<span class="nav-heart-beat">${navIcon(t.id)}</span>` : navIcon(t.id);
+    return `<button class="nav-item${S.navTab===t.id?' active':''}" onclick="navTo('${t.id}')"><span style="position:relative;display:inline-flex">${icon}${badge}</span><span class="nav-label">${t.label}</span></button>`;
   }).join('')}</nav>`;
 }
 
@@ -3651,7 +3654,7 @@ function selectUser(who) {
   S.messageSendError = '';
   S.screen = 'week';
   render();
-  checkAndShowDedicationPopup(who);
+  checkUnreadMessages(who);
   startMessagePolling(who);
   checkBlockChange(who);
 }
@@ -4625,7 +4628,7 @@ function startMessagePolling(user) {
   stopMessagePolling();
   _msgPollInterval = setInterval(() => {
     if (S.user === user && S.screen !== 'setup' && S.screen !== 'user') {
-      checkAndShowDedicationPopup(user);
+      checkUnreadMessages(user);
     }
   }, 30000);
 }
@@ -6020,51 +6023,25 @@ async function deleteReceivedMsg(key) {
   render();
 }
 
-function checkAndShowDedicationPopup(user) {
+function checkUnreadMessages(user) {
   gasReadAll(MESSAGES_SHEET).then(rows => {
     const read    = getReadMsgs(user);
     const deleted = new Set(JSON.parse(localStorage.getItem('deletedMsgs_' + user) || '[]'));
-    const unread  = [];
+    let count = 0;
     rows.forEach(row => {
       const date = normDateStr(String(row[0] || ''));
-      const time = normTimeStr(String(row[1] || ''));
-      const to   = String(row[3] || '').trim().toLowerCase();
       const text = String(row[4] || '').trim();
-      if (to !== user || !date || !text) return;
+      const to   = String(row[3] || '').trim().toLowerCase();
+      if (to !== user || !date || text.length < 2) return;
       const from = String(row[2] || '').trim().toLowerCase();
       const key  = `${date}|${from}|${text.slice(0, 60)}`;
-      if (!read.has(key) && !deleted.has(key)) unread.push({ date, time, from, text, key });
+      if (!read.has(key) && !deleted.has(key)) count++;
     });
-    S.pendingUnreadCount = unread.length;
-    if (unread.length) {
-      unread.forEach(m => markMsgRead(user, m.key));
-      setTimeout(() => showDedicationPopup(unread, user), 400);
+    if (S.pendingUnreadCount !== count) {
+      S.pendingUnreadCount = count;
+      if (S.screen !== 'intro' && S.screen !== 'setup' && S.screen !== 'user') render();
     }
   }).catch(() => {});
-}
-
-function showDedicationPopup(messages, user) {
-  if (document.querySelector('.dedication-popup')) return;
-  const fromName = user === 'husband' ? 'Wife' : 'Husband';
-  const el = document.createElement('div');
-  el.className = 'badge-notif-overlay dedication-popup';
-  const msgsHTML = messages.map(m => `
-    <div style="background:var(--surface2);border-radius:10px;padding:14px;margin-bottom:8px;text-align:left">
-      <div style="font-size:11px;color:var(--muted);margin-bottom:6px">${m.date}${m.time ? ' · ' + m.time : ''}</div>
-      <div style="font-size:15px;line-height:1.55;color:var(--text)">${escapeHtml(m.text)}</div>
-    </div>`).join('');
-  el.innerHTML = `
-    <div class="badge-notif-card">
-      <div style="font-size:40px;text-align:center;margin-bottom:8px">❤️</div>
-      <div style="font-size:12px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px;text-align:center">From ${fromName}</div>
-      <div style="font-size:20px;font-weight:800;margin-bottom:16px;text-align:center">${messages.length > 1 ? messages.length + ' new dedications' : 'A dedication for you'}</div>
-      ${msgsHTML}
-      <button onclick="this.closest('.badge-notif-overlay').remove()"
-        style="width:100%;margin-top:18px;background:var(--accent);color:#000;border:none;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer">
-        ❤️ Thank you!
-      </button>
-    </div>`;
-  document.body.appendChild(el);
 }
 
 // ---- TOGETHER RECORDS ----
