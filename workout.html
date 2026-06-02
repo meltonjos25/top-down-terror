@@ -220,7 +220,7 @@ input.field::placeholder{color:var(--muted)}
 
 /* ---- SWIPE-TO-DELETE ---- */
 .swipe-row{position:relative;overflow:hidden;border-radius:12px;margin-bottom:8px}
-.swipe-content{position:relative;border-radius:12px;will-change:transform}
+.swipe-content{position:relative;border-radius:12px;will-change:transform;background:var(--bg)}
 .swipe-delete-btn{position:absolute;right:0;top:0;bottom:0;width:72px;background:var(--red);display:flex;align-items:center;justify-content:center;border-radius:0 12px 12px 0;cursor:pointer;flex-shrink:0}
 .swipe-delete-btn svg{pointer-events:none}
 /* ---- MESSAGES CHAT UI ---- */
@@ -5489,11 +5489,11 @@ async function loadMessages() {
     const sent = [], received = [];
     rows.forEach(row => {
       const date = normDateStr(String(row[0] || ''));
-      const time = String(row[1] || '').trim();
+      const time = normTimeStr(String(row[1] || ''));
       const from = String(row[2] || '').trim().toLowerCase();
       const to   = String(row[3] || '').trim().toLowerCase();
       const text = String(row[4] || '').trim();
-      if (!date || !text) return;
+      if (!date || text.length < 2) return;
       const msg = { date, time, from, to, text };
       if (from === user) sent.unshift(msg);
       else if (to === user && !deleted.has(msgKey(msg))) received.unshift(msg);
