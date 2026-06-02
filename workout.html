@@ -3026,6 +3026,9 @@ async function submitWorkout() {
     // Mark as submitted and persist — does NOT clear progress
     S.workoutSubmitted = true;
     S.workoutEditing = false;
+    // Write a tiny dedicated submitted flag FIRST — separate from the main progress blob
+    // so it survives even if the larger saveProgress() write fails.
+    try { localStorage.setItem('wod_sub_' + S.user + '_' + localDateStr(S.selectedDate || new Date()), '1'); } catch(e) {}
     saveProgress();
     S.screen = 'success';
     render();
@@ -3809,6 +3812,17 @@ async function selectDay(timestamp) {
   S.workoutDuration = 0;
   S.workoutSubmitted = false;
   S.workoutEditing = false;
+  // Immediately restore submitted flag before ANY async work or renders so the
+  // workout screen never flashes as unsubmitted. Both the tiny flag and the full
+  // progress blob are checked so either storage path is sufficient.
+  try {
+    const _sub = localStorage.getItem('wod_sub_' + S.user + '_' + localDateStr(date));
+    if (_sub === '1') { S.workoutSubmitted = true; }
+    else {
+      const _raw = localStorage.getItem('wod_progress_' + S.user + '_' + localDateStr(date));
+      if (_raw && JSON.parse(_raw).submitted) S.workoutSubmitted = true;
+    }
+  } catch(e) {}
   S.screen = 'loading';
   render();
   setWLProgress(5);
@@ -3939,22 +3953,22 @@ function renderWorkout() {
   const w = S.workout;
   if (!w) return;
 
-  // Defensive: if in-memory flag says not submitted, verify directly from localStorage.
-  // This catches any case where async re-renders fired before loadProgress() ran, or
-  // where the in-memory state was silently lost (iOS page resume, etc.).
+  // Defensive last-resort check: if in-memory flag says not submitted, re-read
+  // both the dedicated tiny flag and the full progress blob from localStorage.
+  // Guards against any async re-render that fires before loadProgress() completes
+  // or any other state loss between save and render.
   if (!S.workoutSubmitted && !S.workoutEditing && S.selectedDate && S.user) {
     try {
-      const raw = localStorage.getItem(progressKey());
-      if (raw) {
-        const saved = JSON.parse(raw);
-        if (saved.submitted) {
-          S.workoutSubmitted = true;
-          if (saved.logs) {
-            S.logs = {};
-            Object.entries(saved.logs).forEach(([k, v]) => { S.logs[parseInt(k)] = v; });
-          }
-          if (saved.progression) S.progression = saved.progression;
-          if (saved.prs) S.prs = saved.prs;
+      const _dateStr = localDateStr(S.selectedDate);
+      const _subFlag = localStorage.getItem('wod_sub_' + S.user + '_' + _dateStr) === '1';
+      let _blobData = null;
+      try { const _r = localStorage.getItem(progressKey()); if (_r) _blobData = JSON.parse(_r); } catch(e) {}
+      if (_subFlag || (_blobData && _blobData.submitted)) {
+        S.workoutSubmitted = true;
+        if (_blobData) {
+          if (_blobData.logs) { S.logs = {}; Object.entries(_blobData.logs).forEach(([k,v]) => { S.logs[parseInt(k)] = v; }); }
+          if (_blobData.progression) S.progression = _blobData.progression;
+          if (_blobData.prs) S.prs = _blobData.prs;
         }
       }
     } catch(e) {}
@@ -4494,13 +4508,15 @@ function progressKey() {
 function saveProgress() {
   if (!S.selectedDate || !S.user) return;
   try {
-    // Prune progress entries older than 21 days to prevent localStorage quota issues
+    // Prune progress entries and submitted flags older than 21 days
     const cutoffDate = new Date(S.selectedDate);
     cutoffDate.setDate(cutoffDate.getDate() - 21);
     const cutoff = localDateStr(cutoffDate);
     const prefix = 'wod_progress_' + S.user + '_';
+    const subPrefix = 'wod_sub_' + S.user + '_';
     Object.keys(localStorage).forEach(k => {
       if (k.startsWith(prefix) && k.slice(prefix.length) < cutoff) localStorage.removeItem(k);
+      if (k.startsWith(subPrefix) && k.slice(subPrefix.length) < cutoff) localStorage.removeItem(k);
     });
     const data = { logs: S.logs, workoutStartTime: S.workoutStartTime, prs: S.prs, submitted: S.workoutSubmitted };
     if (S.workoutSubmitted) data.progression = S.progression; // snapshot targets at submission time
@@ -4513,8 +4529,15 @@ function loadProgress() {
   if (!S.selectedDate || !S.user) return;
   try {
     const key = progressKey();
+    const dateStr = localDateStr(S.selectedDate);
     const raw = localStorage.getItem(key);
-    if (!raw) { console.log('[Together] loadProgress: no saved data for', key); return; }
+    if (!raw) {
+      // No full blob — still check the dedicated submitted flag
+      const _sub = localStorage.getItem('wod_sub_' + S.user + '_' + dateStr);
+      if (_sub === '1') { S.workoutSubmitted = true; console.log('[Together] loadProgress: submitted flag found, no blob for', key); }
+      else { console.log('[Together] loadProgress: no saved data for', key); }
+      return;
+    }
     const data = JSON.parse(raw);
     if (data.logs) {
       S.logs = {};
@@ -4522,13 +4545,15 @@ function loadProgress() {
     }
     if (data.workoutStartTime) S.workoutStartTime = data.workoutStartTime;
     if (data.prs) S.prs = data.prs;
-    if (data.submitted) {
+    // Accept submitted=true from either the blob OR the dedicated tiny flag
+    const _subFlag = localStorage.getItem('wod_sub_' + S.user + '_' + dateStr) === '1';
+    if (data.submitted || _subFlag) {
       S.workoutSubmitted = true;
       // Restore the progression snapshot so we show the targets that were active
       // at submission time, not next-session's targets (which calcProgression
       // would produce now that today's workout is in history).
       if (data.progression) S.progression = data.progression;
-      console.log('[Together] loadProgress: restored submitted state for', key);
+      console.log('[Together] loadProgress: restored submitted state for', key, '(blob:', data.submitted, 'flag:', _subFlag, ')');
     }
     S.workoutEditing = false; // never persist editing state across page reloads
   } catch(e) { console.error('[Together] loadProgress failed:', e); }
@@ -4536,6 +4561,7 @@ function loadProgress() {
 function clearProgress() {
   if (!S.selectedDate || !S.user) return;
   try { localStorage.removeItem(progressKey()); } catch(e) {}
+  try { localStorage.removeItem('wod_sub_' + S.user + '_' + localDateStr(S.selectedDate)); } catch(e) {}
 }
 
 // ---- TIMER ----
