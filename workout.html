@@ -5791,7 +5791,6 @@ function renderMessagesBody() {
           ontouchend="msgLpEnd()"
           oncontextmenu="msgCtxMenu(event,${sentIdx})">
           <div class="msg-bubble sent" style="background:${myColor}">${escapeHtml(m.text)}</div>
-          ${m.edited ? `<div class="msg-edited">edited</div>` : ''}
           ${timeLabel ? `<div class="msg-time">${timeLabel}</div>` : ''}
         </div>`;
       }
