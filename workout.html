@@ -6116,17 +6116,45 @@ async function loadRecordsData() {
       if (!finisherMap.has(leg.name)) finisherMap.set(leg.name, { unit: leg.unit, workout: leg.workout });
     }
 
+    // Build stripped-name index for fuzzy matching (handles band color variants like "Purple Band", "Blue Band")
+    const BAND_COLOR_SUFFIX = /\s+(?:Purple|Blue|Green|Tan|Red|Black|Yellow|Orange|Pink)\s+Band\b/gi;
+    const strippedIndex = new Map(); // strippedName -> meta from finisherMap
+    finisherMap.forEach((meta, name) => {
+      const stripped = name.replace(BAND_COLOR_SUFFIX, '').trim();
+      if (!strippedIndex.has(stripped)) strippedIndex.set(stripped, meta);
+    });
+
+    // Keywords that identify an unknown exercise as a finisher
+    const FINISHER_PATTERN = /burnout|to\s+failure|max\s+(reps?|hold|plank|effort)|isometric\s+burnout/i;
+
+    function resolveFinisherMeta(exName) {
+      // 1. Exact match
+      if (finisherMap.has(exName)) return finisherMap.get(exName);
+      // 2. Strip band color suffix and try exact match
+      const stripped = exName.replace(BAND_COLOR_SUFFIX, '').trim();
+      if (finisherMap.has(stripped)) return finisherMap.get(stripped);
+      // 3. Stripped name matches stripped finisher name
+      if (strippedIndex.has(stripped)) return strippedIndex.get(stripped);
+      // 4. Name contains a finisher keyword — dynamically classify
+      if (FINISHER_PATTERN.test(exName)) {
+        const isTime = /hold|isometric/i.test(exName);
+        return { unit: isTime ? 'sec' : 'reps', workout: String(logRows.find(r => String(r[3]||'').trim() === exName)?.[2] || '') };
+      }
+      return null;
+    }
+
     const bests = {};
     logRows.forEach(row => {
       const name    = String(row[3] || '').trim();
       const repsStr = String(row[5] || '').trim();
-      const meta    = finisherMap.get(name);
-      if (!name || !repsStr || !meta) return;
+      if (!name || !repsStr) return;
+      const meta = resolveFinisherMeta(name);
+      if (!meta) return;
       const vals = repsStr.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v) && v > 0);
       if (!vals.length) return;
       const best = Math.max(...vals);
       if (!bests[name] || best > bests[name].value) {
-        bests[name] = { value: best, unit: meta.unit, workout: meta.workout, date: normDateStr(String(row[0] || '')), notes: String(row[6] || '').trim() };
+        bests[name] = { value: best, unit: meta.unit, workout: meta.workout || '', date: normDateStr(String(row[0] || '')), notes: String(row[6] || '').trim() };
       }
     });
     // One-time correction: Shoulder Isometric Burnout was logged as 128 reps before unit was fixed to sec
