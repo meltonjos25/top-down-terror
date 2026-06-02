@@ -223,6 +223,31 @@ input.field::placeholder{color:var(--muted)}
 .swipe-content{position:relative;border-radius:12px;will-change:transform}
 .swipe-delete-btn{position:absolute;right:0;top:0;bottom:0;width:72px;background:var(--red);display:flex;align-items:center;justify-content:center;border-radius:0 12px 12px 0;cursor:pointer;flex-shrink:0}
 .swipe-delete-btn svg{pointer-events:none}
+/* ---- MESSAGES CHAT UI ---- */
+.msg-chat-body{padding:12px 16px 24px}
+.msg-day-sep{display:flex;align-items:center;gap:8px;margin:20px 0 14px;color:var(--muted);font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px}
+.msg-day-sep::before,.msg-day-sep::after{content:'';flex:1;height:1px;background:var(--border)}
+.msg-bubble-wrap{display:flex;flex-direction:column;margin-bottom:14px}
+.msg-bubble-wrap.sent{align-items:flex-end}
+.msg-bubble-wrap.recv{align-items:flex-start}
+.msg-sender{font-size:11px;font-weight:700;margin-bottom:4px;padding:0 3px;letter-spacing:.2px}
+.msg-bubble{max-width:80%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.55;word-break:break-word}
+.msg-bubble.sent{border-bottom-right-radius:4px;color:#fff;box-shadow:0 1px 8px rgba(0,0,0,.35)}
+.msg-bubble.recv{background:var(--surface2);border:1.5px solid var(--border);border-bottom-left-radius:4px;color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.12)}
+.msg-bubble.recv.unread{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent),0 2px 14px var(--accent-glow)}
+.msg-time{font-size:10px;color:var(--muted);margin-top:4px;padding:0 3px}
+.msg-empty-state{display:flex;flex-direction:column;align-items:center;padding:80px 24px;gap:12px;text-align:center}
+.msg-input-wrap{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--bg);border-top:1px solid var(--border);padding:10px 16px calc(62px + env(safe-area-inset-bottom,0px)) 16px;z-index:48;display:flex;align-items:flex-end;gap:10px;box-sizing:border-box}
+.msg-text-input{flex:1;background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:9px 16px;font-size:14px;color:var(--text);resize:none;outline:none;font-family:inherit;line-height:1.45;overflow-y:auto;transition:border-color .15s;min-height:38px;max-height:120px}
+.msg-text-input:focus{border-color:var(--accent)}
+.msg-send-btn{width:38px;height:38px;border-radius:50%;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:transform .15s,opacity .15s;padding:0}
+.msg-send-btn:active:not(:disabled){transform:scale(.86)}
+.msg-send-btn:disabled{opacity:.3;cursor:default}
+.msg-swipe-wrap.swipe-row{border-radius:0;margin-bottom:0}
+@keyframes msg-slide-up{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+@keyframes msg-pop-right{from{opacity:0;transform:translateX(16px) scale(.96)}to{opacity:1;transform:none}}
+.msg-anim-left{animation:msg-slide-up .22s ease forwards}
+.msg-anim-right{animation:msg-pop-right .22s ease forwards}
 
 /* ---- MISC ---- */
 .error-msg{background:#f8514922;border:1px solid #f8514966;border-radius:10px;padding:12px 16px;font-size:14px;color:var(--red);margin-top:4px}
@@ -3691,6 +3716,14 @@ function renderWeek() {
   </div>
   <div class="body">${bodyContent}</div>
   ${renderNavBar()}`;
+  if (S.navTab === 'messages') {
+    requestAnimationFrame(() => {
+      const body = document.querySelector('.body');
+      if (body) body.scrollTop = body.scrollHeight;
+      const inp = document.getElementById('msg-text-input');
+      if (inp && S.messageDraft) msgInputGrow(inp);
+    });
+  }
 }
 
 async function selectDay(timestamp) {
@@ -5426,91 +5459,113 @@ async function sendDedicationMessage() {
   render();
 }
 
+function formatDaySep(dateStr) {
+  if (!dateStr) return '';
+  try {
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+  } catch(e) { return dateStr; }
+}
+
+function msgInputGrow(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
 function renderMessagesBody() {
   if (!S.messagesLoaded && !S.messagesLoading) loadMessages();
 
-  // Mark all visible received messages as read when the tab is open
+  // Snapshot unread state BEFORE marking as read so highlights show briefly
+  const readSet = getReadMsgs(S.user);
   if (S.messagesLoaded && S.messages) {
     S.messages.received.forEach(m => markMsgRead(S.user, msgKey(m)));
     S.pendingUnreadCount = 0;
   }
 
-  const otherName = S.user === 'husband' ? 'Wife' : 'Husband';
+  const HUSBAND_CLR = '#f97316';
+  const WIFE_CLR    = '#a371f7';
+  const myColor     = S.user === 'husband' ? HUSBAND_CLR : WIFE_CLR;
+  const partnerName = S.user === 'husband' ? 'Wife' : 'Husband';
+  const partnerColor = S.user === 'husband' ? WIFE_CLR : HUSBAND_CLR;
   const msgs = S.messages || { sent: [], received: [] };
-  const readSet = getReadMsgs(S.user);
 
-  const composerHTML = `
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;margin-bottom:24px">
-    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:12px">Write to ${otherName}</div>
-    <textarea id="msg-draft" rows="3"
-      placeholder="Write something kind… (optional)"
-      oninput="S.messageDraft=this.value"
-      style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px;color:var(--text);font-size:14px;line-height:1.5;resize:vertical;outline:none;font-family:inherit">${escapeHtml(S.messageDraft)}</textarea>
-    ${S.messageSendError ? `<div style="font-size:12px;color:var(--red);margin-top:6px">${S.messageSendError}</div>` : ''}
-    <div style="display:flex;justify-content:flex-end;gap:10px;margin-top:10px">
-      <button class="btn btn-ghost btn-sm" onclick="S.messageDraft='';S.messageSendError='';render()">Clear</button>
-      <button class="btn btn-primary btn-sm" onclick="sendDedicationMessage()" ${S.messageSending?'disabled':''}>
-        ${S.messageSending ? 'Sending…' : 'Send ❤️'}
-      </button>
-    </div>
+  const inputBar = `<div class="msg-input-wrap">
+    ${S.messageSendError ? `<div style="position:absolute;bottom:100%;left:0;right:0;padding:7px 16px;font-size:12px;color:var(--red);background:var(--bg);border-top:1px solid var(--border)">${S.messageSendError}</div>` : ''}
+    <textarea id="msg-text-input" class="msg-text-input" rows="1"
+      placeholder="Message ${partnerName}…"
+      oninput="S.messageDraft=this.value;msgInputGrow(this)">${escapeHtml(S.messageDraft)}</textarea>
+    <button class="msg-send-btn" onclick="sendDedicationMessage()"
+      style="background:${myColor}"
+      ${S.messageSending || !(S.messageDraft||'').trim() ? 'disabled' : ''}>
+      ${S.messageSending
+        ? `<div class="spinner" style="width:16px;height:16px;border-width:2px;border-color:rgba(255,255,255,.25);border-top-color:#fff"></div>`
+        : `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`}
+    </button>
   </div>`;
 
-  function msgCard(m, isSent) {
-    const label = isSent
-      ? `To ${S.user === 'husband' ? 'Wife' : 'Husband'}`
-      : `From ${S.user === 'husband' ? 'Wife' : 'Husband'}`;
-    const labelColor = isSent ? 'var(--blue)' : 'var(--accent)';
-    const key = msgKey(m);
-    const isUnread = !isSent && !readSet.has(key);
-    const inner = `<div style="background:var(--surface);border:1px solid ${isUnread ? 'var(--accent)' : 'var(--border)'};border-radius:12px;padding:14px;">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">
-        <div style="display:flex;align-items:center;gap:6px">
-          <div style="font-size:11px;font-weight:700;color:${labelColor};text-transform:uppercase;letter-spacing:.5px">${label}</div>
-          ${isUnread ? '<div class="msg-unread-dot"></div>' : ''}
-        </div>
-        <div style="font-size:11px;color:var(--muted)">${m.date}${m.time ? ' · ' + m.time : ''}</div>
-      </div>
-      <div style="font-size:14px;line-height:1.55;color:var(--text);font-weight:${isUnread ? '600' : '400'}">${escapeHtml(m.text)}</div>
-    </div>`;
-    if (isSent) return `<div style="margin-bottom:8px">${inner}</div>`;
-    const safeKey = escapeHtml(key);
-    return `<div class="swipe-row">
-      <div class="swipe-delete-btn" onclick="deleteReceivedMsg('${safeKey}')">
-        <svg viewBox="0 0 24 24" fill="white" width="22" height="22"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6h14z" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
-      </div>
-      <div class="swipe-content" style="touch-action:pan-y"
-           ontouchstart="swipeStart(event,this)"
-           ontouchmove="swipeMove(event,this)"
-           ontouchend="swipeEnd(event,this)">
-        ${inner}
-      </div>
-    </div>`;
+  if (S.messagesLoading) {
+    return `<div class="msg-chat-body"><div style="display:flex;align-items:center;justify-content:center;padding:80px 0;gap:10px">
+      <div class="spinner"></div><span style="color:var(--muted);font-size:14px">Loading messages…</span>
+    </div></div>${inputBar}`;
   }
 
-  const loading = S.messagesLoading
-    ? `<div class="uploading" style="justify-content:flex-start;gap:10px;padding:12px 0"><div class="spinner"></div><span style="font-size:14px;color:var(--muted)">Loading messages…</span></div>`
-    : '';
+  // Merge sent + received into one chronological timeline
+  const allMsgs = [
+    ...msgs.sent.map(m => ({ ...m, isSent: true })),
+    ...msgs.received.map(m => ({ ...m, isSent: false }))
+  ].sort((a, b) => {
+    if (a.date !== b.date) return a.date.localeCompare(b.date);
+    return (a.time || '00:00').localeCompare(b.time || '00:00');
+  });
 
-  const receivedHTML = !S.messagesLoaded ? loading
-    : msgs.received.length
-      ? msgs.received.map(m => msgCard(m, false)).join('')
-      : `<div style="font-size:13px;color:var(--muted);text-align:center;padding:20px 0">No messages yet.</div>`;
+  if (!allMsgs.length) {
+    return `<div class="msg-chat-body"><div class="msg-empty-state">
+      <div style="font-size:48px">💌</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text)">No messages yet</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.55;max-width:240px">Send your first message to your workout partner below</div>
+    </div></div>${inputBar}`;
+  }
 
-  const sentHTML = !S.messagesLoaded ? ''
-    : msgs.sent.length
-      ? msgs.sent.map(m => msgCard(m, true)).join('')
-      : `<div style="font-size:13px;color:var(--muted);text-align:center;padding:20px 0">Nothing sent yet.</div>`;
+  let chatHTML = '';
+  let lastDate = '';
+  const total = allMsgs.length;
+  allMsgs.forEach((m, idx) => {
+    if (m.date !== lastDate) {
+      chatHTML += `<div class="msg-day-sep"><span>${formatDaySep(m.date)}</span></div>`;
+      lastDate = m.date;
+    }
+    const isLast = idx === total - 1;
+    const animClass = isLast ? (m.isSent ? ' msg-anim-right' : ' msg-anim-left') : '';
+    const timeLabel = m.time || '';
 
-  return `<div style="padding:20px">
-    <div style="font-size:20px;font-weight:800;margin-bottom:4px">❤️ Dedications</div>
-    <div style="font-size:13px;color:var(--muted);margin-bottom:20px">Leave a note for your spouse</div>
-    ${composerHTML}
-    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px">Received</div>
-    ${receivedHTML}
-    ${S.messagesLoaded && msgs.sent.length >= 0 ? `
-    <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:10px;margin-top:20px">Sent</div>
-    ${sentHTML}` : ''}
-  </div>`;
+    if (m.isSent) {
+      chatHTML += `<div class="msg-bubble-wrap sent${animClass}">
+        <div class="msg-bubble sent" style="background:${myColor}">${escapeHtml(m.text)}</div>
+        ${timeLabel ? `<div class="msg-time">${timeLabel}</div>` : ''}
+      </div>`;
+    } else {
+      const key = msgKey(m);
+      const isUnread = !readSet.has(key);
+      const safeKey = escapeHtml(key);
+      chatHTML += `<div class="msg-swipe-wrap swipe-row">
+        <div class="swipe-delete-btn" onclick="deleteReceivedMsg('${safeKey}')">
+          <svg viewBox="0 0 24 24" fill="none" width="20" height="20" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M9 6V4h6v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+        </div>
+        <div class="swipe-content" style="touch-action:pan-y"
+             ontouchstart="swipeStart(event,this)"
+             ontouchmove="swipeMove(event,this)"
+             ontouchend="swipeEnd(event,this)">
+          <div class="msg-bubble-wrap recv${animClass}">
+            <div class="msg-sender" style="color:${partnerColor}">${partnerName}</div>
+            <div class="msg-bubble recv${isUnread ? ' unread' : ''}">${escapeHtml(m.text)}</div>
+            ${timeLabel ? `<div class="msg-time">${timeLabel}</div>` : ''}
+          </div>
+        </div>
+      </div>`;
+    }
+  });
+
+  return `<div class="msg-chat-body">${chatHTML}</div>${inputBar}`;
 }
 
 function escapeHtml(str) {
