@@ -3939,6 +3939,27 @@ function renderWorkout() {
   const w = S.workout;
   if (!w) return;
 
+  // Defensive: if in-memory flag says not submitted, verify directly from localStorage.
+  // This catches any case where async re-renders fired before loadProgress() ran, or
+  // where the in-memory state was silently lost (iOS page resume, etc.).
+  if (!S.workoutSubmitted && !S.workoutEditing && S.selectedDate && S.user) {
+    try {
+      const raw = localStorage.getItem(progressKey());
+      if (raw) {
+        const saved = JSON.parse(raw);
+        if (saved.submitted) {
+          S.workoutSubmitted = true;
+          if (saved.logs) {
+            S.logs = {};
+            Object.entries(saved.logs).forEach(([k, v]) => { S.logs[parseInt(k)] = v; });
+          }
+          if (saved.progression) S.progression = saved.progression;
+          if (saved.prs) S.prs = saved.prs;
+        }
+      }
+    } catch(e) {}
+  }
+
   if (w.type === 'REST') {
     const dateLabel = S.selectedDate ? `${S.day}, ${fmtDate(S.selectedDate)}` : S.day;
     app.innerHTML = `
@@ -4473,16 +4494,27 @@ function progressKey() {
 function saveProgress() {
   if (!S.selectedDate || !S.user) return;
   try {
+    // Prune progress entries older than 21 days to prevent localStorage quota issues
+    const cutoffDate = new Date(S.selectedDate);
+    cutoffDate.setDate(cutoffDate.getDate() - 21);
+    const cutoff = localDateStr(cutoffDate);
+    const prefix = 'wod_progress_' + S.user + '_';
+    Object.keys(localStorage).forEach(k => {
+      if (k.startsWith(prefix) && k.slice(prefix.length) < cutoff) localStorage.removeItem(k);
+    });
     const data = { logs: S.logs, workoutStartTime: S.workoutStartTime, prs: S.prs, submitted: S.workoutSubmitted };
     if (S.workoutSubmitted) data.progression = S.progression; // snapshot targets at submission time
     localStorage.setItem(progressKey(), JSON.stringify(data));
-  } catch(e) {}
+  } catch(e) {
+    console.error('[Together] saveProgress failed — localStorage may be full:', e, 'key:', progressKey());
+  }
 }
 function loadProgress() {
   if (!S.selectedDate || !S.user) return;
   try {
-    const raw = localStorage.getItem(progressKey());
-    if (!raw) return;
+    const key = progressKey();
+    const raw = localStorage.getItem(key);
+    if (!raw) { console.log('[Together] loadProgress: no saved data for', key); return; }
     const data = JSON.parse(raw);
     if (data.logs) {
       S.logs = {};
@@ -4496,9 +4528,10 @@ function loadProgress() {
       // at submission time, not next-session's targets (which calcProgression
       // would produce now that today's workout is in history).
       if (data.progression) S.progression = data.progression;
+      console.log('[Together] loadProgress: restored submitted state for', key);
     }
     S.workoutEditing = false; // never persist editing state across page reloads
-  } catch(e) {}
+  } catch(e) { console.error('[Together] loadProgress failed:', e); }
 }
 function clearProgress() {
   if (!S.selectedDate || !S.user) return;
