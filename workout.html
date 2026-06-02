@@ -2727,6 +2727,31 @@ async function loadStreaks() {
       S.badges[S.champion].duo_champion = champDate;
     }
 
+    // Compute together records using already-fetched rows (no extra GAS calls)
+    const husbandTotalDates = new Set(husbandRows.map(r => normDateStr(r[0])).filter(Boolean));
+    const wifeTotalDates = new Set(wifeRows.map(r => normDateStr(r[0])).filter(Boolean));
+    const husbandTotal = husbandTotalDates.size;
+    const wifeTotal = wifeTotalDates.size;
+    const combinedTotal = [...husbandTotalDates].filter(d => wifeTotalDates.has(d)).length;
+    const togetherCurrentStreak = calcCurrentCombinedStreak(husbandTotalDates, wifeTotalDates);
+    const togetherBestStreak = calcBestCombinedStreak(husbandTotalDates, wifeTotalDates);
+    S.togetherRecords = { combinedTotal, husbandTotal, wifeTotal, currentStreak: togetherCurrentStreak, bestStreak: togetherBestStreak };
+    S.togetherRecordsLoaded = true;
+    S.togetherRecordsLoading = false;
+    const _trDateStr = localDateStr(new Date());
+    gasWrite(TOGETHER_RECORDS_SHEET, [[_trDateStr, husbandTotal, wifeTotal, combinedTotal, togetherCurrentStreak, togetherBestStreak]]).catch(() => {});
+
+    // Cache all user-select data to localStorage (5-min TTL)
+    try {
+      localStorage.setItem('uselect_cache_v1', JSON.stringify({
+        streaks: S.streaks,
+        xp: S.xp,
+        champion: S.champion,
+        togetherRecords: S.togetherRecords,
+        ts: Date.now()
+      }));
+    } catch(e) {}
+
   } catch(e) {
     S.streaks.husband = 0;
     S.streaks.wife = 0;
@@ -3487,8 +3512,19 @@ function goUserSelect() { _userCardAnim = true; S.screen = 'user'; render(); }
 // ---- USER SELECT ----
 function renderUserSelect() {
   stopMessagePolling();
-  if (S.streaks.husband === null && !S.streaksLoading) loadStreaks();
-  if (!S.togetherRecordsLoaded && !S.togetherRecordsLoading) loadTogetherRecords();
+  if (S.streaks.husband === null && !S.streaksLoading) {
+    // Try loading from cache first for instant render, then fetch fresh in background
+    try {
+      const _cached = JSON.parse(localStorage.getItem('uselect_cache_v1') || 'null');
+      if (_cached && (Date.now() - _cached.ts) < 5 * 60 * 1000) {
+        if (_cached.streaks) { S.streaks.husband = _cached.streaks.husband; S.streaks.wife = _cached.streaks.wife; }
+        if (_cached.xp) { S.xp.husband = _cached.xp.husband; S.xp.wife = _cached.xp.wife; }
+        if (_cached.champion !== undefined) S.champion = _cached.champion;
+        if (_cached.togetherRecords) { S.togetherRecords = _cached.togetherRecords; S.togetherRecordsLoaded = true; }
+      }
+    } catch(e) {}
+    loadStreaks();
+  }
   const _anim1 = _userCardAnim ? 'card-enter-1' : '';
   const _anim2 = _userCardAnim ? 'card-enter-2' : '';
   _userCardAnim = false;
@@ -5046,6 +5082,9 @@ function goHome() {
   S.lastXPEarned = 0;
   S.levelUpInfo = null;
   S.xp = { husband: null, wife: null };
+  S.togetherRecordsLoaded = false;
+  S.togetherRecordsLoading = false;
+  S.togetherRecords = null;
   S.screen = 'week';
   render();
 }
@@ -5999,9 +6038,9 @@ function showDedicationPopup(messages, user) {
 
 // ---- TOGETHER RECORDS ----
 async function loadTogetherRecords() {
+  // Already computed by loadStreaks() when called from user-select screen
   if (S.togetherRecordsLoading || S.togetherRecordsLoaded) return;
   S.togetherRecordsLoading = true;
-  render();
   try {
     const [husbandRows, wifeRows] = await Promise.all([
       gasRead(HUSBAND_LOG_SHEET),
