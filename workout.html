@@ -233,8 +233,8 @@ input.field::placeholder{color:var(--muted)}
 .msg-sender{font-size:11px;font-weight:700;margin-bottom:4px;padding:0 3px;letter-spacing:.2px}
 .msg-bubble{max-width:80%;padding:10px 14px;border-radius:18px;font-size:14px;line-height:1.55;word-break:break-word}
 .msg-bubble.sent{border-bottom-right-radius:4px;color:#fff;box-shadow:0 1px 8px rgba(0,0,0,.35)}
-.msg-bubble.recv{background:var(--surface2);border:1.5px solid var(--border);border-bottom-left-radius:4px;color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.12)}
-.msg-bubble.recv.unread{border-color:var(--accent);box-shadow:0 0 0 1.5px var(--accent),0 2px 14px var(--accent-glow)}
+.msg-bubble.recv{border-bottom-left-radius:4px;color:#fff;box-shadow:0 1px 8px rgba(0,0,0,.35)}
+.msg-bubble.recv.unread{box-shadow:0 0 0 3px rgba(255,255,255,.45),0 4px 24px rgba(0,0,0,.4);filter:brightness(1.12)}
 .msg-time{font-size:10px;color:var(--muted);margin-top:4px;padding:0 3px}
 .msg-empty-state{display:flex;flex-direction:column;align-items:center;padding:80px 24px;gap:12px;text-align:center}
 .msg-input-wrap{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:var(--bg);border-top:1px solid var(--border);padding:10px 16px calc(62px + env(safe-area-inset-bottom,0px)) 16px;z-index:48;display:flex;align-items:flex-end;gap:10px;box-sizing:border-box}
@@ -5457,6 +5457,13 @@ async function sendDedicationMessage() {
   }
   S.messageSending = false;
   render();
+  // Scroll to bottom and refocus input after send
+  requestAnimationFrame(() => {
+    const body = document.querySelector('.body');
+    if (body) body.scrollTop = body.scrollHeight;
+    const inp = document.getElementById('msg-text-input');
+    if (inp) inp.focus();
+  });
 }
 
 function formatDaySep(dateStr) {
@@ -5472,6 +5479,13 @@ function msgInputGrow(el) {
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';
 }
 
+function msgUpdateSendBtn() {
+  const btn = document.getElementById('msg-send-btn');
+  if (!btn) return;
+  const hasText = !!(S.messageDraft || '').trim();
+  btn.disabled = !hasText;
+}
+
 function renderMessagesBody() {
   if (!S.messagesLoaded && !S.messagesLoading) loadMessages();
 
@@ -5482,8 +5496,8 @@ function renderMessagesBody() {
     S.pendingUnreadCount = 0;
   }
 
-  const HUSBAND_CLR = '#f97316';
-  const WIFE_CLR    = '#a371f7';
+  const HUSBAND_CLR = '#0A84FF';
+  const WIFE_CLR    = '#FF375F';
   const myColor     = S.user === 'husband' ? HUSBAND_CLR : WIFE_CLR;
   const partnerName = S.user === 'husband' ? 'Wife' : 'Husband';
   const partnerColor = S.user === 'husband' ? WIFE_CLR : HUSBAND_CLR;
@@ -5493,8 +5507,8 @@ function renderMessagesBody() {
     ${S.messageSendError ? `<div style="position:absolute;bottom:100%;left:0;right:0;padding:7px 16px;font-size:12px;color:var(--red);background:var(--bg);border-top:1px solid var(--border)">${S.messageSendError}</div>` : ''}
     <textarea id="msg-text-input" class="msg-text-input" rows="1"
       placeholder="Message ${partnerName}…"
-      oninput="S.messageDraft=this.value;msgInputGrow(this)">${escapeHtml(S.messageDraft)}</textarea>
-    <button class="msg-send-btn" onclick="sendDedicationMessage()"
+      oninput="S.messageDraft=this.value;msgInputGrow(this);msgUpdateSendBtn()">${escapeHtml(S.messageDraft)}</textarea>
+    <button id="msg-send-btn" class="msg-send-btn" onclick="sendDedicationMessage()"
       style="background:${myColor}"
       ${S.messageSending || !(S.messageDraft||'').trim() ? 'disabled' : ''}>
       ${S.messageSending
@@ -5557,7 +5571,7 @@ function renderMessagesBody() {
              ontouchend="swipeEnd(event,this)">
           <div class="msg-bubble-wrap recv${animClass}">
             <div class="msg-sender" style="color:${partnerColor}">${partnerName}</div>
-            <div class="msg-bubble recv${isUnread ? ' unread' : ''}">${escapeHtml(m.text)}</div>
+            <div class="msg-bubble recv${isUnread ? ' unread' : ''}" style="background:${partnerColor}">${escapeHtml(m.text)}</div>
             ${timeLabel ? `<div class="msg-time">${timeLabel}</div>` : ''}
           </div>
         </div>
