@@ -253,6 +253,7 @@ input.field::placeholder{color:var(--muted)}
 /* Fade-out on delete */
 @keyframes msg-fade-out{to{opacity:0;transform:translateX(24px) scale(.88)}}
 .msg-bubble-wrap.msg-fading{animation:msg-fade-out .32s ease forwards;pointer-events:none}
+.msg-bubble-wrap.msg-deleting{opacity:.45;pointer-events:none;transition:opacity .15s}
 /* Edited label */
 .msg-edited{font-size:10px;color:var(--muted);font-style:italic;margin-top:2px;padding:0 3px;text-align:right}
 /* Action menu */
@@ -1941,6 +1942,8 @@ const S = {
   msgEditingKey: null,
   msgEditDraft: '',
   msgFadingKey: null,
+  msgDeletingKey: null,
+  msgSaving: false,
   xp: { husband: null, wife: null },
   lastXPEarned: 0,
   levelUpInfo: null,    // { level, title } while on success screen
@@ -3406,10 +3409,11 @@ function doGet(e) {
     var rows = s.getDataRange().getValues();
     for (var i = 1; i < rows.length; i++) {
       var r = rows[i];
-      if (String(r[0]) === data.date && String(r[1]) === data.time &&
-          String(r[2]).toLowerCase() === data.from && String(r[3]).toLowerCase() === data.to &&
-          String(r[4]) === data.oldText) {
+      if (String(r[2]).toLowerCase().trim() === data.from &&
+          String(r[3]).toLowerCase().trim() === data.to &&
+          String(r[4]).trim() === data.oldText) {
         s.getRange(i + 1, 5).setValue(data.newText);
+        s.getRange(i + 1, 6).setValue('edited');
         return res({success: true});
       }
     }
@@ -3423,9 +3427,9 @@ function doGet(e) {
     var rows = s.getDataRange().getValues();
     for (var i = 1; i < rows.length; i++) {
       var r = rows[i];
-      if (String(r[0]) === data.date && String(r[1]) === data.time &&
-          String(r[2]).toLowerCase() === data.from && String(r[3]).toLowerCase() === data.to &&
-          String(r[4]) === data.text) {
+      if (String(r[2]).toLowerCase().trim() === data.from &&
+          String(r[3]).toLowerCase().trim() === data.to &&
+          String(r[4]).trim() === data.text) {
         s.deleteRow(i + 1);
         return res({success: true});
       }
@@ -5592,7 +5596,8 @@ async function loadMessages() {
       const to   = String(row[3] || '').trim().toLowerCase();
       const text = String(row[4] || '').trim();
       if (!date || text.length < 2) return;
-      const msg = { date, time, from, to, text };
+      const edited = String(row[5] || '').trim().toLowerCase() === 'edited';
+      const msg = { date, time, from, to, text, edited };
       if (from === user) sent.unshift(msg);
       else if (to === user && !deleted.has(msgKey(msg))) received.unshift(msg);
     });
@@ -5654,16 +5659,20 @@ let _msgConfirmEl = null, _msgConfirmMsg = null;
 window._sentMsgs = [];
 
 async function gasEditMessage(msg, newText) {
-  const data = encodeURIComponent(JSON.stringify({ sheet: MESSAGES_SHEET, date: msg.date, time: msg.time, from: msg.from, to: msg.to, oldText: msg.text, newText }));
+  const data = encodeURIComponent(JSON.stringify({ sheet: MESSAGES_SHEET, from: msg.from, to: msg.to, oldText: msg.text, newText }));
   const r = await fetch(`${S.gasUrl}?action=edit_msg&data=${data}`);
   if (!r.ok) throw new Error('Edit failed');
-  return r.json();
+  const json = await r.json();
+  if (json.error) throw new Error(json.error);
+  return json;
 }
 async function gasDeleteMessage(msg) {
-  const data = encodeURIComponent(JSON.stringify({ sheet: MESSAGES_SHEET, date: msg.date, time: msg.time, from: msg.from, to: msg.to, text: msg.text }));
+  const data = encodeURIComponent(JSON.stringify({ sheet: MESSAGES_SHEET, from: msg.from, to: msg.to, text: msg.text }));
   const r = await fetch(`${S.gasUrl}?action=delete_msg&data=${data}`);
   if (!r.ok) throw new Error('Delete failed');
-  return r.json();
+  const json = await r.json();
+  if (json.error) throw new Error(json.error);
+  return json;
 }
 
 function msgLpStart(e, idx) {
@@ -5740,17 +5749,23 @@ function msgCancelEdit() {
 }
 async function msgSaveEdit() {
   const newText = (S.msgEditDraft || '').trim();
-  if (!newText || !S.msgEditingKey) return;
+  if (!newText || !S.msgEditingKey || S.msgSaving) return;
   const key = S.msgEditingKey;
   const msg = S.messages?.sent.find(m => msgKey(m) === key);
   if (!msg) return;
-  const oldText = msg.text;
-  msg.text = newText; msg.edited = true;
-  S.msgEditingKey = null; S.msgEditDraft = '';
+  S.msgSaving = true;
+  S.messageSendError = '';
   const body = document.querySelector('.body'); const st = body?.scrollTop || 0;
   render(); requestAnimationFrame(() => { if (body) body.scrollTop = st; });
-  try { await gasEditMessage({ ...msg, text: oldText }, newText); }
-  catch(e) { msg.text = oldText; msg.edited = false; render(); }
+  try {
+    await gasEditMessage(msg, newText);
+    msg.text = newText; msg.edited = true;
+    S.msgEditingKey = null; S.msgEditDraft = '';
+  } catch(e) {
+    S.messageSendError = 'Could not save edit — please try again.';
+  }
+  S.msgSaving = false;
+  render(); requestAnimationFrame(() => { if (body) body.scrollTop = st; });
 }
 
 function msgConfirmDelete() {
@@ -5776,12 +5791,17 @@ function msgHideConfirm() {
 async function msgDoDelete() {
   const msg = _msgConfirmMsg; msgHideConfirm(); if (!msg || !S.messages) return;
   const key = msgKey(msg);
-  S.msgFadingKey = key; render();
-  setTimeout(async () => {
+  S.msgDeletingKey = key;
+  S.messageSendError = '';
+  render();
+  try {
+    await gasDeleteMessage(msg);
     S.messages.sent = S.messages.sent.filter(m => msgKey(m) !== key);
-    S.msgFadingKey = null; render();
-    try { await gasDeleteMessage(msg); } catch(e) {}
-  }, 350);
+  } catch(e) {
+    S.messageSendError = 'Could not delete message — please try again.';
+  }
+  S.msgDeletingKey = null;
+  render();
 }
 
 function msgUpdateSendBtn() {
@@ -5870,31 +5890,31 @@ function renderMessagesBody() {
       window._sentMsgs.push(m);
       const key = msgKey(m);
       const isEditing = S.msgEditingKey === key;
-      const isFading = S.msgFadingKey === key;
+      const isDeleting = S.msgDeletingKey === key;
       if (isEditing) {
         chatHTML += `<div class="msg-bubble-wrap sent msg-edit-wrap">
           <div class="msg-edit-bubble" style="background:${myColor}">
             <textarea id="msg-edit-input" class="msg-edit-input" rows="3"
               oninput="S.msgEditDraft=this.value">${escapeHtml(S.msgEditDraft)}</textarea>
             <div class="msg-edit-btns">
-              <button class="msg-edit-btn msg-edit-cancel" onclick="msgCancelEdit()">Cancel</button>
-              <button class="msg-edit-btn msg-edit-save" onclick="msgSaveEdit()">Save</button>
+              <button class="msg-edit-btn msg-edit-cancel" onclick="msgCancelEdit()" ${S.msgSaving ? 'disabled' : ''}>Cancel</button>
+              <button class="msg-edit-btn msg-edit-save" onclick="msgSaveEdit()" ${S.msgSaving ? 'disabled' : ''}>
+                ${S.msgSaving ? '<span style="opacity:.6">Saving…</span>' : 'Save'}
+              </button>
             </div>
           </div>
         </div>`;
       } else {
-        chatHTML += `<div class="msg-bubble-wrap sent${animClass}${isFading ? ' msg-fading' : ''}"
-          ontouchstart="msgLpStart(event,${sentIdx})"
-          ontouchmove="msgLpMove(event)"
-          ontouchend="msgLpEnd()"
-          oncontextmenu="msgCtxMenu(event,${sentIdx})">
+        chatHTML += `<div class="msg-bubble-wrap sent${animClass}${isDeleting ? ' msg-deleting' : ''}"
+          ${isDeleting ? '' : `ontouchstart="msgLpStart(event,${sentIdx})" ontouchmove="msgLpMove(event)" ontouchend="msgLpEnd()" oncontextmenu="msgCtxMenu(event,${sentIdx})"`}>
           <div class="msg-bubble sent" style="background:${myColor}">${escapeHtml(m.text)}</div>
-          ${timeLabel ? `<div class="msg-time">${timeLabel}</div>` : ''}
+          <div class="msg-time">${isDeleting ? '<span style="opacity:.5">Deleting…</span>' : (timeLabel || '') + (m.edited ? ' <span style="opacity:.55;font-size:10px">(edited)</span>' : '')}</div>
         </div>`;
       }
     } else {
       const key = msgKey(m);
       const isUnread = !readSet.has(key);
+      const isDeleting = S.msgDeletingKey === key;
       const safeKey = escapeHtml(key);
       chatHTML += `<div class="msg-swipe-wrap swipe-row">
         <div class="swipe-delete-btn" onclick="deleteReceivedMsg('${safeKey}')">
@@ -5904,10 +5924,10 @@ function renderMessagesBody() {
              ontouchstart="swipeStart(event,this)"
              ontouchmove="swipeMove(event,this)"
              ontouchend="swipeEnd(event,this)">
-          <div class="msg-bubble-wrap recv${animClass}">
+          <div class="msg-bubble-wrap recv${animClass}${isDeleting ? ' msg-deleting' : ''}">
             <div class="msg-sender" style="color:${partnerColor}">${partnerName}</div>
             <div class="msg-bubble recv${isUnread ? ' unread' : ''}" style="background:${partnerColor}">${escapeHtml(m.text)}</div>
-            ${timeLabel ? `<div class="msg-time">${timeLabel}</div>` : ''}
+            <div class="msg-time">${isDeleting ? '<span style="opacity:.5">Deleting…</span>' : timeLabel || ''}</div>
           </div>
         </div>
       </div>`;
@@ -5977,15 +5997,26 @@ function getUnreadCount() {
   return S.pendingUnreadCount || 0;
 }
 
-function deleteReceivedMsg(key) {
+async function deleteReceivedMsg(key) {
   if (!S.messages) return;
-  S.messages.received = S.messages.received.filter(m => msgKey(m) !== key);
+  const msg = S.messages.received.find(m => msgKey(m) === key);
+  if (!msg) return;
+  S.msgDeletingKey = key;
+  S.messageSendError = '';
+  render();
   try {
-    const stored = JSON.parse(localStorage.getItem('deletedMsgs_' + S.user) || '[]');
-    if (!stored.includes(key)) stored.push(key);
-    localStorage.setItem('deletedMsgs_' + S.user, JSON.stringify(stored));
-  } catch(e) {}
-  markMsgRead(S.user, key);
+    await gasDeleteMessage(msg);
+    S.messages.received = S.messages.received.filter(m => msgKey(m) !== key);
+    markMsgRead(S.user, key);
+    try {
+      const stored = JSON.parse(localStorage.getItem('deletedMsgs_' + S.user) || '[]');
+      if (!stored.includes(key)) stored.push(key);
+      localStorage.setItem('deletedMsgs_' + S.user, JSON.stringify(stored));
+    } catch(e) {}
+  } catch(e) {
+    S.messageSendError = 'Could not delete message — please try again.';
+  }
+  S.msgDeletingKey = null;
   render();
 }
 
