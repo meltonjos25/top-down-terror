@@ -3335,6 +3335,11 @@ function renderNavBar() {
 }
 
 function navTo(tab) {
+  if (tab === 'messages') {
+    // Always fetch fresh from the sheet — never use a cached copy
+    S.messagesLoaded = false;
+    S.messagesLoading = false;
+  }
   S.navTab = tab;
   render();
 }
@@ -3410,7 +3415,7 @@ function doGet(e) {
     var s = ss.getSheetByName(data.sheet);
     if (!s) return res({error: 'Sheet not found'});
     var rows = s.getDataRange().getValues();
-    for (var i = 1; i < rows.length; i++) {
+    for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (String(r[2]).toLowerCase().trim() === data.from &&
           String(r[3]).toLowerCase().trim() === data.to &&
@@ -3428,7 +3433,7 @@ function doGet(e) {
     var s = ss.getSheetByName(data.sheet);
     if (!s) return res({error: 'Sheet not found'});
     var rows = s.getDataRange().getValues();
-    for (var i = 1; i < rows.length; i++) {
+    for (var i = 0; i < rows.length; i++) {
       var r = rows[i];
       if (String(r[2]).toLowerCase().trim() === data.from &&
           String(r[3]).toLowerCase().trim() === data.to &&
