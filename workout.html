@@ -4687,7 +4687,7 @@ function playAlarm() {
   const ctx = _audioCtx;
   if (!ctx) return;
 
-  // Play 3 two-tone chimes (A5 + E6 = perfect fifth — clear but pleasant)
+  // Two-tone ding: A5 (880Hz) + E6 (1320Hz) — perfect fifth, clean and pleasant
   const chime = (startTime) => {
     [[880, 0.55], [1320, 0.35]].forEach(([freq, vol]) => {
       const osc = ctx.createOscillator();
@@ -4704,22 +4704,18 @@ function playAlarm() {
     });
   };
 
+  // Pattern: Ding Ding — 600ms pause — Ding Ding — done
   const doPlay = () => {
     const t = ctx.currentTime + 0.05;
-    chime(t);
-    chime(t + 0.7);
-    chime(t + 1.4);
+    chime(t);        // Ding 1
+    chime(t + 0.2);  // Ding 2 — 200ms after Ding 1
+    chime(t + 0.8);  // Ding 3 — 600ms pause after Ding 2
+    chime(t + 1.0);  // Ding 4 — 200ms after Ding 3
   };
 
-  // Resume first in case iOS suspended the context between tap and alarm,
-  // then repeat the full alarm 3 times with a 2.5-second gap between each
-  const fireOnce = () => {
-    if (ctx.state === 'suspended') ctx.resume().then(doPlay); else doPlay();
-    if (navigator.vibrate) navigator.vibrate([350, 150, 350, 150, 350]);
-  };
-  fireOnce();
-  setTimeout(fireOnce, 2500);
-  setTimeout(fireOnce, 5000);
+  // Resume first in case iOS suspended the context between tap and alarm
+  if (ctx.state === 'suspended') ctx.resume().then(doPlay); else doPlay();
+  if (navigator.vibrate) navigator.vibrate([100, 200, 100, 600, 100, 200, 100]);
 }
 
 function leaveWorkout() {
