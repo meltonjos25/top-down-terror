@@ -3317,7 +3317,7 @@ function checkAndNotifyNewBadges() {
 // NAV BAR
 // ═══════════════════════════════════════════════
 function navIcon(tab) {
-  if (tab === 'workout') return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="0" y="7" width="3.5" height="10" rx="1.5"/><rect x="3.5" y="9.5" width="3" height="5" rx="1"/><rect x="6.5" y="11" width="11" height="2" rx="1"/><rect x="17.5" y="9.5" width="3" height="5" rx="1"/><rect x="20.5" y="7" width="3.5" height="10" rx="1.5"/></svg>`;
+  if (tab === 'workout') return `<span style="font-size:20px;line-height:1;display:block">💪</span>`;
   if (tab === 'calendar') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><circle cx="8" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="16" cy="14" r="1.3" fill="currentColor" stroke="none"/><circle cx="8" cy="18" r="1.3" fill="currentColor" stroke="none"/><circle cx="12" cy="18" r="1.3" fill="currentColor" stroke="none"/></svg>`;
   if (tab === 'progress') return `<svg viewBox="0 0 24 24" fill="currentColor"><rect x="2" y="14" width="5" height="8" rx="1"/><rect x="9.5" y="9" width="5" height="13" rx="1"/><rect x="17" y="4" width="5" height="18" rx="1"/></svg>`;
   if (tab === 'records') return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 21h8M12 17v4"/><path d="M6 3h12v8a6 6 0 01-12 0V3z"/><path d="M6 7H3.5a2.5 2.5 0 000 5H6M18 7h2.5a2.5 2.5 0 010 5H18"/></svg>`;
@@ -3327,9 +3327,9 @@ function navIcon(tab) {
 
 function renderNavBar() {
   const tabs = [
-    {id:'workout',  label:'Workout'},
     {id:'calendar', label:'Calendar'},
     {id:'progress', label:'Progress'},
+    {id:'workout',  label:'Workout'},
     {id:'records',  label:'Records'},
     {id:'messages', label:'Messages'},
   ];
