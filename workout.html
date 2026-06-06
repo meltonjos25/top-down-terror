@@ -362,6 +362,14 @@ input.field::placeholder{color:var(--muted)}
 .cal-day-num{font-size:12px;font-weight:600;line-height:1;color:var(--text)}
 .cal-day.other-month .cal-day-num{color:var(--muted)}
 .cal-check{color:var(--accent);font-size:13px;font-weight:800;line-height:1}
+.cal-avg-wrap{padding:0 2px 4px;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent}
+.cal-avg-row{display:flex;align-items:center;gap:8px}
+.cal-avg-track{flex:1;height:3px;background:var(--surface3);border-radius:2px;overflow:hidden}
+.cal-avg-fill{height:100%;border-radius:2px;transition:width .5s ease}
+.cal-avg-label{font-size:10px;font-weight:700;flex-shrink:0;opacity:.82;white-space:nowrap}
+.cal-avg-tip{display:none;font-size:11px;color:var(--muted);padding:4px 2px 0;line-height:1.5}
+.cal-avg-tip.open{display:block}
+@media(hover:hover){.cal-avg-wrap:hover .cal-avg-tip{display:block}}
 
 /* ---- MUSCLE HEATMAP ---- */
 .muscle-diagram{margin:0 0 16px;background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:12px 14px 10px}
@@ -3783,6 +3791,8 @@ function renderCalendarBody() {
 
   // Group into week rows; detect gold weeks (all scheduled days logged)
   const weeksHTML = [];
+  const AVG_DAY_ABBR = ['Mo','Tu','We','Th','Fr','Sa','Su'];
+  const AVG_TARGET_MIN = 45;
   for (let i = 0; i < cells.length; i += 7) {
     const wk = cells.slice(i, i + 7);
     const scheduledDays = wk.filter(c => c.cur && c.scheduled);
@@ -3795,7 +3805,37 @@ function renderCalendarBody() {
         ${c.logged ? '<span class="cal-check">✓</span>' : ''}
       </div>`;
     }).join('');
-    weeksHTML.push(`<div class="cal-week${isGold ? ' gold' : ''}">${wkCells}</div>`);
+
+    // Weekly avg duration bar — spans full Mon–Sun regardless of month boundary
+    const wkMonday = new Date(year, month, 1 - firstDow + i);
+    const durEntries = Array.from({length: 7}, (_, d) => {
+      const day = new Date(wkMonday); day.setDate(wkMonday.getDate() + d);
+      const dStr = localDateStr(day);
+      const dur = S.weekDurations[dStr];
+      if (!dur) return null;
+      const min = parseDurMinutes(dur);
+      return (min && min > 0) ? { dStr, dur, min, label: AVG_DAY_ABBR[d] } : null;
+    }).filter(Boolean);
+
+    let avgBarHTML = '';
+    if (durEntries.length > 0) {
+      const avgMin = Math.round(durEntries.reduce((s, e) => s + e.min, 0) / durEntries.length);
+      const blk = getConjugateBlock(durEntries[0].dStr);
+      const barColor = blk ? blk.color : 'var(--accent)';
+      const pct = Math.min(avgMin / AVG_TARGET_MIN * 100, 115).toFixed(1);
+      const breakdown = durEntries.map(e => `${e.label} ${e.dur}`).join(' · ');
+      const tipText = `${breakdown} · Avg ${avgMin} min`;
+      const tipId = `cavg${i}`;
+      avgBarHTML = `<div class="cal-avg-wrap" onclick="calAvgToggle('${tipId}')" title="${tipText}">
+        <div class="cal-avg-row">
+          <div class="cal-avg-track"><div class="cal-avg-fill" style="width:${pct}%;background:${barColor}"></div></div>
+          <span class="cal-avg-label" style="color:${barColor}">Avg ${avgMin} min</span>
+        </div>
+        <div class="cal-avg-tip" id="${tipId}">${tipText}</div>
+      </div>`;
+    }
+
+    weeksHTML.push(`<div class="cal-week${isGold ? ' gold' : ''}">${wkCells}</div>${avgBarHTML}`);
   }
 
   const DOW = ['Mo','Tu','We','Th','Fr','Sa','Su'];
@@ -3819,6 +3859,10 @@ function nextMonth() {
   if (S.calendarMonth === 11) { S.calendarMonth = 0; S.calendarYear++; }
   else S.calendarMonth++;
   render();
+}
+function calAvgToggle(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.toggle('open');
 }
 
 function renderWeek() {
