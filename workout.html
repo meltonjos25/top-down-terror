@@ -5235,11 +5235,13 @@ function renderProgressBody() {
 function renderBadgeGrid() {
   if (!S.badgesLoaded) return `<div class="uploading" style="padding:16px 0;justify-content:flex-start;gap:10px"><div class="spinner"></div><span style="font-size:14px;color:var(--muted)">Loading badges…</span></div>`;
   const earned = S.badges[S.user] || {};
-  const earnedCount = Object.keys(earned).filter(id => BADGE_DEFS.some(b => b.id === id)).length;
-  const total = BADGE_DEFS.length;
 
-  const CATS = ['Milestones','Streaks','Records','Levels','Consistency','Special','Duo'];
-  const CAT_ICONS = { Milestones:'🏋️', Streaks:'🔥', Records:'🏆', Levels:'⭐', Consistency:'📅', Special:'✨', Duo:'👫' };
+  const CATS = ['Milestones','Records','Levels','Consistency','Special','Duo'];
+  const CAT_ICONS = { Milestones:'🏋️', Records:'🏆', Levels:'⭐', Consistency:'📅', Special:'✨', Duo:'👫' };
+
+  const visibleBadges = BADGE_DEFS.filter(b => CATS.includes(b.cat));
+  const earnedCount = Object.keys(earned).filter(id => visibleBadges.some(b => b.id === id)).length;
+  const total = visibleBadges.length;
 
   const sections = CATS.map(cat => {
     const badges = BADGE_DEFS.filter(b => b.cat === cat);
