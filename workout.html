@@ -872,12 +872,12 @@ function applyBadgeOverrides(user, earned) {
 // ═══════════════════════════════════════════════
 const PLAN_SHEETS = {
   husband: {
-    Monday:    { sheet: 'Husband — Core', name: 'Core Workout A',  type: 'CORE', duration: '30 min' },
-    Tuesday:   { sheet: 'Husband — Arms', name: 'Arms Workout A',  type: 'ARMS', duration: '30 min' },
-    Wednesday: { sheet: 'Husband — Core', name: 'Core Workout B',  type: 'CORE', duration: '30 min' },
-    Thursday:  { sheet: 'Husband — Arms', name: 'Arms Workout B',  type: 'ARMS', duration: '30 min' },
-    Friday:    { sheet: 'Husband — Core', name: 'Core Workout C',  type: 'CORE', duration: '30 min' },
-    Saturday:  { sheet: 'Husband — Arms', name: 'Arms Workout C',  type: 'ARMS', duration: '30 min' },
+    Monday:    { sheet: 'Husband — Core', name: 'Core Workout',  type: 'CORE', duration: '30 min' },
+    Tuesday:   { sheet: 'Husband — Arms', name: 'Arms Workout',  type: 'ARMS', duration: '30 min' },
+    Wednesday: null,
+    Thursday:  { sheet: 'Husband — Core', name: 'Core Workout',  type: 'CORE', duration: '30 min' },
+    Friday:    { sheet: 'Husband — Arms', name: 'Arms Workout',  type: 'ARMS', duration: '30 min' },
+    Saturday:  null,
     Sunday:    null,
   },
   wife: {
@@ -2941,23 +2941,62 @@ async function gasWrite(sheetName, rows) {
   return r.json();
 }
 
+// ═══════════════════════════════════════════════
+// HUSBAND WORKOUT ROTATION
+// Husband trains Mon/Thu (Core) and Tue/Fri (Arms) — 2 sessions/week per type
+// instead of 3. To keep all three Core and all three Arms workouts (originally
+// tied to Mon/Wed/Fri and Tue/Thu/Sat) in rotation, both sessions of a given
+// type share one variant (A/B/C) each week, and the variant advances weekly on
+// a 3-week cycle: week 1 = A, week 2 = B, week 3 = C, then repeats.
+// ═══════════════════════════════════════════════
+const HUSBAND_VARIANT_DAYS = {
+  CORE: ['Monday', 'Wednesday', 'Friday'],
+  ARMS: ['Tuesday', 'Thursday', 'Saturday'],
+};
+const HUSBAND_VARIANT_LETTERS = ['A', 'B', 'C'];
+const HUSBAND_ROTATION_ANCHOR = '2026-05-04'; // a Monday — anchor week = variant A
+
+function husbandRotationMonday(d) {
+  const x = new Date(d);
+  const dow = x.getDay();
+  x.setDate(x.getDate() + (dow === 0 ? -6 : 1 - dow));
+  x.setHours(0, 0, 0, 0);
+  return x;
+}
+
+function getHusbandVariantIndex(dateStr) {
+  const anchorMon = husbandRotationMonday(new Date(HUSBAND_ROTATION_ANCHOR + 'T00:00:00'));
+  const targetMon = husbandRotationMonday(new Date(dateStr + 'T00:00:00'));
+  const weeks = Math.round((targetMon - anchorMon) / (7 * 86400000));
+  return ((weeks % 3) + 3) % 3;
+}
+
 async function fetchPlan(user, day) {
   const meta = PLAN_SHEETS[user][day];
   if (!meta) return null; // rest day
 
+  const dateStr = S.selectedDate ? localDateStr(S.selectedDate) : localDateStr(new Date());
+
+  // Husband's Core/Arms exercises are looked up under their original weekday key
+  // (Mon/Wed/Fri for Core, Tue/Thu/Sat for Arms) so existing sheet data and local
+  // fallback content keep working unchanged — only which key gets used rotates weekly.
+  const rotationDays = user === 'husband' ? HUSBAND_VARIANT_DAYS[meta.type] : null;
+  const variantIdx = rotationDays ? getHusbandVariantIndex(dateStr) : null;
+  const lookupDay = rotationDays ? rotationDays[variantIdx] : day;
+  const displayMeta = rotationDays ? { ...meta, name: `${meta.name} ${HUSBAND_VARIANT_LETTERS[variantIdx]}` } : meta;
+
   const conjType = CONJUGATE_EXERCISES[user]?.[meta.type] ? meta.type : null;
   if (conjType) {
-    const dateStr = S.selectedDate ? localDateStr(S.selectedDate) : localDateStr(new Date());
     const blockInfo = getConjugateBlock(dateStr);
 
     // Phase 5: use the regular named sheets (Husband — Core, etc.) unchanged
     if (blockInfo && blockInfo.num === 5) {
-      const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
+      const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(lookupDay)}`;
       const r = await fetch(url);
       if (!r.ok) throw new Error(`Could not load workout plan (${r.status})`);
       const json = await r.json();
       if (json.error) throw new Error(json.error);
-      return { ...meta, exercises: json.exercises, blockInfo };
+      return { ...displayMeta, exercises: json.exercises, blockInfo };
     }
 
     if (blockInfo) {
@@ -2969,7 +3008,7 @@ async function fetchPlan(user, day) {
 
       let exercises = null;
       try {
-        const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(phaseSheet)}&day=${encodeURIComponent(day)}`;
+        const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(phaseSheet)}&day=${encodeURIComponent(lookupDay)}`;
         const r = await fetch(url);
         if (r.ok) {
           const json = await r.json();
@@ -2980,20 +3019,20 @@ async function fetchPlan(user, day) {
       } catch(e) {}
 
       if (!exercises) {
-        exercises = (CONJUGATE_EXERCISES[user]?.[conjType]?.[blockInfo.num]?.[day]) || [];
+        exercises = (CONJUGATE_EXERCISES[user]?.[conjType]?.[blockInfo.num]?.[lookupDay]) || [];
       }
 
-      return { ...meta, exercises, blockInfo };
+      return { ...displayMeta, exercises, blockInfo };
     }
   }
 
   // GAS-only fallback (e.g. pre-start dates)
-  const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(day)}`;
+  const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(lookupDay)}`;
   const r = await fetch(url);
   if (!r.ok) throw new Error(`Could not load workout plan (${r.status})`);
   const json = await r.json();
   if (json.error) throw new Error(json.error);
-  return { ...meta, exercises: json.exercises };
+  return { ...displayMeta, exercises: json.exercises };
 }
 
 async function loadHistory() {
@@ -3733,7 +3772,11 @@ function renderWeekBody() {
     const dName = dateDay(date);
     const meta = PLAN_SHEETS[S.user][dName];
     const type = meta ? meta.type : 'REST';
-    const workoutName = meta ? meta.name : 'Rest Day';
+    let workoutName = meta ? meta.name : 'Rest Day';
+    if (meta && S.user === 'husband' && HUSBAND_VARIANT_DAYS[meta.type]) {
+      const vIdx = getHusbandVariantIndex(localDateStr(date));
+      workoutName = `${meta.name} ${HUSBAND_VARIANT_LETTERS[vIdx]}`;
+    }
     const color = TYPE_COLOR[type] || '#8b949e';
     const dStr = localDateStr(date);
     const isToday = dStr === todayStr;
