@@ -2036,8 +2036,15 @@ function calcMaxStreak(user, loggedDates) {
   let max = 0, cur = 0;
   while (d <= end) {
     const dStr = localDateStr(d);
-    if (isPlanActive(PLAN_SHEETS[user][dateDay(d)], dStr)) {
-      if (loggedDates.has(dStr)) { cur++; if (cur > max) max = cur; }
+    const logged = loggedDates.has(dStr);
+    const scheduled = isPlanActive(PLAN_SHEETS[user][dateDay(d)], dStr);
+    if (user === 'husband') {
+      // Same rule as calcStreak: any logged day counts, even off the current
+      // schedule; only a missed CURRENTLY-scheduled day resets the run.
+      if (logged) { cur++; if (cur > max) max = cur; }
+      else if (scheduled && dStr < todayStr) cur = 0;
+    } else if (scheduled) {
+      if (logged) { cur++; if (cur > max) max = cur; }
       else if (dStr < todayStr) cur = 0;
     }
     d.setDate(d.getDate() + 1);
@@ -2055,8 +2062,13 @@ function findStreakEarnedDate(user, loggedDates, target) {
   let cur = 0;
   while (d <= end) {
     const dStr = localDateStr(d);
-    if (isPlanActive(PLAN_SHEETS[user][dateDay(d)], dStr)) {
-      if (loggedDates.has(dStr)) { cur++; if (cur === target) return dStr; }
+    const logged = loggedDates.has(dStr);
+    const scheduled = isPlanActive(PLAN_SHEETS[user][dateDay(d)], dStr);
+    if (user === 'husband') {
+      if (logged) { cur++; if (cur === target) return dStr; }
+      else if (scheduled && dStr < todayStr) cur = 0;
+    } else if (scheduled) {
+      if (logged) { cur++; if (cur === target) return dStr; }
       else if (dStr < todayStr) cur = 0;
     }
     d.setDate(d.getDate() + 1);
@@ -2588,12 +2600,27 @@ function calcStreak(user, loggedDates) {
   for (let i = 0; i < 365; i++) {
     const dStr = localDateStr(d);
     const isScheduled = isPlanActive(PLAN_SHEETS[user][dateDay(d)], dStr);
+    const logged = loggedDates.has(dStr);
+
+    if (user === 'husband') {
+      // Any logged workout counts toward the streak, even on a day that is no
+      // longer on the current schedule (e.g. a Wed/Sat session from the old
+      // 6-day plan) — historical workouts are never subtracted just because a
+      // schedule change later. The streak only breaks when a day that IS on
+      // the CURRENT schedule (Mon/Tue/Thu/Fri) is missed.
+      if (logged) { streak++; d.setDate(d.getDate() - 1); continue; }
+      if (!isScheduled) { d.setDate(d.getDate() - 1); continue; }
+      if (dStr === todayStr) { d.setDate(d.getDate() - 1); continue; }
+      break;
+    }
+
+    // Wife: unchanged original behavior
     if (!isScheduled) {
       // Rest day — skip without breaking streak
       d.setDate(d.getDate() - 1);
       continue;
     }
-    if (loggedDates.has(dStr)) {
+    if (logged) {
       streak++;
       d.setDate(d.getDate() - 1);
       continue;
