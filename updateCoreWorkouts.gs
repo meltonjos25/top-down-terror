@@ -1,34 +1,46 @@
 /**
- * Applies the 8 confirmed Core-workout exercise replacements (removing
- * band-row / rowing-pattern exercises and replacing them with genuine
- * anti-rotation core exercises) directly to the live Google Sheet.
+ * Applies the Core-workout row-exercise fix to the live Google Sheet.
  *
- * Scope: exactly 8 rows, on exactly 6 named tabs:
- *   Husband Core P1C1, Husband Core P3C1, Husband Core P4C1,
- *   Wife Core P1C1, Wife Core P2C1, Wife Core P4C1
- * No other tab is read or written. No tab is reordered, renamed, added,
- * or deleted -- only specific cells on specific existing rows change.
+ * IMPORTANT -- read this before running:
+ * The original 8-row plan was built against the app's local
+ * CONJUGATE_EXERCISES fallback data, which turned out to have diverged
+ * significantly from what is actually on this Sheet. After reading the
+ * live tab content directly, only ONE of the original 8 target rows
+ * actually exists as named:
  *
- * For each of the 8 rows, this script finds the row by matching Day +
- * Block + the CURRENT (old) Exercise name, then updates that row's
- * Exercise, Sets, Target Reps/Time, and Coaching Note cells to the new
- * values below. Updating Sets/Target Reps/Time along with the Exercise
- * name is intentional -- leaving the old sets/reps numbers attached to a
- * brand new exercise name would leave the sheet internally inconsistent
- * (e.g. "Bird Dog Hold" still showing the old "25 sec" from "Band Row
- * Hold" instead of its own prescribed "20 sec/side"). If you actually
- * want Sets/Target Reps/Time left untouched, delete the two setValue(...)
- * lines for setsCol and targetCol inside applyChange() below before
- * running.
+ *   Wife Core P2C1, Monday, Block 2: "Seated Band Core Row Tan"
  *
- * The Demo Link column is NEVER touched, on any row, under any
- * circumstance. No row other than these exact 8 is ever written to.
+ * The other 7 do not need any change on this Sheet:
+ *   - Husband Core P1C1 (Monday Block 2, Friday Block 1), Husband Core
+ *     P3C1 (Wednesday Block 1), and Wife Core P1C1 (Monday Block 2) never
+ *     contained the named rowing exercise in the first place -- those
+ *     slots have different exercises entirely and no rowing movement.
+ *   - Husband Core P4C1 and Wife Core P4C1 do not exist yet (Phase 4
+ *     has not started, so those tabs have not been created).
+ *
+ * "Side Plank with Band Row Blue" (Husband Core P2C1, Wednesday, Block 2)
+ * is the only OTHER rowing-pattern exercise present in Core right now,
+ * and it is intentionally left alone per prior confirmation -- it is a
+ * side-plank anti-rotation hold with an incidental band row, not a back
+ * exercise, and is NOT in the CHANGES list below.
+ *
+ * Also fixed from the prior version of this script: the real header row
+ * on this Sheet is "Target Reps / Time" (spaces around the slash) and
+ * "Exercise Demo Link" -- not "Target Reps/Time" / "Demo Link". That
+ * mismatch alone caused every tab to fail validation and report "not
+ * found" last time, regardless of exercise names.
+ *
+ * For the one real match, this script finds the row by matching Day +
+ * Block + the CURRENT Exercise name, then updates that row's Exercise,
+ * Sets, Target Reps / Time, and Coaching Note cells. The Exercise Demo
+ * Link column is never touched. No tab is reordered, renamed, added, or
+ * deleted, and no row other than this one is ever written to.
  *
  * SAFETY:
  *   DRY_RUN defaults to true. The first run only logs what WOULD change
- *   (View > Logs, or Execution log) and edits nothing. Once the log looks
- *   right, set DRY_RUN to false and run updateCoreWorkouts() again to
- *   actually apply it.
+ *   (View > Logs, or Execution log) and edits nothing. Once the log shows
+ *   the row was found, set DRY_RUN to false and run updateCoreWorkouts()
+ *   again to actually apply it.
  *
  * Run once by selecting updateCoreWorkouts from the function dropdown
  * and clicking Run.
@@ -37,56 +49,14 @@
 var SPREADSHEET_ID = '1zqR0CeERQg_8YtgWnQYxiFKAbGcZb4Zvf-R1Iqn46t8';
 var DRY_RUN = true; // set to false after reviewing the log, then re-run
 
-var EXPECTED_HEADERS = ['Day', 'Block', 'Exercise', 'Sets', 'Target Reps/Time', 'Demo Link', 'Coaching Note'];
+var EXPECTED_HEADERS = ['Day', 'Block', 'Exercise', 'Sets', 'Target Reps / Time', 'Exercise Demo Link', 'Coaching Note'];
 
 var CHANGES = [
-  {
-    tab: 'Husband Core P1C1', day: 'Monday', block: 'Block 2',
-    oldName: 'Band Row Hold', newName: 'Bird Dog Hold',
-    sets: '3', target: '20 sec/side',
-    note: 'Start on all fours and extend one arm and the opposite leg simultaneously. Hold for 2 seconds at full extension keeping your hips completely level and your lower back flat -- never let your hips rotate or sag.'
-  },
-  {
-    tab: 'Husband Core P1C1', day: 'Friday', block: 'Block 1',
-    oldName: 'Tall Kneeling Band Row', newName: 'Kneeling Pallof Press',
-    sets: '3', target: '12/side',
-    note: 'Kneel tall on both knees with the blue band anchored at chest height to your side. Press both hands straight out and hold 2 seconds -- resist any pull to rotate or lean. Keep hips square and breathe steadily.'
-  },
-  {
-    tab: 'Husband Core P3C1', day: 'Wednesday', block: 'Block 1',
-    oldName: 'Explosive Table Inverted Row', newName: 'Plank Reach Fast',
-    sets: '3', target: '20 reps fast',
-    note: 'In a forearm plank, alternate reaching each arm straight forward as fast as possible. Keep your hips completely level and still -- speed should never cause your hips to rock or rotate.'
-  },
-  {
-    tab: 'Husband Core P4C1', day: 'Monday', block: 'Block 2',
-    oldName: 'Single Arm Band Row', newName: 'Half-Kneeling Band Chop',
-    sets: '3', target: '10/side',
-    note: 'Kneel on one knee with the green band anchored high. Pull the band diagonally down across your body to the opposite hip. Resist rotation throughout -- your torso should stay square.'
-  },
-  {
-    tab: 'Husband Core P4C1', day: 'Friday', block: 'Block 1',
-    oldName: 'Single Arm Band Row Blue', newName: 'Single Arm Band Pallof Press',
-    sets: '3', target: '10/side',
-    note: 'Anchor the blue band at chest height and kneel or stand sideways to it. Press one hand straight out from your chest and hold 2 seconds -- resist any rotation. Switch sides and repeat.'
-  },
-  {
-    tab: 'Wife Core P1C1', day: 'Monday', block: 'Block 2',
-    oldName: 'Seated Band Row', newName: 'Seated Band Pallof Press',
-    sets: '3', target: '10/side',
-    note: 'Sit tall with the band anchored at chest height to your side. Press both hands straight out and hold 2 seconds -- resist any pull to rotate your torso. Breathe steadily and never hold your breath.'
-  },
   {
     tab: 'Wife Core P2C1', day: 'Monday', block: 'Block 2',
     oldName: 'Seated Band Core Row Tan', newName: 'Band Pallof Press Tan',
     sets: '3', target: '10/side',
     note: 'Anchor the tan band at chest height and sit or stand sideways to it. Press both hands straight out and hold 2 seconds -- resist any rotation. Breathe steadily and never hold your breath.'
-  },
-  {
-    tab: 'Wife Core P4C1', day: 'Friday', block: 'Block 1',
-    oldName: 'Single Arm Band Row Tan', newName: 'Single Arm Band Pallof Press Tan',
-    sets: '3', target: '12/side',
-    note: 'Anchor the tan band at chest height and stand sideways to it. Press one hand straight out and hold 2 seconds -- resist any pull to rotate. Breathe steadily and never hold your breath.'
   }
 ];
 
@@ -132,14 +102,14 @@ function applyChange(ss, change) {
     return String(h).trim();
   });
   if (!headersMatch(headerRow, EXPECTED_HEADERS)) {
-    return { status: 'NOT FOUND', message: label + ': NOT FOUND (tab headers do not match the expected Day/Block/Exercise/Sets/Target Reps/Time/Demo Link/Coaching Note layout)' };
+    return { status: 'NOT FOUND', message: label + ': NOT FOUND (tab headers do not match the expected layout -- actual headers were: ' + headerRow.join(' | ') + ')' };
   }
 
   var dayCol = headerRow.indexOf('Day');
   var blockCol = headerRow.indexOf('Block');
   var exerciseCol = headerRow.indexOf('Exercise');
   var setsCol = headerRow.indexOf('Sets');
-  var targetCol = headerRow.indexOf('Target Reps/Time');
+  var targetCol = headerRow.indexOf('Target Reps / Time');
   var noteCol = headerRow.indexOf('Coaching Note');
 
   var data = sheet.getRange(2, 1, lastRow - 1, lastCol).getValues();
