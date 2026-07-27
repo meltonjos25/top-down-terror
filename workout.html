@@ -4506,7 +4506,7 @@ function renderModal() {
     <div class="modal" onclick="event.stopPropagation()" ontouchstart="modalTouchStart(event)" ontouchmove="modalTouchMove(event)" ontouchend="modalTouchEnd(event)" ontouchcancel="modalTouchCancel()">
       <div class="modal-handle"></div>
       <div id="modal-slide-viewport">
-        <div id="modal-slide-track" style="display:flex;will-change:transform;transform:translateX(0)">
+        <div id="modal-slide-track" style="display:flex;will-change:transform;transform:translateX(-33.3333%)">
           <div class="modal-pane" id="pane-prev">${i > 0 ? renderModalInner(i - 1) : ''}</div>
           <div class="modal-pane" id="pane-curr">${renderModalInner(i)}</div>
           <div class="modal-pane" id="pane-next">${i < total - 1 ? renderModalInner(i + 1) : ''}</div>
@@ -5050,7 +5050,12 @@ function timerUse(i) {
   const ex = S.workout.exercises[i];
   const sec = S.timerSec;
   log.repsPerSet = Array(ex.sets).fill(String(sec));
-  render();
+  saveProgress();
+  // Use _renderAllPanes (not render()) so we only refresh the pane contents in
+  // place -- a full render() rebuilds modal-slide-track from its HTML template,
+  // which resets transform to the prev-pane position and looks like the screen
+  // jumped back to the previous exercise.
+  _renderAllPanes();
 }
 
 // ---- SUMMARY ----
