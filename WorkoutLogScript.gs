@@ -54,6 +54,41 @@ function doGet(e) {
     return res({rows: vals});
   }
 
+  if (action === 'edit_msg') {
+    var data = JSON.parse(decodeURIComponent(params.data));
+    var s = ss.getSheetByName(data.sheet);
+    if (!s) return res({error: 'Sheet not found'});
+    var rows = s.getDataRange().getValues();
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (String(r[2]).toLowerCase().trim() === data.from &&
+          String(r[3]).toLowerCase().trim() === data.to &&
+          String(r[4]).trim() === data.oldText) {
+        s.getRange(i + 1, 5).setValue(data.newText);
+        s.getRange(i + 1, 6).setValue('edited');
+        return res({success: true});
+      }
+    }
+    return res({error: 'Message not found'});
+  }
+
+  if (action === 'delete_msg') {
+    var data = JSON.parse(decodeURIComponent(params.data));
+    var s = ss.getSheetByName(data.sheet);
+    if (!s) return res({error: 'Sheet not found'});
+    var rows = s.getDataRange().getValues();
+    for (var i = 0; i < rows.length; i++) {
+      var r = rows[i];
+      if (String(r[2]).toLowerCase().trim() === data.from &&
+          String(r[3]).toLowerCase().trim() === data.to &&
+          String(r[4]).trim() === data.text) {
+        s.deleteRow(i + 1);
+        return res({success: true});
+      }
+    }
+    return res({error: 'Message not found'});
+  }
+
   if (action === 'claude_benefit') {
     var data = JSON.parse(decodeURIComponent(params.data));
     var apiKey = (data.apiKey || '').trim();
