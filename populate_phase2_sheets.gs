@@ -35,7 +35,10 @@ function populatePhase2Sheets() {
   function buildSheet(name, exercises) {
     // Delete and recreate
     var existing = ss.getSheetByName(name);
-    if (existing) ss.deleteSheet(existing);
+    if (existing) {
+      Logger.log('SKIP (tab already exists, not overwriting): ' + name);
+      return;
+    }
     var sheet = ss.insertSheet(name);
 
     // ── ROW 1: Title banner ──────────────────────────────────────────────────

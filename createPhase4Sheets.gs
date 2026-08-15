@@ -111,7 +111,10 @@ function createPhase4Sheets() {
 
   function buildSheet(name, exercises) {
     var existing = ss.getSheetByName(name);
-    if (existing) ss.deleteSheet(existing);
+    if (existing) {
+      Logger.log('SKIP (tab already exists, not overwriting): ' + name);
+      return;
+    }
     var sheet = ss.insertSheet(name);
 
     // -- ROW 1: Title banner ---------------------------------------------------
