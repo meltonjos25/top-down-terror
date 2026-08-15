@@ -2906,47 +2906,44 @@ async function fetchPlan(user, day) {
   const displayMeta = rotationDays ? { ...meta, name: `${meta.name} ${HUSBAND_VARIANT_LETTERS[variantIdx]}` } : meta;
 
   const conjType = CONJUGATE_EXERCISES[user]?.[meta.type] ? meta.type : null;
-  if (conjType) {
-    // Phase 5: use the regular named sheets (Husband — Core, etc.) unchanged
-    if (blockInfo && blockInfo.num === 5) {
-      const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(lookupDay)}`;
-      const r = await fetch(url);
-      if (!r.ok) throw new Error(`Could not load workout plan (${r.status})`);
-      const json = await r.json();
-      if (json.error) throw new Error(json.error);
-      return { ...displayMeta, exercises: json.exercises, blockInfo };
-    }
 
-    if (blockInfo) {
-      // Phases 1–4: primary source = dedicated phase/cycle sheet (e.g. "Husband Core P1C1"),
-      // with local CONJUGATE_EXERCISES as silent fallback for any missing sheet.
-      const userLabel = user.charAt(0).toUpperCase() + user.slice(1);
-      const typeLabel = conjType.charAt(0) + conjType.slice(1).toLowerCase();
-      const phaseSheet = `${userLabel} ${typeLabel} P${blockInfo.num}C${blockInfo.cycle}`;
+  if (conjType && blockInfo) {
+    // The Google Sheet is the single source of truth for every phase and every
+    // cycle (P1C1 through P5C1 and beyond) — always fetch fresh from the
+    // dedicated phase/cycle sheet (e.g. "Husband Core P4C1"), bypassing any
+    // HTTP cache so a Sheet edit is visible on the very next load. Local
+    // CONJUGATE_EXERCISES is only used if the Sheet is genuinely unreachable
+    // (network failure, bad HTTP status, or an explicit error from the script)
+    // — never just because the fetch happened to return fewer rows than local
+    // data, and never as a way to override what the Sheet actually says.
+    const userLabel = user.charAt(0).toUpperCase() + user.slice(1);
+    const typeLabel = conjType.charAt(0) + conjType.slice(1).toLowerCase();
+    const phaseSheet = `${userLabel} ${typeLabel} P${blockInfo.num}C${blockInfo.cycle}`;
 
-      let exercises = null;
-      try {
-        const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(phaseSheet)}&day=${encodeURIComponent(lookupDay)}`;
-        const r = await fetch(url);
-        if (r.ok) {
-          const json = await r.json();
-          if (!json.error && Array.isArray(json.exercises) && json.exercises.length > 0) {
-            exercises = json.exercises;
-          }
+    let exercises = null;
+    try {
+      const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(phaseSheet)}&day=${encodeURIComponent(lookupDay)}`;
+      const r = await fetch(url, { cache: 'no-store' });
+      if (r.ok) {
+        const json = await r.json();
+        if (!json.error && Array.isArray(json.exercises)) {
+          exercises = json.exercises;
         }
-      } catch(e) {}
-
-      if (!exercises) {
-        exercises = (CONJUGATE_EXERCISES[user]?.[conjType]?.[blockInfo.num]?.[lookupDay]) || [];
       }
+    } catch(e) {}
 
-      return { ...displayMeta, exercises, blockInfo };
+    if (exercises === null) {
+      // Sheet unreachable or returned something unusable — last-resort fallback only.
+      exercises = (CONJUGATE_EXERCISES[user]?.[conjType]?.[blockInfo.num]?.[lookupDay]) || [];
     }
+
+    return { ...displayMeta, exercises, blockInfo };
   }
 
-  // GAS-only fallback (e.g. pre-start dates)
+  // GAS-only fallback (e.g. pre-start dates, or workout types with no conjugate
+  // phase data such as Wife Bands before its 2026-05-12 start date)
   const url = `${S.gasUrl}?action=get_plan&sheet=${encodeURIComponent(meta.sheet)}&day=${encodeURIComponent(lookupDay)}`;
-  const r = await fetch(url);
+  const r = await fetch(url, { cache: 'no-store' });
   if (!r.ok) throw new Error(`Could not load workout plan (${r.status})`);
   const json = await r.json();
   if (json.error) throw new Error(json.error);
