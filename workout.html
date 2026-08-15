@@ -843,9 +843,10 @@ function bodyDiagramSVG(primary, secondary) {
 const BADGE_OVERRIDES = {
   husband: {
     prs_5:  '2026-05-11',  // corrected — 5th real PR was May 11, not May 4
-    prs_10: null,           // block until legitimately earned — remove this line when ready
-    prs_25: null,           // block until legitimately earned — remove this line when ready
-    prs_50: null,           // block until legitimately earned — remove this line when ready
+    // prs_10/25/50 were blocked here while PR count was self-derived from the
+    // workout log (an inaccurate method). PR count now reads directly from
+    // the PR History sheet (one row = one real PR event), so the block is
+    // removed -- these will unlock naturally once genuinely earned.
     early_bird:    '2026-05-05', // consistently finishes before 7am; time field lost to Sheets date conversion
     duo_before_8am: '2026-05-05', // both finish before 8am daily; time field lost to Sheets date conversion
   },
@@ -1965,7 +1966,7 @@ function findStreakEarnedDate(user, loggedDates, target) {
 }
 
 // Compute earned badges (with earn dates) from raw log rows + date set
-function computeBadgesFromRows(user, rows, dateSet) {
+function computeBadgesFromRows(user, rows, dateSet, prHistRows) {
   const sorted = [...dateSet].sort();
   const total  = sorted.length;
   const todayStr = localDateStr(new Date());
@@ -1979,35 +1980,23 @@ function computeBadgesFromRows(user, rows, dateSet) {
   const streak200Date = findStreakEarnedDate(user, dateSet, 200);
   const streak365Date = findStreakEarnedDate(user, dateSet, 365);
 
-  // ── PR count (beat previous best for an exercise) ────────────
-  // First-time logs establish the baseline but do NOT count as a PR.
-  // Only a logged value that strictly exceeds all prior logs for that exercise counts.
+  // ── PR count (from the dedicated PR History sheet -- one row per PR event,
+  // written once per exercise the first time a session beats its prior best) ──
+  const sortedPrRows = [...(prHistRows || [])]
+    .map(row => normDateStr(row[0]))
+    .filter(d => d)
+    .sort();
+  const prCount  = sortedPrRows.length;
+  const pr1Date  = sortedPrRows[0]  || null;
+  const pr5Date  = sortedPrRows[4]  || null;
+  const pr10Date = sortedPrRows[9]  || null;
+  const pr25Date = sortedPrRows[24] || null;
+  const pr50Date = sortedPrRows[49] || null;
+
   const sortedRows = [...rows].sort((a, b) => {
     const da = normDateStr(a[0]), db = normDateStr(b[0]);
     return da < db ? -1 : da > db ? 1 : 0;
   });
-  const bestPerExercise = {}; // exerciseName → highest value ever logged
-  let prCount = 0;
-  let pr1Date = null, pr5Date = null, pr10Date = null, pr25Date = null, pr50Date = null;
-  for (const row of sortedRows) {
-    const name = String(row[3] || '').trim();
-    if (!name) continue;
-    const repsStr = String(row[5] || '').trim();
-    const vals = repsStr.split(',').map(v => parseFloat(v.trim())).filter(n => !isNaN(n) && n > 0);
-    if (!vals.length) continue;
-    const maxVal = Math.max(...vals);
-    const prevBest = bestPerExercise[name];
-    if (prevBest !== undefined && maxVal > prevBest) {
-      prCount++;
-      const d = normDateStr(row[0]);
-      if (prCount === 1)  pr1Date  = d;
-      if (prCount === 5)  pr5Date  = d;
-      if (prCount === 10) pr10Date = d;
-      if (prCount === 25) pr25Date = d;
-      if (prCount === 50) pr50Date = d;
-    }
-    if (prevBest === undefined || maxVal > prevBest) bestPerExercise[name] = maxVal;
-  }
 
   // ── Total reps ───────────────────────────────────────────────
   let runningReps = 0, reps10kDate = null;
@@ -2740,7 +2729,7 @@ async function loadWeekDurations() {
     });
     S.weekDurations = map;
     S.loggedDates = dateSet;
-    const baseBadges = computeBadgesFromRows(S.user, rows, dateSet);
+    const baseBadges = computeBadgesFromRows(S.user, rows, dateSet, prHistRows);
 
     // PR streak badge: check if any exercise has PRs in 3 consecutive calendar weeks
     const pr3Date = computePR3WeeksBadge(prHistRows);
@@ -3367,6 +3356,12 @@ function navTo(tab) {
     // Always fetch fresh from the sheet — never use a cached copy
     S.messagesLoaded = false;
     S.messagesLoading = false;
+  }
+  if (tab === 'progress') {
+    // Achievements must reflect live Sheet data on every visit, not just the
+    // first load of the session -- re-fetch the log + PR history and
+    // recompute badges fresh each time the Progress tab is opened.
+    S.weekDurationsLoaded = false;
   }
   S.navTab = tab;
   render();
