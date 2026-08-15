@@ -2409,6 +2409,31 @@ function levelFromXP(xp) {
 const LEVEL_TITLES = ['','Rookie','Trainee','Grinder','Athlete','Competitor','Warrior','Champion','Elite','Master','Legend'];
 function getLevelTitle(lv) { return LEVEL_TITLES[Math.min(lv, LEVEL_TITLES.length - 1)] || 'Legend'; }
 
+// Streak-length title shown on the profile card / progress tab in place of the
+// level title. Purely a function of current streak days -- resets to "Just
+// Getting Started" whenever the streak drops to 0.
+const STREAK_TITLES = [
+  { min: 0,   max: 6,        title: 'Just Getting Started' },
+  { min: 7,   max: 13,       title: 'One Week Warrior' },
+  { min: 14,  max: 20,       title: 'Two Week Grinder' },
+  { min: 21,  max: 29,       title: 'Monthly Contender' },
+  { min: 30,  max: 44,       title: 'Monthly Champion' },
+  { min: 45,  max: 59,       title: 'Consistency King' },
+  { min: 60,  max: 74,       title: 'Iron Streak' },
+  { min: 75,  max: 89,       title: 'Elite Athlete' },
+  { min: 90,  max: 104,      title: 'Century Chaser' },
+  { min: 105, max: 119,      title: '100 Day Legend' },
+  { min: 120, max: 149,      title: 'Unstoppable' },
+  { min: 150, max: 179,      title: 'Legend in Progress' },
+  { min: 180, max: 364,      title: 'Half Year Hero' },
+  { min: 365, max: Infinity, title: 'Immortal' },
+];
+function getStreakTitle(streak) {
+  const n = typeof streak === 'number' && !isNaN(streak) ? Math.max(0, streak) : 0;
+  const tier = STREAK_TITLES.find(t => n >= t.min && n <= t.max);
+  return tier ? tier.title : 'Immortal';
+}
+
 function xpProgressInfo(xp) {
   xp = xp || 0;
   const lv    = levelFromXP(xp);
@@ -2433,9 +2458,10 @@ function xpBarHTML(user) {
   const xp = S.xp[user];
   if (xp === null) return '<div style="font-size:12px;color:var(--muted);margin-top:8px">Loading level…</div>';
   const info = xpProgressInfo(xp);
+  const streakTitle = getStreakTitle(S.streaks[user]);
   return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border)">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-      <span style="font-size:13px;font-weight:700;color:var(--accent)">Lv.${info.level} &middot; ${info.title}</span>
+      <span style="font-size:13px;font-weight:700;color:var(--accent)">Lv.${info.level} &middot; ${streakTitle}</span>
       <span style="font-size:11px;color:var(--muted)">${info.current} / ${info.needed} XP</span>
     </div>
     <div style="height:6px;background:var(--surface3);border-radius:3px;overflow:hidden">
@@ -2447,11 +2473,12 @@ function xpBarHTML(user) {
 function renderXPCard() {
   if (!S.lastXPEarned) return '';
   const info = xpProgressInfo(S.xp[S.user] || 0);
+  const streakTitle = getStreakTitle(S.streaks[S.user]);
   return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 20px;text-align:center;width:100%;max-width:320px">
     <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.8px;margin-bottom:4px">XP Earned</div>
     <div style="font-size:30px;font-weight:800;color:var(--yellow)">+${S.lastXPEarned} XP</div>
     ${S.levelUpInfo
-      ? `<div style="font-size:13px;color:var(--accent);font-weight:700;margin-top:6px">⭐ Level Up → Lv.${info.level} · ${info.title}!</div>`
+      ? `<div style="font-size:13px;color:var(--accent);font-weight:700;margin-top:6px">⭐ Level Up → Lv.${info.level} · ${streakTitle}!</div>`
       : `<div style="font-size:12px;color:var(--muted);margin-top:6px">Lv.${info.level} · ${info.current}/${info.needed} XP to next level</div>`
     }
   </div>`;
@@ -3045,7 +3072,7 @@ async function submitWorkout() {
       S.xp[S.user]   = prevXP + xpEarned;
       S.lastXPEarned  = xpEarned;
       const newLevel  = levelFromXP(S.xp[S.user]);
-      S.levelUpInfo   = newLevel > prevLevel ? { level: newLevel, title: getLevelTitle(newLevel) } : null;
+      S.levelUpInfo   = newLevel > prevLevel ? { level: newLevel, title: getStreakTitle(S.streaks[S.user] || 0) } : null;
       const xpNote = `${exercisesDone} ex${prCount > 0 ? `, ${prCount} PR` : ''}${(S.streaks[S.user]||0) >= 7 ? ', streak' : ''}`;
       gasWrite(S.user === 'husband' ? HUSBAND_XP_SHEET : WIFE_XP_SHEET,
         [[dateStr, S.workout.name, xpEarned, xpNote]]).catch(() => {});
@@ -3638,7 +3665,7 @@ function renderUserSelect() {
         ${S.champion==='husband' ? '<span style="font-size:13px;font-weight:700;color:var(--yellow)">👑 Monthly Champion</span>' : ''}
       </div>
       <h3>Husband</h3>
-      <p>Core (Mon/Wed/Fri) · Arms (Tue/Thu/Sat)</p>
+      <p>Core (Mon/Thu) · Arms (Tue/Fri)</p>
       ${streakHTML('husband')}
       ${xpBarHTML('husband')}
     </div>
@@ -5266,7 +5293,7 @@ function renderProgressBody() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
         <div>
           <div style="font-size:26px;font-weight:800;line-height:1">Level ${lvInfo.level}</div>
-          <div style="font-size:13px;color:var(--muted);margin-top:3px">${lvInfo.title}</div>
+          <div style="font-size:13px;color:var(--muted);margin-top:3px">${getStreakTitle(streak)}</div>
         </div>
         <div style="text-align:right">
           <div style="font-size:14px;font-weight:700;color:var(--accent)">${S.xp[S.user] || 0} XP total</div>
