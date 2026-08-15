@@ -2918,7 +2918,13 @@ async function fetchPlan(user, day) {
     // data, and never as a way to override what the Sheet actually says.
     const userLabel = user.charAt(0).toUpperCase() + user.slice(1);
     const typeLabel = conjType.charAt(0) + conjType.slice(1).toLowerCase();
-    const phaseSheet = `${userLabel} ${typeLabel} P${blockInfo.num}C${blockInfo.cycle}`;
+    // Phase content repeats identically every cycle (local CONJUGATE_EXERCISES
+    // has no cycle dimension, and no script has ever created a C2/C3/... tab),
+    // so the live sheet is always read from the Cycle 1 tab regardless of the
+    // real cycle number -- otherwise this would need a brand new tab created
+    // every 105 days forever. blockInfo.cycle itself is still computed and
+    // displayed correctly everywhere else (e.g. the Cycle Complete toast).
+    const phaseSheet = `${userLabel} ${typeLabel} P${blockInfo.num}C1`;
 
     let exercises = null;
     let source = 'sheet';
