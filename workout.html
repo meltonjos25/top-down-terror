@@ -2807,13 +2807,31 @@ function calcProgression(exercises, history) {
       prog[ex.name] = {target: ex.target, progressed: false};
       return;
     }
-    const loggedVal = parseFloat(last.reps);
-    if (!isNaN(loggedVal) && loggedVal >= parsed.value) {
+
+    // last.reps is a comma-joined string, one entry per set (e.g. "12, 11, 12").
+    // Every logged set must be present and must meet or exceed the target --
+    // one missed rep/second on a single set, or a set left blank, blocks
+    // progression entirely. A blank set collapses the count below ex.sets,
+    // which also blocks it.
+    const loggedSets = String(last.reps || '')
+      .split(',')
+      .map(v => v.trim())
+      .filter(v => v !== '');
+    const allSetsMetTarget =
+      loggedSets.length >= ex.sets &&
+      loggedSets.every(v => {
+        const n = parseFloat(v);
+        return !isNaN(n) && n >= parsed.value;
+      });
+
+    if (allSetsMetTarget) {
       let newVal = parsed.unit === 'sec' ? parsed.value + 5 : parsed.value + 1;
       const unit = parsed.unit === 'sec' ? ' sec' : ' reps';
       const side = parsed.perSide ? '/side' : '';
       prog[ex.name] = {target: `${newVal}${unit}${side}`, progressed: true};
     } else {
+      // Did not hit every set at target -- keep the current target unchanged,
+      // never decrease it.
       prog[ex.name] = {target: ex.target, progressed: false};
     }
   });
