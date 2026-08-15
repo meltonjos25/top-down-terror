@@ -24,10 +24,11 @@ function createPhase5Sheets() {
     'Cool-Down': '#134e4a'
   };
 
-  // Tab titles
+  // Tab titles. Husband Core/Arms are 2 sessions/week (Monday/Thursday and
+  // Tuesday/Friday) to match the current PLAN_SHEETS schedule; Wife is unchanged.
   var TAB_TITLES = {
-    'Husband Core P5C1': 'Husband Core Workout - P5C1 (Monday, Wednesday, Friday) - Culmination Phase',
-    'Husband Arms P5C1': 'Husband Arms Workout - P5C1 (Tuesday, Thursday, Saturday) - Culmination Phase',
+    'Husband Core P5C1': 'Husband Core Workout - P5C1 (Monday, Thursday) - Culmination Phase',
+    'Husband Arms P5C1': 'Husband Arms Workout - P5C1 (Tuesday, Friday) - Culmination Phase',
     'Wife Core P5C1':    'Wife Core Workout - P5C1 (Monday, Wednesday, Friday) - Culmination Phase, Breastfeeding-Safe',
     'Wife Bands P5C1':   'Wife Bands Workout - P5C1 (Tuesday, Thursday) - Culmination Phase, Breastfeeding-Safe'
   };
@@ -218,7 +219,7 @@ function createPhase5Sheets() {
   }
 
 
-  // == HUSBAND CORE P5C1 == Mon / Wed / Fri ====================================
+  // == HUSBAND CORE P5C1 == Mon / Thu (2 sessions/week) ========================
 
   buildSheet('Husband Core P5C1', [
 
@@ -237,40 +238,25 @@ function createPhase5Sheets() {
     ['Monday', 'Cool-Down', 'Supine Hamstring Stretch',   1, '30 sec/side'],
     ['Monday', 'Cool-Down', 'Seated Spinal Twist',        1, '30 sec/side'],
 
-    // Wednesday
-    ['Wednesday', 'Warm-Up',   'Lying Knee Rocks',           1, '12 reps'],
-    ['Wednesday', 'Warm-Up',   'Single-Leg Glute Bridge',    1, '10/side'],
-    ['Wednesday', 'Warm-Up',   'Arm Circles',                1, '10 each direction'],
-    ['Wednesday', 'Block 1',   'Hollow Body Hold',           3, '35 sec'],
-    ['Wednesday', 'Block 1',   'Dragon Flag Negative',       3, '5 reps'],
-    ['Wednesday', 'Block 1',   'Stir the Pot',               3, '8/direction'],
-    ['Wednesday', 'Block 2',   'Mountain Climber Tabata',    3, '20 sec on/10 sec off'],
-    ['Wednesday', 'Block 2',   'Unilateral Dead Bug',        3, '8/side'],
-    ['Wednesday', 'Block 2',   'Archer Push-Up',             3, '6/side'],
-    ['Wednesday', 'Finisher',  'Culmination Gauntlet',       1, '1 round', 'Hollow Body 30s -> Clap Push-Up 6 -> Unilateral Dead Bug 8/side -> Archer Push-Up 5/side, no rest'],
-    ['Wednesday', 'Cool-Down', 'Lying Spinal Twist',         1, '45 sec/side'],
-    ['Wednesday', 'Cool-Down', 'Figure-4 Stretch',           1, '30 sec/side'],
-    ['Wednesday', 'Cool-Down', "Child's Pose",               1, '30 sec'],
-
-    // Friday
-    ['Friday', 'Warm-Up',   'Cat-Camel Stretch',       1, '10 reps'],
-    ['Friday', 'Warm-Up',   'Bear Crawl In Place',     1, '30 sec'],
-    ['Friday', 'Warm-Up',   'Inchworm Walk-Out',       1, '6 reps'],
-    ['Friday', 'Block 1',   'Dead Bug Full',           3, '8/side'],
-    ['Friday', 'Block 1',   'Band Pallof Press Blue',  3, '12/side'],
-    ['Friday', 'Block 1',   'Copenhagen Plank',        3, '20 sec/side'],
-    ['Friday', 'Block 2',   'Diamond Push-Up',         3, '10 reps'],
-    ['Friday', 'Block 2',   'Archer Push-Up',          3, '6/side'],
-    ['Friday', 'Block 2',   'Single Leg Glute Bridge', 3, '12/side'],
-    ['Friday', 'Finisher',  'Max Effort Integration',  1, '1 round', '30s Explosive Push-Up -> rest 15s -> 30s Mountain Climbers -> rest 15s -> Max Archer Push-Ups/side'],
-    ['Friday', 'Cool-Down', "Child's Pose",            1, '45 sec'],
-    ['Friday', 'Cool-Down', 'Cobra to Upward Dog',     1, '30 sec'],
-    ['Friday', 'Cool-Down', 'Seated Spinal Twist',     1, '30 sec/side']
+    // Thursday
+    ['Thursday', 'Warm-Up',   'Lying Knee Rocks',           1, '12 reps'],
+    ['Thursday', 'Warm-Up',   'Single-Leg Glute Bridge',    1, '10/side'],
+    ['Thursday', 'Warm-Up',   'Arm Circles',                1, '10 each direction'],
+    ['Thursday', 'Block 1',   'Hollow Body Hold',           3, '35 sec'],
+    ['Thursday', 'Block 1',   'Dragon Flag Negative',       3, '5 reps'],
+    ['Thursday', 'Block 1',   'Stir the Pot',               3, '8/direction'],
+    ['Thursday', 'Block 2',   'Mountain Climber Tabata',    3, '20 sec on/10 sec off'],
+    ['Thursday', 'Block 2',   'Unilateral Dead Bug',        3, '8/side'],
+    ['Thursday', 'Block 2',   'Archer Push-Up',             3, '6/side'],
+    ['Thursday', 'Finisher',  'Culmination Gauntlet',       1, '1 round', 'Hollow Body 30s -> Clap Push-Up 6 -> Unilateral Dead Bug 8/side -> Archer Push-Up 5/side, no rest'],
+    ['Thursday', 'Cool-Down', 'Lying Spinal Twist',         1, '45 sec/side'],
+    ['Thursday', 'Cool-Down', 'Figure-4 Stretch',           1, '30 sec/side'],
+    ['Thursday', 'Cool-Down', "Child's Pose",               1, '30 sec']
 
   ]);
 
 
-  // == HUSBAND ARMS P5C1 == Tue / Thu / Sat =====================================
+  // == HUSBAND ARMS P5C1 == Tue / Fri (2 sessions/week) =========================
 
   buildSheet('Husband Arms P5C1', [
 
@@ -288,34 +274,19 @@ function createPhase5Sheets() {
     ['Tuesday', 'Cool-Down', 'Overhead Tricep Stretch',           1, '30 sec/side'],
     ['Tuesday', 'Cool-Down', 'Cross-Body Bicep Stretch',          1, '30 sec/side'],
 
-    // Thursday
-    ['Thursday', 'Warm-Up',   'Arm Circles Fast',           1, '15 each direction'],
-    ['Thursday', 'Warm-Up',   'Band Pull-Apart Blue',       1, '15 reps'],
-    ['Thursday', 'Warm-Up',   'Wrist Circles',              1, '10 each direction'],
-    ['Thursday', 'Block 1',   'Pike Push-Up',               3, '10 reps'],
-    ['Thursday', 'Block 1',   'Pseudo Planche Lean',        3, '20 sec'],
-    ['Thursday', 'Block 1',   'Band Face Pull Green',       3, '15 reps'],
-    ['Thursday', 'Block 2',   'Explosive Pike Push-Up',     3, '8 reps'],
-    ['Thursday', 'Block 2',   'Single Arm Pike Push-Up',    3, '6/side'],
-    ['Thursday', 'Block 2',   'Archer Row',                 3, '8/side'],
-    ['Thursday', 'Finisher',  'Shoulder Culmination',       1, '1 round', 'Pseudo Planche Lean 20s -> Explosive Pike Push-Up 8 -> Single Arm Pike Push-Up 5/side, no rest'],
-    ['Thursday', 'Cool-Down', 'Doorway Chest Stretch',      1, '30 sec'],
-    ['Thursday', 'Cool-Down', "Child's Pose Wide Arms",     1, '45 sec'],
-
-    // Saturday
-    ['Saturday', 'Warm-Up',   'Band Pull-Apart Blue',               1, '15 reps'],
-    ['Saturday', 'Warm-Up',   'Inchworm Walk-Out',                  1, '6 reps'],
-    ['Saturday', 'Warm-Up',   'Wrist Circles',                      1, '10 each direction'],
-    ['Saturday', 'Block 1',   'Typewriter Push-Up',                 3, '6/side'],
-    ['Saturday', 'Block 1',   'Explosive Table Inverted Row',       3, '8 reps'],
-    ['Saturday', 'Block 1',   'Single Arm Push-Up Progression',     3, '5/side'],
-    ['Saturday', 'Block 2',   'Clap Push-Up',                       3, '8 reps'],
-    ['Saturday', 'Block 2',   'Band Curl to Press Blue',            3, '10 reps'],
-    ['Saturday', 'Block 2',   'Archer Row',                         3, '10/side'],
-    ['Saturday', 'Finisher',  'Culmination Triset',                 1, '1 round max effort', 'Clap Push-Up 8 -> Explosive Row 8 -> Single Arm Push-Up 4/side, no rest'],
-    ['Saturday', 'Cool-Down', 'Overhead Tricep Stretch',            1, '30 sec/side'],
-    ['Saturday', 'Cool-Down', 'Doorway Chest Opener',               1, '30 sec'],
-    ['Saturday', 'Cool-Down', 'Wrist Flexor Stretch',               1, '20 sec/side']
+    // Friday
+    ['Friday', 'Warm-Up',   'Arm Circles Fast',           1, '15 each direction'],
+    ['Friday', 'Warm-Up',   'Band Pull-Apart Blue',       1, '15 reps'],
+    ['Friday', 'Warm-Up',   'Wrist Circles',              1, '10 each direction'],
+    ['Friday', 'Block 1',   'Pike Push-Up',               3, '10 reps'],
+    ['Friday', 'Block 1',   'Pseudo Planche Lean',        3, '20 sec'],
+    ['Friday', 'Block 1',   'Band Face Pull Green',       3, '15 reps'],
+    ['Friday', 'Block 2',   'Explosive Pike Push-Up',     3, '8 reps'],
+    ['Friday', 'Block 2',   'Single Arm Pike Push-Up',    3, '6/side'],
+    ['Friday', 'Block 2',   'Archer Row',                 3, '8/side'],
+    ['Friday', 'Finisher',  'Shoulder Culmination',       1, '1 round', 'Pseudo Planche Lean 20s -> Explosive Pike Push-Up 8 -> Single Arm Pike Push-Up 5/side, no rest'],
+    ['Friday', 'Cool-Down', 'Doorway Chest Stretch',      1, '30 sec'],
+    ['Friday', 'Cool-Down', "Child's Pose Wide Arms",     1, '45 sec']
 
   ]);
 
